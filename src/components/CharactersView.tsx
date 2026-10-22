@@ -6,19 +6,17 @@ import {
   StatblockEntry,
   formatMod,
 } from '../types/dnd';
+import { useLanguage } from '../i18n/LanguageContext';
 import { StatblockCard } from './StatblockCard';
 import {
   Users,
   UserPlus,
   Search,
-  Shield,
   Skull,
   UserCheck,
-  Plus,
   Trash2,
   Copy,
   Check,
-  Sparkles,
   FolderPlus,
 } from 'lucide-react';
 
@@ -31,48 +29,6 @@ interface CharactersViewProps {
   onDeleteParty: (id: string) => void;
 }
 
-const EMPTY_CHARACTER: CharacterEntity = {
-  id: '',
-  kind: 'pc',
-  name: 'Nuovo Personaggio',
-  playerOrRole: 'Giocatore / Ruolo',
-  size: 'Media',
-  creatureType: 'Umanoide',
-  alignment: 'Neutrale Buono',
-  classOrArchetype: 'Guerriero',
-  levelOrCr: 'Livello 3',
-  ac: 15,
-  acNote: '(Cotta di maglia)',
-  hpMax: 28,
-  hitDiceFormula: '3d10 + 6',
-  speed: '9m',
-  initiativeBonus: 2,
-  passivePerception: 13,
-  abilities: { str: 16, dex: 14, con: 14, int: 10, wis: 12, cha: 11 },
-  savingThrows: 'FOR +5, COS +4',
-  skills: 'Atletica +5, Percezione +3',
-  senses: 'Percezione passiva 13',
-  languages: 'Comune',
-  traits: [
-    {
-      name: 'Recuperare Energie',
-      description: 'Usa un’azione bonus per recuperare 1d10 + 3 punti ferita.',
-    },
-  ],
-  actions: [
-    {
-      name: 'Spada Lunga',
-      description: 'Attacco con arma da mischia: +5 a colpire, portata 1,5m. Colpito: 1d8 + 3 danni taglienti.',
-      attackBonus: 5,
-      damageFormula: '1d8+3',
-    },
-  ],
-  reactionsOrLegendary: [],
-  spellsNotes: '',
-  biographyOrLore: '',
-  tags: ['Nuovo'],
-};
-
 export const CharactersView: React.FC<CharactersViewProps> = ({
   characters,
   parties,
@@ -81,12 +37,11 @@ export const CharactersView: React.FC<CharactersViewProps> = ({
   onSaveParty,
   onDeleteParty,
 }) => {
+  const { tr } = useLanguage();
   const [filterKind, setFilterKind] = useState<'all' | EntityKind | 'parties'>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedId, setSelectedId] = useState<string>(characters[0]?.id || '');
   const [editingChar, setEditingChar] = useState<CharacterEntity | null>(null);
-
-  // Party creation/editing state
   const [editingParty, setEditingParty] = useState<PartyGroup | null>(null);
 
   const filteredCharacters = characters.filter((c) => {
@@ -109,19 +64,61 @@ export const CharactersView: React.FC<CharactersViewProps> = ({
 
   const handleCreateNew = (kind: EntityKind) => {
     const newChar: CharacterEntity = {
-      ...structuredClone(EMPTY_CHARACTER),
       id: `${kind}-${Date.now()}`,
       kind,
       name:
         kind === 'pc'
-          ? 'Nuovo Eroe PG'
+          ? tr('New PC Hero', 'Nuovo Eroe PG')
           : kind === 'npc'
-          ? 'Nuovo PNG Importante'
-          : 'Nuova Creatura / Mostro',
+          ? tr('New Notable NPC', 'Nuovo PNG Importante')
+          : tr('New Creature / Monster', 'Nuova Creatura / Mostro'),
       playerOrRole:
-        kind === 'pc' ? 'Giocatore: ...' : kind === 'npc' ? 'NPC — Alleato / Contatto' : 'Mostro Dungeon',
-      levelOrCr: kind === 'pc' ? 'Livello 3' : 'GS 1 (200 PE)',
-      classOrArchetype: kind === 'pc' ? 'Avventuriero' : '',
+        kind === 'pc'
+          ? tr('Player: ...', 'Giocatore: ...')
+          : kind === 'npc'
+          ? tr('NPC — Ally / Contact', 'NPC — Alleato / Contatto')
+          : tr('Dungeon Monster', 'Mostro Dungeon'),
+      size: tr('Medium', 'Media'),
+      creatureType: tr('Humanoid', 'Umanoide'),
+      alignment: tr('Neutral Good', 'Neutrale Buono'),
+      classOrArchetype: kind === 'pc' ? tr('Fighter', 'Guerriero') : '',
+      levelOrCr: kind === 'pc' ? tr('Level 3', 'Livello 3') : tr('CR 1 (200 XP)', 'GS 1 (200 PE)'),
+      ac: 15,
+      acNote: tr('(Chain shirt)', '(Cotta di maglia)'),
+      hpMax: 28,
+      hitDiceFormula: '3d10 + 6',
+      speed: tr('30 ft.', '9m'),
+      initiativeBonus: 2,
+      passivePerception: 13,
+      abilities: { str: 16, dex: 14, con: 14, int: 10, wis: 12, cha: 11 },
+      savingThrows: tr('STR +5, CON +4', 'FOR +5, COS +4'),
+      skills: tr('Athletics +5, Perception +3', 'Atletica +5, Percezione +3'),
+      senses: tr('Passive Perception 13', 'Percezione passiva 13'),
+      languages: tr('Common', 'Comune'),
+      traits: [
+        {
+          name: tr('Second Wind', 'Recuperare Energie'),
+          description: tr(
+            'Use a bonus action to regain 1d10 + 3 hit points.',
+            'Usa un’azione bonus per recuperare 1d10 + 3 punti ferita.'
+          ),
+        },
+      ],
+      actions: [
+        {
+          name: tr('Longsword', 'Spada Lunga'),
+          description: tr(
+            'Melee Weapon Attack: +5 to hit, reach 5 ft. Hit: 1d8 + 3 slashing damage.',
+            'Attacco con arma da mischia: +5 a colpire, portata 1,5m. Colpito: 1d8 + 3 danni taglienti.'
+          ),
+          attackBonus: 5,
+          damageFormula: '1d8+3',
+        },
+      ],
+      reactionsOrLegendary: [],
+      spellsNotes: '',
+      biographyOrLore: '',
+      tags: [tr('New', 'Nuovo')],
     };
     setEditingChar(newChar);
   };
@@ -130,7 +127,7 @@ export const CharactersView: React.FC<CharactersViewProps> = ({
     const copy: CharacterEntity = {
       ...structuredClone(char),
       id: `${char.kind}-${Date.now()}`,
-      name: `${char.name} (Copia)`,
+      name: `${char.name} (${tr('Copy', 'Copia')})`,
     };
     onSaveCharacter(copy);
     setSelectedId(copy.id);
@@ -161,7 +158,10 @@ export const CharactersView: React.FC<CharactersViewProps> = ({
   const addListEntry = (field: 'traits' | 'actions' | 'reactionsOrLegendary') => {
     if (!editingChar) return;
     const current = [...(editingChar[field] || [])];
-    current.push({ name: 'Nuova Capacità / Azione', description: 'Descrizione dell’effetto o tiro per colpire.' });
+    current.push({
+      name: tr('New Feature / Action', 'Nuova Capacità / Azione'),
+      description: tr('Description of effect or attack roll.', 'Descrizione dell’effetto o tiro per colpire.'),
+    });
     setEditingChar({ ...editingChar, [field]: current });
   };
 
@@ -181,10 +181,16 @@ export const CharactersView: React.FC<CharactersViewProps> = ({
         <div>
           <h2 className="font-header text-2xl font-bold text-amber-400 flex items-center gap-2">
             <Users className="w-6 h-6 text-amber-500" />
-            Repository Globale: PG, NPC, Bestiario & Gruppi
+            {tr(
+              'Global Repository: PCs, NPCs, Bestiary & Parties',
+              'Repository Globale: PG, NPC, Bestiario & Gruppi'
+            )}
           </h2>
           <p className="text-xs text-stone-400 mt-0.5">
-            Crea una sola volta le schede D&D 5e di giocatori, PNG e mostri per riutilizzarli in qualsiasi One-Shot, Campagna o Combattimento.
+            {tr(
+              'Create D&D 5e sheets for players, NPCs, and monsters once and reuse them across any One-Shot, Campaign, or Combat.',
+              'Crea una sola volta le schede D&D 5e di giocatori, PNG e mostri per riutilizzarli in qualsiasi One-Shot, Campagna o Combattimento.'
+            )}
           </p>
         </div>
 
@@ -193,32 +199,32 @@ export const CharactersView: React.FC<CharactersViewProps> = ({
             onClick={() => handleCreateNew('pc')}
             className="px-3 py-2 rounded-lg bg-amber-600 hover:bg-amber-500 text-stone-950 font-bold text-xs flex items-center gap-1.5 transition shadow"
           >
-            <UserPlus className="w-4 h-4" /> + Nuovo PG
+            <UserPlus className="w-4 h-4" /> {tr('+ New PC', '+ Nuovo PG')}
           </button>
           <button
             onClick={() => handleCreateNew('npc')}
             className="px-3 py-2 rounded-lg bg-sky-700 hover:bg-sky-600 text-white font-bold text-xs flex items-center gap-1.5 transition shadow"
           >
-            <UserCheck className="w-4 h-4" /> + Nuovo NPC
+            <UserCheck className="w-4 h-4" /> {tr('+ New NPC', '+ Nuovo NPC')}
           </button>
           <button
             onClick={() => handleCreateNew('monster')}
             className="px-3 py-2 rounded-lg bg-red-800 hover:bg-red-700 text-amber-100 font-bold text-xs flex items-center gap-1.5 transition shadow"
           >
-            <Skull className="w-4 h-4" /> + Nuovo Mostro/Boss
+            <Skull className="w-4 h-4" /> {tr('+ New Monster/Boss', '+ Nuovo Mostro/Boss')}
           </button>
           <button
             onClick={() =>
               setEditingParty({
                 id: `party-${Date.now()}`,
-                name: 'Nuovo Gruppo di Gioco',
-                description: 'Formazione di PG per sessioni o one-shot.',
+                name: tr('New Adventuring Party', 'Nuovo Gruppo di Gioco'),
+                description: tr('PC roster for sessions or one-shots.', 'Formazione di PG per sessioni o one-shot.'),
                 memberCharacterIds: pcsOnly.slice(0, 3).map((p) => p.id),
               })
             }
             className="px-3 py-2 rounded-lg bg-stone-800 hover:bg-stone-700 text-amber-300 border border-amber-500/30 font-bold text-xs flex items-center gap-1.5 transition"
           >
-            <FolderPlus className="w-4 h-4" /> + Nuovo Gruppo (Party)
+            <FolderPlus className="w-4 h-4" /> {tr('+ New Party Group', '+ Nuovo Gruppo (Party)')}
           </button>
         </div>
       </div>
@@ -228,11 +234,11 @@ export const CharactersView: React.FC<CharactersViewProps> = ({
         <div className="flex items-center gap-1.5 bg-stone-900 p-1 rounded-lg border border-stone-800">
           {(
             [
-              ['all', `Tutti (${characters.length})`],
-              ['pc', `PG Giocanti (${characters.filter((c) => c.kind === 'pc').length})`],
+              ['all', `${tr('All', 'Tutti')} (${characters.length})`],
+              ['pc', `${tr('Player Characters', 'PG Giocanti')} (${characters.filter((c) => c.kind === 'pc').length})`],
               ['npc', `NPC (${characters.filter((c) => c.kind === 'npc').length})`],
-              ['monster', `Mostri & Boss (${characters.filter((c) => c.kind === 'monster').length})`],
-              ['parties', `Gruppi / Party (${parties.length})`],
+              ['monster', `${tr('Monsters & Bosses', 'Mostri & Boss')} (${characters.filter((c) => c.kind === 'monster').length})`],
+              ['parties', `${tr('Parties / Groups', 'Gruppi / Party')} (${parties.length})`],
             ] as const
           ).map(([key, label]) => (
             <button
@@ -255,7 +261,7 @@ export const CharactersView: React.FC<CharactersViewProps> = ({
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Cerca per nome, classe, GS, tag..."
+            placeholder={tr('Search by name, class, CR, tag...', 'Cerca per nome, classe, GS, tag...')}
             className="w-full pl-9 pr-3 py-1.5 rounded-lg bg-stone-900 border border-stone-800 text-sm text-stone-200 focus:outline-none focus:border-amber-500"
           />
         </div>
@@ -284,7 +290,7 @@ export const CharactersView: React.FC<CharactersViewProps> = ({
                         onClick={() => setEditingParty(structuredClone(party))}
                         className="px-2.5 py-1 rounded bg-stone-800 hover:bg-stone-700 text-xs text-amber-300 font-semibold"
                       >
-                        Modifica
+                        {tr('Edit', 'Modifica')}
                       </button>
                       <button
                         onClick={() => onDeleteParty(party.id)}
@@ -297,7 +303,7 @@ export const CharactersView: React.FC<CharactersViewProps> = ({
 
                   <div className="mt-4 space-y-2">
                     <div className="text-[11px] font-bold uppercase tracking-wider text-stone-400">
-                      Membri del Gruppo ({members.length} PG)
+                      {tr(`Party Members (${members.length} PCs)`, `Membri del Gruppo (${members.length} PG)`)}
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                       {members.map((m) => (
@@ -312,8 +318,12 @@ export const CharactersView: React.FC<CharactersViewProps> = ({
                             </div>
                           </div>
                           <div className="text-right text-xs font-mono text-stone-300">
-                            <div>CA {m.ac}</div>
-                            <div className="text-emerald-400">PF {m.hpMax}</div>
+                            <div>
+                              {tr('AC', 'CA')} {m.ac}
+                            </div>
+                            <div className="text-emerald-400">
+                              {tr('HP', 'PF')} {m.hpMax}
+                            </div>
                           </div>
                         </div>
                       ))}
@@ -322,7 +332,11 @@ export const CharactersView: React.FC<CharactersViewProps> = ({
                 </div>
 
                 <div className="text-[11px] text-stone-500 border-t border-stone-800 pt-2">
-                  ID Template Gruppo: <code>{party.id}</code> — Associabile a qualsiasi nuova Istanza di Gioco.
+                  {tr('Party Template ID:', 'ID Template Gruppo:')} <code>{party.id}</code> —{' '}
+                  {tr(
+                    'Can be linked to any new Play Instance.',
+                    'Associabile a qualsiasi nuova Istanza di Gioco.'
+                  )}
                 </div>
               </div>
             );
@@ -366,7 +380,7 @@ export const CharactersView: React.FC<CharactersViewProps> = ({
                     </p>
                     <div className="flex flex-wrap gap-1 mt-1.5">
                       <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-stone-950 text-amber-300 border border-stone-800">
-                        id: @{c.kind === 'pc' ? 'npc' : 'npc'}[{c.id}]
+                        id: @npc[{c.id}]
                       </span>
                       {c.tags.slice(0, 3).map((t, idx) => (
                         <span
@@ -381,9 +395,11 @@ export const CharactersView: React.FC<CharactersViewProps> = ({
 
                   <div className="text-right shrink-0">
                     <div className="flex items-center gap-2 text-xs font-semibold text-stone-200">
-                      <span className="px-2 py-0.5 rounded bg-stone-800">CA {c.ac}</span>
+                      <span className="px-2 py-0.5 rounded bg-stone-800">
+                        {tr('AC', 'CA')} {c.ac}
+                      </span>
                       <span className="px-2 py-0.5 rounded bg-red-950/70 text-red-200 border border-red-800/40">
-                        PF {c.hpMax}
+                        {tr('HP', 'PF')} {c.hpMax}
                       </span>
                     </div>
                     <div className="flex items-center justify-end gap-1 mt-2">
@@ -394,14 +410,14 @@ export const CharactersView: React.FC<CharactersViewProps> = ({
                         }}
                         className="px-2 py-0.5 text-[11px] rounded bg-stone-800 hover:bg-amber-600 hover:text-stone-950 text-stone-300 transition"
                       >
-                        Modifica
+                        {tr('Edit', 'Modifica')}
                       </button>
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
                           handleDuplicate(c);
                         }}
-                        title="Duplica scheda"
+                        title={tr('Duplicate sheet', 'Duplica scheda')}
                         className="p-1 rounded bg-stone-800 hover:bg-stone-700 text-stone-400"
                       >
                         <Copy className="w-3.5 h-3.5" />
@@ -411,7 +427,7 @@ export const CharactersView: React.FC<CharactersViewProps> = ({
                           e.stopPropagation();
                           onDeleteCharacter(c.id);
                         }}
-                        title="Elimina scheda"
+                        title={tr('Delete sheet', 'Elimina scheda')}
                         className="p-1 rounded bg-stone-800 hover:bg-red-900/60 text-stone-400 hover:text-red-200"
                       >
                         <Trash2 className="w-3.5 h-3.5" />
@@ -429,11 +445,16 @@ export const CharactersView: React.FC<CharactersViewProps> = ({
               <div className="space-y-3">
                 <div className="flex items-center justify-between bg-stone-900/90 border border-stone-800 px-4 py-2.5 rounded-xl text-xs">
                   <div className="flex items-center gap-2 text-stone-300">
-                    <span>Tag per inserimento rapido nella storia Homebrewery:</span>
+                    <span>
+                      {tr(
+                        'Quick-insert tags for Homebrewery story:',
+                        'Tag per inserimento rapido nella storia Homebrewery:'
+                      )}
+                    </span>
                     <code className="px-2 py-0.5 rounded bg-stone-950 text-amber-400 border border-stone-800 font-mono">
                       @npc[{selectedCharacter.id}]
                     </code>
-                    <span>oppure</span>
+                    <span>{tr('or', 'oppure')}</span>
                     <code className="px-2 py-0.5 rounded bg-stone-950 text-amber-400 border border-stone-800 font-mono">
                       @statblock[{selectedCharacter.id}]
                     </code>
@@ -446,7 +467,10 @@ export const CharactersView: React.FC<CharactersViewProps> = ({
               </div>
             ) : (
               <div className="p-12 text-center text-stone-500 bg-stone-900/40 rounded-xl border border-stone-800">
-                Seleziona o crea un personaggio per visualizzare lo Statblock D&D 5e.
+                {tr(
+                  'Select or create a character to view its D&D 5e Statblock.',
+                  'Seleziona o crea un personaggio per visualizzare lo Statblock D&D 5e.'
+                )}
               </div>
             )}
           </div>
@@ -459,14 +483,14 @@ export const CharactersView: React.FC<CharactersViewProps> = ({
           <div className="bg-stone-900 border border-stone-700 rounded-2xl max-w-5xl w-full max-h-[90vh] flex flex-col shadow-2xl overflow-hidden">
             <div className="px-6 py-4 border-b border-stone-800 flex items-center justify-between">
               <h3 className="font-header text-xl font-bold text-amber-400">
-                Editor Scheda D&D 5e — {editingChar.name}
+                {tr('D&D 5e Sheet Editor', 'Editor Scheda D&D 5e')} — {editingChar.name}
               </h3>
               <div className="flex items-center gap-2">
                 <button
                   onClick={() => setEditingChar(null)}
                   className="px-3 py-1.5 rounded-lg bg-stone-800 text-stone-300 text-xs font-semibold hover:bg-stone-700"
                 >
-                  Annulla
+                  {tr('Cancel', 'Annulla')}
                 </button>
                 <button
                   onClick={() => {
@@ -476,7 +500,8 @@ export const CharactersView: React.FC<CharactersViewProps> = ({
                   }}
                   className="px-4 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-500 text-stone-950 text-xs font-bold flex items-center gap-1.5"
                 >
-                  <Check className="w-4 h-4" /> Salva Scheda nel Repository
+                  <Check className="w-4 h-4" />{' '}
+                  {tr('Save Sheet to Repository', 'Salva Scheda nel Repository')}
                 </button>
               </div>
             </div>
@@ -486,19 +511,25 @@ export const CharactersView: React.FC<CharactersViewProps> = ({
               <div className="space-y-4 text-xs">
                 <div className="grid grid-cols-3 gap-3">
                   <div>
-                    <label className="block text-stone-400 mb-1 font-semibold">Categoria</label>
+                    <label className="block text-stone-400 mb-1 font-semibold">
+                      {tr('Category', 'Categoria')}
+                    </label>
                     <select
                       value={editingChar.kind}
-                      onChange={(e) => setEditingChar({ ...editingChar, kind: e.target.value as EntityKind })}
+                      onChange={(e) =>
+                        setEditingChar({ ...editingChar, kind: e.target.value as EntityKind })
+                      }
                       className="w-full px-2.5 py-2 rounded bg-stone-950 border border-stone-700 text-stone-100"
                     >
-                      <option value="pc">PG (Giocatore)</option>
-                      <option value="npc">NPC (Alleato/PNG)</option>
-                      <option value="monster">Mostro / Boss</option>
+                      <option value="pc">{tr('PC (Player)', 'PG (Giocatore)')}</option>
+                      <option value="npc">{tr('NPC (Ally/Character)', 'NPC (Alleato/PNG)')}</option>
+                      <option value="monster">{tr('Monster / Boss', 'Mostro / Boss')}</option>
                     </select>
                   </div>
                   <div className="col-span-2">
-                    <label className="block text-stone-400 mb-1 font-semibold">Nome Completo</label>
+                    <label className="block text-stone-400 mb-1 font-semibold">
+                      {tr('Full Name', 'Nome Completo')}
+                    </label>
                     <input
                       type="text"
                       value={editingChar.name}
@@ -511,23 +542,29 @@ export const CharactersView: React.FC<CharactersViewProps> = ({
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="block text-stone-400 mb-1 font-semibold">
-                      {editingChar.kind === 'pc' ? 'Nome Giocatore' : 'Ruolo Narrativo / Titolo'}
+                      {editingChar.kind === 'pc'
+                        ? tr('Player Name', 'Nome Giocatore')
+                        : tr('Narrative Role / Title', 'Ruolo Narrativo / Titolo')}
                     </label>
                     <input
                       type="text"
                       value={editingChar.playerOrRole}
-                      onChange={(e) => setEditingChar({ ...editingChar, playerOrRole: e.target.value })}
+                      onChange={(e) =>
+                        setEditingChar({ ...editingChar, playerOrRole: e.target.value })
+                      }
                       className="w-full px-2.5 py-1.5 rounded bg-stone-950 border border-stone-700 text-stone-200"
                     />
                   </div>
                   <div>
                     <label className="block text-stone-400 mb-1 font-semibold">
-                      Livello (PG) o Grado di Sfida (GS)
+                      {tr('Level (PC) or Challenge Rating (CR)', 'Livello (PG) o Grado di Sfida (GS)')}
                     </label>
                     <input
                       type="text"
                       value={editingChar.levelOrCr}
-                      onChange={(e) => setEditingChar({ ...editingChar, levelOrCr: e.target.value })}
+                      onChange={(e) =>
+                        setEditingChar({ ...editingChar, levelOrCr: e.target.value })
+                      }
                       className="w-full px-2.5 py-1.5 rounded bg-stone-950 border border-stone-700 text-stone-200"
                     />
                   </div>
@@ -535,29 +572,41 @@ export const CharactersView: React.FC<CharactersViewProps> = ({
 
                 <div className="grid grid-cols-3 gap-3">
                   <div>
-                    <label className="block text-stone-400 mb-1 font-semibold">Tipo / Razza</label>
+                    <label className="block text-stone-400 mb-1 font-semibold">
+                      {tr('Type / Species', 'Tipo / Razza')}
+                    </label>
                     <input
                       type="text"
                       value={editingChar.creatureType}
-                      onChange={(e) => setEditingChar({ ...editingChar, creatureType: e.target.value })}
+                      onChange={(e) =>
+                        setEditingChar({ ...editingChar, creatureType: e.target.value })
+                      }
                       className="w-full px-2.5 py-1.5 rounded bg-stone-950 border border-stone-700 text-stone-200"
                     />
                   </div>
                   <div>
-                    <label className="block text-stone-400 mb-1 font-semibold">Classe / Archetipo</label>
+                    <label className="block text-stone-400 mb-1 font-semibold">
+                      {tr('Class / Archetype', 'Classe / Archetipo')}
+                    </label>
                     <input
                       type="text"
                       value={editingChar.classOrArchetype || ''}
-                      onChange={(e) => setEditingChar({ ...editingChar, classOrArchetype: e.target.value })}
+                      onChange={(e) =>
+                        setEditingChar({ ...editingChar, classOrArchetype: e.target.value })
+                      }
                       className="w-full px-2.5 py-1.5 rounded bg-stone-950 border border-stone-700 text-stone-200"
                     />
                   </div>
                   <div>
-                    <label className="block text-stone-400 mb-1 font-semibold">Allineamento</label>
+                    <label className="block text-stone-400 mb-1 font-semibold">
+                      {tr('Alignment', 'Allineamento')}
+                    </label>
                     <input
                       type="text"
                       value={editingChar.alignment}
-                      onChange={(e) => setEditingChar({ ...editingChar, alignment: e.target.value })}
+                      onChange={(e) =>
+                        setEditingChar({ ...editingChar, alignment: e.target.value })
+                      }
                       className="w-full px-2.5 py-1.5 rounded bg-stone-950 border border-stone-700 text-stone-200"
                     />
                   </div>
@@ -566,50 +615,68 @@ export const CharactersView: React.FC<CharactersViewProps> = ({
                 {/* Combat Vitals */}
                 <div className="grid grid-cols-5 gap-2 bg-stone-950 p-3 rounded-lg border border-stone-800">
                   <div>
-                    <label className="block text-stone-400 mb-1">CA</label>
+                    <label className="block text-stone-400 mb-1">{tr('AC', 'CA')}</label>
                     <input
                       type="number"
                       value={editingChar.ac}
-                      onChange={(e) => setEditingChar({ ...editingChar, ac: Number(e.target.value) })}
+                      onChange={(e) =>
+                        setEditingChar({ ...editingChar, ac: Number(e.target.value) })
+                      }
                       className="w-full px-2 py-1 rounded bg-stone-900 border border-stone-700 text-amber-300 font-bold"
                     />
                   </div>
                   <div>
-                    <label className="block text-stone-400 mb-1">PF Max</label>
+                    <label className="block text-stone-400 mb-1">{tr('Max HP', 'PF Max')}</label>
                     <input
                       type="number"
                       value={editingChar.hpMax}
-                      onChange={(e) => setEditingChar({ ...editingChar, hpMax: Number(e.target.value) })}
+                      onChange={(e) =>
+                        setEditingChar({ ...editingChar, hpMax: Number(e.target.value) })
+                      }
                       className="w-full px-2 py-1 rounded bg-stone-900 border border-stone-700 text-emerald-400 font-bold"
                     />
                   </div>
                   <div>
-                    <label className="block text-stone-400 mb-1">Formula Dadi</label>
+                    <label className="block text-stone-400 mb-1">
+                      {tr('Hit Dice', 'Formula Dadi')}
+                    </label>
                     <input
                       type="text"
                       value={editingChar.hitDiceFormula}
-                      onChange={(e) => setEditingChar({ ...editingChar, hitDiceFormula: e.target.value })}
-                      className="w-full px-2 py-1 rounded bg-stone-900 border border-stone-700 text-stone-200"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-stone-400 mb-1">Bonus Iniz.</label>
-                    <input
-                      type="number"
-                      value={editingChar.initiativeBonus}
                       onChange={(e) =>
-                        setEditingChar({ ...editingChar, initiativeBonus: Number(e.target.value) })
+                        setEditingChar({ ...editingChar, hitDiceFormula: e.target.value })
                       }
                       className="w-full px-2 py-1 rounded bg-stone-900 border border-stone-700 text-stone-200"
                     />
                   </div>
                   <div>
-                    <label className="block text-stone-400 mb-1">Perc. Passiva</label>
+                    <label className="block text-stone-400 mb-1">
+                      {tr('Init Bonus', 'Bonus Iniz.')}
+                    </label>
+                    <input
+                      type="number"
+                      value={editingChar.initiativeBonus}
+                      onChange={(e) =>
+                        setEditingChar({
+                          ...editingChar,
+                          initiativeBonus: Number(e.target.value),
+                        })
+                      }
+                      className="w-full px-2 py-1 rounded bg-stone-900 border border-stone-700 text-stone-200"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-stone-400 mb-1">
+                      {tr('Pass. Perc.', 'Perc. Passiva')}
+                    </label>
                     <input
                       type="number"
                       value={editingChar.passivePerception}
                       onChange={(e) =>
-                        setEditingChar({ ...editingChar, passivePerception: Number(e.target.value) })
+                        setEditingChar({
+                          ...editingChar,
+                          passivePerception: Number(e.target.value),
+                        })
                       }
                       className="w-full px-2 py-1 rounded bg-stone-900 border border-stone-700 text-stone-200"
                     />
@@ -619,20 +686,26 @@ export const CharactersView: React.FC<CharactersViewProps> = ({
                 {/* 6 Abilities */}
                 <div>
                   <label className="block text-stone-400 mb-1 font-semibold">
-                    Caratteristiche D&D 5e (calcolo automatico modificatore)
+                    {tr(
+                      'D&D 5e Ability Scores (auto-calculates modifier)',
+                      'Caratteristiche D&D 5e (calcolo automatico modificatore)'
+                    )}
                   </label>
                   <div className="grid grid-cols-6 gap-2">
                     {(
                       [
-                        ['str', 'FOR'],
-                        ['dex', 'DES'],
-                        ['con', 'COS'],
+                        ['str', tr('STR', 'FOR')],
+                        ['dex', tr('DEX', 'DES')],
+                        ['con', tr('CON', 'COS')],
                         ['int', 'INT'],
-                        ['wis', 'SAG'],
-                        ['cha', 'CAR'],
+                        ['wis', tr('WIS', 'SAG')],
+                        ['cha', tr('CHA', 'CAR')],
                       ] as const
                     ).map(([k, label]) => (
-                      <div key={k} className="bg-stone-950 p-2 rounded border border-stone-800 text-center">
+                      <div
+                        key={k}
+                        className="bg-stone-950 p-2 rounded border border-stone-800 text-center"
+                      >
                         <div className="text-[10px] font-bold text-amber-400">{label}</div>
                         <input
                           type="number"
@@ -651,16 +724,20 @@ export const CharactersView: React.FC<CharactersViewProps> = ({
                 {/* Skills & Saves */}
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-stone-400 mb-1">Tiri Salvezza</label>
+                    <label className="block text-stone-400 mb-1">
+                      {tr('Saving Throws', 'Tiri Salvezza')}
+                    </label>
                     <input
                       type="text"
                       value={editingChar.savingThrows || ''}
-                      onChange={(e) => setEditingChar({ ...editingChar, savingThrows: e.target.value })}
+                      onChange={(e) =>
+                        setEditingChar({ ...editingChar, savingThrows: e.target.value })
+                      }
                       className="w-full px-2.5 py-1.5 rounded bg-stone-950 border border-stone-700 text-stone-200"
                     />
                   </div>
                   <div>
-                    <label className="block text-stone-400 mb-1">Abilità</label>
+                    <label className="block text-stone-400 mb-1">{tr('Skills', 'Abilità')}</label>
                     <input
                       type="text"
                       value={editingChar.skills || ''}
@@ -673,29 +750,36 @@ export const CharactersView: React.FC<CharactersViewProps> = ({
                 {/* Traits & Actions */}
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
-                    <span className="font-bold text-amber-400">Tratti & Capacità Speciali</span>
+                    <span className="font-bold text-amber-400">
+                      {tr('Traits & Special Abilities', 'Tratti & Capacità Speciali')}
+                    </span>
                     <button
                       type="button"
                       onClick={() => addListEntry('traits')}
                       className="px-2 py-0.5 rounded bg-stone-800 hover:bg-stone-700 text-amber-300"
                     >
-                      + Aggiungi Tratto
+                      {tr('+ Add Trait', '+ Aggiungi Tratto')}
                     </button>
                   </div>
                   {editingChar.traits.map((t, idx) => (
-                    <div key={idx} className="flex gap-2 items-start bg-stone-950 p-2 rounded border border-stone-800">
+                    <div
+                      key={idx}
+                      className="flex gap-2 items-start bg-stone-950 p-2 rounded border border-stone-800"
+                    >
                       <input
                         type="text"
                         value={t.name}
                         onChange={(e) => updateListEntry('traits', idx, { name: e.target.value })}
-                        placeholder="Nome tratto"
+                        placeholder={tr('Trait name', 'Nome tratto')}
                         className="w-1/3 px-2 py-1 rounded bg-stone-900 border border-stone-700 text-amber-200 font-semibold"
                       />
                       <input
                         type="text"
                         value={t.description}
-                        onChange={(e) => updateListEntry('traits', idx, { description: e.target.value })}
-                        placeholder="Descrizione"
+                        onChange={(e) =>
+                          updateListEntry('traits', idx, { description: e.target.value })
+                        }
+                        placeholder={tr('Description', 'Descrizione')}
                         className="flex-1 px-2 py-1 rounded bg-stone-900 border border-stone-700 text-stone-200"
                       />
                       <button
@@ -711,29 +795,36 @@ export const CharactersView: React.FC<CharactersViewProps> = ({
 
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
-                    <span className="font-bold text-amber-400">Azioni & Attacchi</span>
+                    <span className="font-bold text-amber-400">
+                      {tr('Actions & Attacks', 'Azioni & Attacchi')}
+                    </span>
                     <button
                       type="button"
                       onClick={() => addListEntry('actions')}
                       className="px-2 py-0.5 rounded bg-stone-800 hover:bg-stone-700 text-amber-300"
                     >
-                      + Aggiungi Azione
+                      {tr('+ Add Action', '+ Aggiungi Azione')}
                     </button>
                   </div>
                   {editingChar.actions.map((a, idx) => (
-                    <div key={idx} className="flex gap-2 items-start bg-stone-950 p-2 rounded border border-stone-800">
+                    <div
+                      key={idx}
+                      className="flex gap-2 items-start bg-stone-950 p-2 rounded border border-stone-800"
+                    >
                       <input
                         type="text"
                         value={a.name}
                         onChange={(e) => updateListEntry('actions', idx, { name: e.target.value })}
-                        placeholder="Nome azione"
+                        placeholder={tr('Action name', 'Nome azione')}
                         className="w-1/3 px-2 py-1 rounded bg-stone-900 border border-stone-700 text-amber-200 font-semibold"
                       />
                       <input
                         type="text"
                         value={a.description}
-                        onChange={(e) => updateListEntry('actions', idx, { description: e.target.value })}
-                        placeholder="Descrizione attacco / danni"
+                        onChange={(e) =>
+                          updateListEntry('actions', idx, { description: e.target.value })
+                        }
+                        placeholder={tr('Attack / damage description', 'Descrizione attacco / danni')}
                         className="flex-1 px-2 py-1 rounded bg-stone-900 border border-stone-700 text-stone-200"
                       />
                       <button
@@ -748,11 +839,18 @@ export const CharactersView: React.FC<CharactersViewProps> = ({
                 </div>
 
                 <div>
-                  <label className="block text-stone-400 mb-1">Note Incantesimi / Equipaggiamento / Lore</label>
+                  <label className="block text-stone-400 mb-1">
+                    {tr(
+                      'Spells / Equipment / Lore Notes',
+                      'Note Incantesimi / Equipaggiamento / Lore'
+                    )}
+                  </label>
                   <textarea
                     rows={2}
                     value={editingChar.biographyOrLore}
-                    onChange={(e) => setEditingChar({ ...editingChar, biographyOrLore: e.target.value })}
+                    onChange={(e) =>
+                      setEditingChar({ ...editingChar, biographyOrLore: e.target.value })
+                    }
                     className="w-full px-2.5 py-1.5 rounded bg-stone-950 border border-stone-700 text-stone-200"
                   />
                 </div>
@@ -761,7 +859,7 @@ export const CharactersView: React.FC<CharactersViewProps> = ({
               {/* Right Live Statblock Preview */}
               <div>
                 <div className="text-xs font-bold uppercase tracking-wider text-stone-400 mb-2">
-                  Anteprima Live Statblock D&D 5e
+                  {tr('Live D&D 5e Statblock Preview', 'Anteprima Live Statblock D&D 5e')}
                 </div>
                 <StatblockCard character={editingChar} />
               </div>
@@ -775,11 +873,13 @@ export const CharactersView: React.FC<CharactersViewProps> = ({
         <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-stone-900 border border-stone-700 rounded-2xl max-w-lg w-full p-6 space-y-4 shadow-2xl">
             <h3 className="font-header text-xl font-bold text-amber-400">
-              Configura Gruppo (Party di Giocatori)
+              {tr('Configure Adventuring Party', 'Configura Gruppo (Party di Giocatori)')}
             </h3>
             <div className="space-y-3 text-xs">
               <div>
-                <label className="block text-stone-400 mb-1 font-semibold">Nome del Gruppo</label>
+                <label className="block text-stone-400 mb-1 font-semibold">
+                  {tr('Party Name', 'Nome del Gruppo')}
+                </label>
                 <input
                   type="text"
                   value={editingParty.name}
@@ -788,17 +888,24 @@ export const CharactersView: React.FC<CharactersViewProps> = ({
                 />
               </div>
               <div>
-                <label className="block text-stone-400 mb-1 font-semibold">Descrizione / Giorno di gioco</label>
+                <label className="block text-stone-400 mb-1 font-semibold">
+                  {tr('Description / Schedule', 'Descrizione / Giorno di gioco')}
+                </label>
                 <input
                   type="text"
                   value={editingParty.description}
-                  onChange={(e) => setEditingParty({ ...editingParty, description: e.target.value })}
+                  onChange={(e) =>
+                    setEditingParty({ ...editingParty, description: e.target.value })
+                  }
                   className="w-full px-3 py-2 rounded bg-stone-950 border border-stone-700 text-stone-200"
                 />
               </div>
               <div>
                 <label className="block text-stone-400 mb-1.5 font-semibold">
-                  Seleziona i PG del Repository che fanno parte di questo gruppo:
+                  {tr(
+                    'Select Repository PCs belonging to this party:',
+                    'Seleziona i PG del Repository che fanno parte di questo gruppo:'
+                  )}
                 </label>
                 <div className="space-y-1.5 max-h-56 overflow-y-auto bg-stone-950 p-2.5 rounded border border-stone-800">
                   {pcsOnly.map((pc) => {
@@ -835,7 +942,7 @@ export const CharactersView: React.FC<CharactersViewProps> = ({
                 onClick={() => setEditingParty(null)}
                 className="px-3 py-1.5 rounded bg-stone-800 text-stone-300 text-xs font-semibold"
               >
-                Annulla
+                {tr('Cancel', 'Annulla')}
               </button>
               <button
                 onClick={() => {
@@ -845,7 +952,7 @@ export const CharactersView: React.FC<CharactersViewProps> = ({
                 }}
                 className="px-4 py-1.5 rounded bg-amber-600 hover:bg-amber-500 text-stone-950 text-xs font-bold"
               >
-                Salva Gruppo
+                {tr('Save Party', 'Salva Gruppo')}
               </button>
             </div>
           </div>

@@ -1,6 +1,10 @@
 # Claude & Agent Instructions
 
-See [AGENTS.md](./AGENTS.md) for project architecture, build commands, and mandatory **Branches and releases** / git worktree rules.
+See [AGENTS.md](./AGENTS.md) for project architecture, build commands, localization rules, and mandatory **Branches and releases** / git worktree rules.
+
+## Language & Localization (i18n)
+- **English is the primary language** across the entire project: all code comments, identifiers, documentation (`README.md`, `CHANGELOG.md`, agent instructions), commits, PRs, and default seed data must be written in English.
+- **Multi-language UI support**: Every user-facing string in the UI must support all available languages (`en` default, `it` Italian) via `useLanguage()` / `tr(en, it)` in `src/i18n/LanguageContext.tsx`. Always adapt new or modified UI components to all supported languages.
 
 ## Branches and releases
 - `main` holds released code only; `dev` is the integration branch. Never commit or push directly to either.

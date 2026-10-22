@@ -7,6 +7,11 @@
   - `npm run build` — Run `tsc -b && vite build` to verify TypeScript and bundle frontend.
   - `npm run tauri dev` / `npm run tauri build` — Run or package the native Tauri v2 desktop application.
 
+## Language & Localization (i18n)
+- **English is the primary language** across the entire project: all source code identifiers, comments, commit messages, PR descriptions, `README.md`, `CHANGELOG.md`, agent instructions, and default seed data (`SEED_DATABASE_EN`) must be written in English.
+- **Multi-language UI support**: The application supports multiple UI languages via `src/i18n/LanguageContext.tsx` (`useLanguage()`, `tr(en, it)`), currently **English (`en`, default)** and **Italian (`it`)**.
+- Whenever you add or modify any user-facing UI text, labels, tooltips, placeholders, alerts, or default content, you **must** provide translations for all supported languages (`en` and `it`) using `tr('English text', 'Testo italiano')` (or localized dictionaries/helpers) so the UI adapts seamlessly to the active language.
+
 ## Branches and releases
 - `main` holds released code only; `dev` is the integration branch. Never commit or push directly to either.
 - Work on `feat/*`, `fix/*` or `chore/*` branches cut from `dev`, and open the PR against `dev` (squash merge). Don't start from `main`.

@@ -1,6 +1,7 @@
 import React from 'react';
 import { CharacterEntity, formatMod } from '../types/dnd';
-import { Shield, Heart, Zap, Eye,Swords, Sparkles, User, Skull } from 'lucide-react';
+import { useLanguage } from '../i18n/LanguageContext';
+import { Shield, Heart, Zap, Eye, Swords } from 'lucide-react';
 
 interface StatblockCardProps {
   character: CharacterEntity;
@@ -15,6 +16,7 @@ export const StatblockCard: React.FC<StatblockCardProps> = ({
   onEdit,
   onAddToCombat,
 }) => {
+  const { tr } = useLanguage();
   const isPc = character.kind === 'pc';
   const isBoss = character.tags.some((t) => t.toLowerCase().includes('boss'));
 
@@ -42,7 +44,13 @@ export const StatblockCard: React.FC<StatblockCardProps> = ({
                     : 'bg-stone-800/15 text-stone-800 border-stone-600/40'
                 }`}
               >
-                {isPc ? 'PG Giocante' : character.kind === 'npc' ? 'NPC' : isBoss ? 'Boss' : 'Mostro'}
+                {isPc
+                  ? tr('Player Character', 'PG Giocante')
+                  : character.kind === 'npc'
+                  ? 'NPC'
+                  : isBoss
+                  ? 'Boss'
+                  : tr('Monster', 'Mostro')}
               </span>
             </div>
             <p className="italic text-sm text-[#4a2b1d] mt-0.5">
@@ -58,11 +66,11 @@ export const StatblockCard: React.FC<StatblockCardProps> = ({
             {onAddToCombat && (
               <button
                 onClick={() => onAddToCombat(character)}
-                title="Aggiungi al Combattimento attivo"
+                title={tr('Add to active combat', 'Aggiungi al Combattimento attivo')}
                 className="px-2.5 py-1 text-xs font-semibold rounded bg-[#58180D] text-amber-100 hover:bg-[#7a2213] transition flex items-center gap-1 shadow-sm"
               >
                 <Swords className="w-3.5 h-3.5" />
-                In Combat
+                {tr('To Combat', 'In Combat')}
               </button>
             )}
             {onEdit && (
@@ -70,7 +78,7 @@ export const StatblockCard: React.FC<StatblockCardProps> = ({
                 onClick={() => onEdit(character)}
                 className="px-2.5 py-1 text-xs font-semibold rounded border border-[#58180D]/40 text-[#58180D] hover:bg-[#58180D]/10 transition"
               >
-                Modifica
+                {tr('Edit', 'Modifica')}
               </button>
             )}
           </div>
@@ -84,7 +92,9 @@ export const StatblockCard: React.FC<StatblockCardProps> = ({
           <div className="flex items-center gap-2">
             <Shield className="w-4 h-4 text-[#58180D] shrink-0" />
             <div>
-              <div className="text-[11px] font-sans uppercase font-bold text-[#58180D]/80">Classe Armatura</div>
+              <div className="text-[11px] font-sans uppercase font-bold text-[#58180D]/80">
+                {tr('Armor Class', 'Classe Armatura')}
+              </div>
               <div className="font-bold text-[#58180D]">
                 {character.ac} <span className="font-normal text-xs">{character.acNote}</span>
               </div>
@@ -94,7 +104,9 @@ export const StatblockCard: React.FC<StatblockCardProps> = ({
           <div className="flex items-center gap-2">
             <Heart className="w-4 h-4 text-red-700 shrink-0" />
             <div>
-              <div className="text-[11px] font-sans uppercase font-bold text-[#58180D]/80">Punti Ferita</div>
+              <div className="text-[11px] font-sans uppercase font-bold text-[#58180D]/80">
+                {tr('Hit Points', 'Punti Ferita')}
+              </div>
               <div className="font-bold text-[#58180D]">
                 {character.hpMax} <span className="font-normal text-xs">({character.hitDiceFormula})</span>
               </div>
@@ -104,7 +116,9 @@ export const StatblockCard: React.FC<StatblockCardProps> = ({
           <div className="flex items-center gap-2">
             <Zap className="w-4 h-4 text-amber-700 shrink-0" />
             <div>
-              <div className="text-[11px] font-sans uppercase font-bold text-[#58180D]/80">Iniziativa & Vel.</div>
+              <div className="text-[11px] font-sans uppercase font-bold text-[#58180D]/80">
+                {tr('Init & Speed', 'Iniziativa & Vel.')}
+              </div>
               <div className="font-bold text-[#58180D]">
                 {character.initiativeBonus >= 0 ? `+${character.initiativeBonus}` : character.initiativeBonus}{' '}
                 <span className="font-normal text-xs">• {character.speed}</span>
@@ -115,7 +129,9 @@ export const StatblockCard: React.FC<StatblockCardProps> = ({
           <div className="flex items-center gap-2">
             <Eye className="w-4 h-4 text-emerald-800 shrink-0" />
             <div>
-              <div className="text-[11px] font-sans uppercase font-bold text-[#58180D]/80">Percezione Pass.</div>
+              <div className="text-[11px] font-sans uppercase font-bold text-[#58180D]/80">
+                {tr('Passive Perc.', 'Percezione Pass.')}
+              </div>
               <div className="font-bold text-[#58180D]">{character.passivePerception}</div>
             </div>
           </div>
@@ -128,12 +144,12 @@ export const StatblockCard: React.FC<StatblockCardProps> = ({
         <div className="grid grid-cols-6 gap-1 text-center py-1">
           {(
             [
-              ['FOR', character.abilities.str],
-              ['DES', character.abilities.dex],
-              ['COS', character.abilities.con],
+              [tr('STR', 'FOR'), character.abilities.str],
+              [tr('DEX', 'DES'), character.abilities.dex],
+              [tr('CON', 'COS'), character.abilities.con],
               ['INT', character.abilities.int],
-              ['SAG', character.abilities.wis],
-              ['CAR', character.abilities.cha],
+              [tr('WIS', 'SAG'), character.abilities.wis],
+              [tr('CHA', 'CAR'), character.abilities.cha],
             ] as const
           ).map(([label, score]) => (
             <div key={label} className="bg-[#efe0bb]/70 rounded px-1 py-1.5 border border-[#58180D]/15">
@@ -152,27 +168,32 @@ export const StatblockCard: React.FC<StatblockCardProps> = ({
         <div className="space-y-1 text-sm leading-snug text-[#3d170b]">
           {character.savingThrows && (
             <p>
-              <strong className="text-[#58180D]">Tiri Salvezza:</strong> {character.savingThrows}
+              <strong className="text-[#58180D]">{tr('Saving Throws:', 'Tiri Salvezza:')}</strong>{' '}
+              {character.savingThrows}
             </p>
           )}
           {character.skills && (
             <p>
-              <strong className="text-[#58180D]">Abilità:</strong> {character.skills}
+              <strong className="text-[#58180D]">{tr('Skills:', 'Abilità:')}</strong> {character.skills}
             </p>
           )}
           {character.damageResistances && (
             <p>
-              <strong className="text-[#58180D]">Resistenze / Immunità:</strong> {character.damageResistances}
+              <strong className="text-[#58180D]">
+                {tr('Resistances / Immunities:', 'Resistenze / Immunità:')}
+              </strong>{' '}
+              {character.damageResistances}
             </p>
           )}
           {character.senses && (
             <p>
-              <strong className="text-[#58180D]">Sensi:</strong> {character.senses}
+              <strong className="text-[#58180D]">{tr('Senses:', 'Sensi:')}</strong> {character.senses}
             </p>
           )}
           {character.languages && (
             <p>
-              <strong className="text-[#58180D]">Linguaggi:</strong> {character.languages}
+              <strong className="text-[#58180D]">{tr('Languages:', 'Linguaggi:')}</strong>{' '}
+              {character.languages}
             </p>
           )}
         </div>
@@ -195,7 +216,7 @@ export const StatblockCard: React.FC<StatblockCardProps> = ({
         {character.actions.length > 0 && (
           <div className="mt-4">
             <h4 className="font-header text-base font-bold text-[#58180D] uppercase border-b border-[#58180D] pb-0.5 mb-2">
-              Azioni
+              {tr('Actions', 'Azioni')}
             </h4>
             <div className="space-y-2 text-sm">
               {character.actions.map((act, i) => (
@@ -211,7 +232,7 @@ export const StatblockCard: React.FC<StatblockCardProps> = ({
         {character.reactionsOrLegendary && character.reactionsOrLegendary.length > 0 && (
           <div className="mt-4">
             <h4 className="font-header text-base font-bold text-[#58180D] uppercase border-b border-[#58180D] pb-0.5 mb-2">
-              Reazioni & Azioni Leggendarie
+              {tr('Reactions & Legendary Actions', 'Reazioni & Azioni Leggendarie')}
             </h4>
             <div className="space-y-2 text-sm">
               {character.reactionsOrLegendary.map((leg, i) => (
@@ -228,13 +249,18 @@ export const StatblockCard: React.FC<StatblockCardProps> = ({
           <div className="mt-4 pt-3 border-t border-[#58180D]/25 space-y-2 text-xs text-[#4a2b1d]">
             {character.spellsNotes && (
               <p className="bg-amber-900/10 p-2 rounded border border-amber-900/20">
-                <strong className="text-[#58180D] font-bold">✦ Incantesimi / Note di Gioco:</strong>{' '}
+                <strong className="text-[#58180D] font-bold">
+                  ✦ {tr('Spells / Gameplay Notes:', 'Incantesimi / Note di Gioco:')}
+                </strong>{' '}
                 {character.spellsNotes}
               </p>
             )}
             {character.biographyOrLore && (
               <p className="italic">
-                <strong className="not-italic text-[#58180D]">Note & Background:</strong> {character.biographyOrLore}
+                <strong className="not-italic text-[#58180D]">
+                  {tr('Notes & Background:', 'Note & Background:')}
+                </strong>{' '}
+                {character.biographyOrLore}
               </p>
             )}
           </div>

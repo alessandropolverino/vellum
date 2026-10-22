@@ -20,17 +20,17 @@ export interface CharacterEntity {
   id: string;
   kind: EntityKind;
   name: string;
-  playerOrRole: string; // Nome giocatore per PG, oppure ruolo narrativo ("Locandiere", "Boss Finale") per NPC/Mostri
-  size: 'Minuscola' | 'Piccola' | 'Media' | 'Grande' | 'Enorme' | 'Mastodontica';
-  creatureType: string; // es. "Umanoide (Elfo)", "Non Morto", "Drago", "Aberrazione"
+  playerOrRole: string; // Player name for PCs, or narrative role ("Innkeeper", "Final Boss") for NPCs/Monsters
+  size: string; // e.g. "Tiny" | "Small" | "Medium" | "Large" | "Huge" | "Gargantuan" (or localized equivalent)
+  creatureType: string; // e.g. "Humanoid (Elf)", "Undead", "Dragon", "Aberration"
   alignment: string;
   classOrArchetype?: string;
-  levelOrCr: string; // es. "Livello 4" per PG o "GS 2 (450 PE)" per Mostri/NPC
+  levelOrCr: string; // e.g. "Level 4" for PCs or "CR 2 (450 XP)" for Monsters/NPCs
   ac: number;
-  acNote?: string; // es. "(Armatura di cuoio borchiato, scudo)"
+  acNote?: string; // e.g. "(Studded leather, shield)"
   hpMax: number;
-  hitDiceFormula: string; // es. "6d8 + 12"
-  speed: string; // es. "9m, volo 18m"
+  hitDiceFormula: string; // e.g. "6d8 + 12"
+  speed: string; // e.g. "30 ft., fly 60 ft."
   initiativeBonus: number;
   passivePerception: number;
   abilities: AbilityScores;
@@ -87,7 +87,7 @@ export interface SfxItem {
   loop: boolean;
   defaultVolume: number; // 0.0 - 1.0
   synthPreset: SynthPresetId;
-  customAudioUrl?: string; // URL / DataURL o path locale file audio caricato dall'utente
+  customAudioUrl?: string; // URL / DataURL or local file path uploaded by user
   iconName: string;
   color: string;
   tags: string[];
@@ -100,10 +100,20 @@ export interface EncounterSlot {
   notes?: string;
 }
 
+export type EncounterDifficulty =
+  | 'Easy'
+  | 'Medium'
+  | 'Hard'
+  | 'Deadly'
+  | 'Facile'
+  | 'Media'
+  | 'Difficile'
+  | 'Mortale';
+
 export interface EncounterPreset {
   id: string;
   name: string;
-  difficulty: 'Facile' | 'Media' | 'Difficile' | 'Mortale';
+  difficulty: EncounterDifficulty;
   environment: string;
   description: string;
   slots: EncounterSlot[];
@@ -112,14 +122,14 @@ export interface EncounterPreset {
 
 export interface AdventureScene {
   id: string;
-  code: string; // es. "Atto I - Scena 1"
+  code: string; // e.g. "Act I - Scene 1"
   title: string;
   estimatedMinutes: number;
   location: string;
   summary: string;
   homebreweryMarkdown: string;
-  linkedCharacterIds: string[]; // NPC o Mostri presenti nella scena
-  linkedSfxIds: string[]; // SFX assegnati specificamente a questa parte della storia
+  linkedCharacterIds: string[]; // NPCs or Monsters featured in this scene
+  linkedSfxIds: string[]; // SFX specifically assigned to this scene for quick access
   encounters: EncounterPreset[];
 }
 
@@ -128,7 +138,7 @@ export interface Campaign {
   title: string;
   setting: string;
   description: string;
-  status: 'In Corso' | 'In Preparazione' | 'Conclusa';
+  status: 'Active' | 'Prep' | 'Completed' | 'In Corso' | 'In Preparazione' | 'Conclusa';
   createdAt: string;
 }
 
@@ -205,14 +215,14 @@ export interface PcRuntimeStatus {
 export interface PlayInstance {
   id: string;
   adventureId: string;
-  instanceName: string; // es. "Gruppo del Giovedì - I Corvi d'Argento"
+  instanceName: string; // e.g. "Thursday Group - The Silver Ravens"
   groupName: string;
-  partyCharacterIds: string[]; // PG che giocano in questa istanza
+  partyCharacterIds: string[]; // PCs playing in this instance
   status: 'active' | 'paused' | 'completed';
   sessionCount: number;
   currentSceneId: string;
   visitedSceneIds: string[];
-  sceneNotes: Record<string, string>; // Note DM per singola scena specifiche di questa istanza
+  sceneNotes: Record<string, string>; // Per-scene DM notes isolated to this instance
   pcStatus: Record<string, PcRuntimeStatus>;
   timeline: SessionLogEntry[];
   activeCombat: ActiveCombatState | null;
@@ -231,7 +241,26 @@ export interface DndDatabase {
   playInstances: PlayInstance[];
 }
 
-export const DND_CONDITIONS = [
+export const DND_CONDITIONS_EN = [
+  'Blinded',
+  'Charmed',
+  'Grappled',
+  'Deafened',
+  'Poisoned',
+  'Incapacitated',
+  'Invisible',
+  'Paralyzed',
+  'Petrified',
+  'Prone',
+  'Frightened',
+  'Stunned',
+  'Restrained',
+  'Unconscious',
+  'Concentrating',
+  'Blessed',
+] as const;
+
+export const DND_CONDITIONS_IT = [
   'Accecato',
   'Affascinato',
   'Afferrato',
@@ -249,6 +278,12 @@ export const DND_CONDITIONS = [
   'Concentrazione',
   'Benedetto',
 ] as const;
+
+export const DND_CONDITIONS = DND_CONDITIONS_EN;
+
+export function getDndConditions(lang: 'en' | 'it'): readonly string[] {
+  return lang === 'it' ? DND_CONDITIONS_IT : DND_CONDITIONS_EN;
+}
 
 export function formatMod(score: number): string {
   const mod = Math.floor((score - 10) / 2);
