@@ -1,0 +1,248 @@
+import React from 'react';
+import { CharacterEntity, formatMod } from '../types/dnd';
+import { Shield, Heart, Zap, Eye,Swords, Sparkles, User, Skull } from 'lucide-react';
+
+interface StatblockCardProps {
+  character: CharacterEntity;
+  compact?: boolean;
+  onEdit?: (char: CharacterEntity) => void;
+  onAddToCombat?: (char: CharacterEntity) => void;
+}
+
+export const StatblockCard: React.FC<StatblockCardProps> = ({
+  character,
+  compact = false,
+  onEdit,
+  onAddToCombat,
+}) => {
+  const isPc = character.kind === 'pc';
+  const isBoss = character.tags.some((t) => t.toLowerCase().includes('boss'));
+
+  return (
+    <div className="dnd-statblock relative rounded-sm border-2 border-[#58180D]/80 bg-[#fdf5e0] text-[#2b170e] shadow-xl overflow-hidden font-serif">
+      {/* Top decorative D&D orange-gold bar */}
+      <div className="h-2 bg-gradient-to-r from-[#58180D] via-[#c9ad6a] to-[#58180D] border-b border-[#58180D]" />
+
+      <div className={compact ? 'p-3.5' : 'p-5'}>
+        {/* Header */}
+        <div className="flex items-start justify-between gap-2">
+          <div>
+            <div className="flex items-center gap-2 flex-wrap">
+              <h3 className="font-header text-xl md:text-2xl font-extrabold tracking-wide text-[#58180D] uppercase leading-tight">
+                {character.name}
+              </h3>
+              <span
+                className={`text-[10px] font-sans font-bold uppercase px-2 py-0.5 rounded-full border ${
+                  isPc
+                    ? 'bg-amber-800/15 text-amber-900 border-amber-700/40'
+                    : character.kind === 'npc'
+                    ? 'bg-sky-900/15 text-sky-900 border-sky-700/40'
+                    : isBoss
+                    ? 'bg-red-900/20 text-red-900 border-red-800/50'
+                    : 'bg-stone-800/15 text-stone-800 border-stone-600/40'
+                }`}
+              >
+                {isPc ? 'PG Giocante' : character.kind === 'npc' ? 'NPC' : isBoss ? 'Boss' : 'Mostro'}
+              </span>
+            </div>
+            <p className="italic text-sm text-[#4a2b1d] mt-0.5">
+              {character.size} {character.creatureType}, {character.alignment}
+              {character.classOrArchetype ? ` — ${character.classOrArchetype}` : ''}
+            </p>
+            <p className="text-xs font-sans font-semibold text-[#58180D]/80 mt-0.5">
+              {character.playerOrRole} • <span className="font-bold">{character.levelOrCr}</span>
+            </p>
+          </div>
+
+          <div className="flex items-center gap-1.5 shrink-0 font-sans">
+            {onAddToCombat && (
+              <button
+                onClick={() => onAddToCombat(character)}
+                title="Aggiungi al Combattimento attivo"
+                className="px-2.5 py-1 text-xs font-semibold rounded bg-[#58180D] text-amber-100 hover:bg-[#7a2213] transition flex items-center gap-1 shadow-sm"
+              >
+                <Swords className="w-3.5 h-3.5" />
+                In Combat
+              </button>
+            )}
+            {onEdit && (
+              <button
+                onClick={() => onEdit(character)}
+                className="px-2.5 py-1 text-xs font-semibold rounded border border-[#58180D]/40 text-[#58180D] hover:bg-[#58180D]/10 transition"
+              >
+                Modifica
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Tapered Crimson Rule */}
+        <div className="my-2.5 h-[3px] bg-gradient-to-r from-[#58180D] via-[#9e2a18] to-transparent" />
+
+        {/* Core Vitals (AC, HP, Speed, Initiative, Passive Perception) */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-sm my-2 bg-[#f4e6c3]/80 p-2.5 rounded border border-[#58180D]/20">
+          <div className="flex items-center gap-2">
+            <Shield className="w-4 h-4 text-[#58180D] shrink-0" />
+            <div>
+              <div className="text-[11px] font-sans uppercase font-bold text-[#58180D]/80">Classe Armatura</div>
+              <div className="font-bold text-[#58180D]">
+                {character.ac} <span className="font-normal text-xs">{character.acNote}</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <Heart className="w-4 h-4 text-red-700 shrink-0" />
+            <div>
+              <div className="text-[11px] font-sans uppercase font-bold text-[#58180D]/80">Punti Ferita</div>
+              <div className="font-bold text-[#58180D]">
+                {character.hpMax} <span className="font-normal text-xs">({character.hitDiceFormula})</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <Zap className="w-4 h-4 text-amber-700 shrink-0" />
+            <div>
+              <div className="text-[11px] font-sans uppercase font-bold text-[#58180D]/80">Iniziativa & Vel.</div>
+              <div className="font-bold text-[#58180D]">
+                {character.initiativeBonus >= 0 ? `+${character.initiativeBonus}` : character.initiativeBonus}{' '}
+                <span className="font-normal text-xs">• {character.speed}</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <Eye className="w-4 h-4 text-emerald-800 shrink-0" />
+            <div>
+              <div className="text-[11px] font-sans uppercase font-bold text-[#58180D]/80">Percezione Pass.</div>
+              <div className="font-bold text-[#58180D]">{character.passivePerception}</div>
+            </div>
+          </div>
+        </div>
+
+        {/* Tapered Crimson Rule */}
+        <div className="my-2.5 h-[3px] bg-gradient-to-r from-[#58180D] via-[#9e2a18] to-transparent" />
+
+        {/* 6 Ability Scores */}
+        <div className="grid grid-cols-6 gap-1 text-center py-1">
+          {(
+            [
+              ['FOR', character.abilities.str],
+              ['DES', character.abilities.dex],
+              ['COS', character.abilities.con],
+              ['INT', character.abilities.int],
+              ['SAG', character.abilities.wis],
+              ['CAR', character.abilities.cha],
+            ] as const
+          ).map(([label, score]) => (
+            <div key={label} className="bg-[#efe0bb]/70 rounded px-1 py-1.5 border border-[#58180D]/15">
+              <div className="font-header font-bold text-xs text-[#58180D]">{label}</div>
+              <div className="text-sm font-bold text-[#2b170e]">
+                {score} <span className="text-xs font-normal text-[#58180D]">({formatMod(score)})</span>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Tapered Crimson Rule */}
+        <div className="my-2.5 h-[3px] bg-gradient-to-r from-[#58180D] via-[#9e2a18] to-transparent" />
+
+        {/* Secondary Attributes */}
+        <div className="space-y-1 text-sm leading-snug text-[#3d170b]">
+          {character.savingThrows && (
+            <p>
+              <strong className="text-[#58180D]">Tiri Salvezza:</strong> {character.savingThrows}
+            </p>
+          )}
+          {character.skills && (
+            <p>
+              <strong className="text-[#58180D]">Abilità:</strong> {character.skills}
+            </p>
+          )}
+          {character.damageResistances && (
+            <p>
+              <strong className="text-[#58180D]">Resistenze / Immunità:</strong> {character.damageResistances}
+            </p>
+          )}
+          {character.senses && (
+            <p>
+              <strong className="text-[#58180D]">Sensi:</strong> {character.senses}
+            </p>
+          )}
+          {character.languages && (
+            <p>
+              <strong className="text-[#58180D]">Linguaggi:</strong> {character.languages}
+            </p>
+          )}
+        </div>
+
+        {/* Traits */}
+        {character.traits.length > 0 && (
+          <>
+            <div className="my-2.5 h-[2px] bg-[#58180D]/40" />
+            <div className="space-y-2 text-sm">
+              {character.traits.map((t, i) => (
+                <p key={i} className="leading-relaxed">
+                  <strong className="italic font-bold text-[#58180D]">{t.name}.</strong> {t.description}
+                </p>
+              ))}
+            </div>
+          </>
+        )}
+
+        {/* Actions */}
+        {character.actions.length > 0 && (
+          <div className="mt-4">
+            <h4 className="font-header text-base font-bold text-[#58180D] uppercase border-b border-[#58180D] pb-0.5 mb-2">
+              Azioni
+            </h4>
+            <div className="space-y-2 text-sm">
+              {character.actions.map((act, i) => (
+                <p key={i} className="leading-relaxed">
+                  <strong className="italic font-bold text-[#58180D]">{act.name}.</strong> {act.description}
+                </p>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Legendary / Reactions */}
+        {character.reactionsOrLegendary && character.reactionsOrLegendary.length > 0 && (
+          <div className="mt-4">
+            <h4 className="font-header text-base font-bold text-[#58180D] uppercase border-b border-[#58180D] pb-0.5 mb-2">
+              Reazioni & Azioni Leggendarie
+            </h4>
+            <div className="space-y-2 text-sm">
+              {character.reactionsOrLegendary.map((leg, i) => (
+                <p key={i} className="leading-relaxed">
+                  <strong className="italic font-bold text-[#58180D]">{leg.name}.</strong> {leg.description}
+                </p>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Spells & Lore */}
+        {!compact && (character.spellsNotes || character.biographyOrLore) && (
+          <div className="mt-4 pt-3 border-t border-[#58180D]/25 space-y-2 text-xs text-[#4a2b1d]">
+            {character.spellsNotes && (
+              <p className="bg-amber-900/10 p-2 rounded border border-amber-900/20">
+                <strong className="text-[#58180D] font-bold">✦ Incantesimi / Note di Gioco:</strong>{' '}
+                {character.spellsNotes}
+              </p>
+            )}
+            {character.biographyOrLore && (
+              <p className="italic">
+                <strong className="not-italic text-[#58180D]">Note & Background:</strong> {character.biographyOrLore}
+              </p>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Bottom decorative D&D bar */}
+      <div className="h-2 bg-gradient-to-r from-[#58180D] via-[#c9ad6a] to-[#58180D] border-t border-[#58180D]" />
+    </div>
+  );
+};
