@@ -20,8 +20,8 @@ Web & Desktop application (**Tauri v2 + React 19 + TypeScript + Tailwind CSS**) 
    - Each play instance tracks its own isolated state: current scene, visited scenes, PC hit points/conditions/inspiration, active combat state, scene-specific DM scratchpad notes, and timestamped session log.
 
 3. **Global PC, NPC, Bestiary & Party Repository**:
-   - Complete D&D 5e statblocks and character sheets with automatic ability modifiers, AC, HP, hit dice, initiative bonus, passive perception, traits, actions, and legendary actions.
-   - Reusable **Parties** to spin up new play instances in one click.
+   - Complete D&D 5e statblocks and character sheets with automatic ability modifiers, all 18 skills & 6 saving throws, portraits, AC, HP, hit dice, initiative bonus, passive perception, traits, actions, and legendary actions.
+   - Support for **Pre-Gen PC Blueprints**, player-specific instantiated sheets, session-only PCs, and **Official D&D 5e PDF Character Sheet & Statblock export**.
 
 4. **Integrated Combat Tracker (Planned or Ad-Hoc)**:
    - Launch combat with 1 click from an inline `@encounter[id]` block or start an **ad-hoc encounter** on the fly.
@@ -41,12 +41,41 @@ Web & Desktop application (**Tauri v2 + React 19 + TypeScript + Tailwind CSS**) 
 
 ## Install & Quick Start
 
+### Using `Makefile` (Unix / Linux / macOS / Windows)
+
+```bash
+make help         # List all available targets
+make dev          # Start Vite dev server (http://localhost:1420)
+make build        # Typecheck (tsc -b) and build production bundle (./dist)
+make tauri-dev    # Start native Tauri v2 desktop app in dev mode
+make tauri-build  # Build native Tauri v2 desktop installer
+make clean        # Remove ./dist build artifacts
+```
+
+### Using PowerShell Scripts (Windows)
+
+```powershell
+# Start development server (auto-installs node_modules if missing)
+.\dev.ps1
+.\dev.ps1 -Tauri   # Or launch native Tauri v2 desktop dev mode
+
+# Build production bundle in ./dist
+.\build.ps1
+.\build.ps1 -Clean # Clean ./dist before building
+.\build.ps1 -Tauri # Package native Tauri v2 desktop installer
+```
+
+### Using `npm` Directly
+
 ```bash
 # Install dependencies
 npm install
 
 # Start Web UI + local disk persistence (./data/dnd5e-db.json)
 npm run dev
+
+# Build production frontend
+npm run build
 
 # Run or build as a native Tauri v2 desktop application
 npm run tauri dev
