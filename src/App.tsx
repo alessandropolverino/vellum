@@ -179,20 +179,25 @@ export const App: React.FC = () => {
     if (!targetAdv) return;
     const defaultParty = db.parties[0];
     setNewInstanceAdventure(targetAdv);
-    setNewInstPartyId(defaultParty?.id || '');
+    setNewInstPartyId(defaultParty?.id || '__custom_empty__');
     const countForAdv =
       db.playInstances.filter((i) => i.adventureId === targetAdv.id).length + 1;
     setNewInstName(
-      `Run #${countForAdv} — ${defaultParty?.name || tr('New Group', 'Nuovo Gruppo')}`
+      `Run #${countForAdv} — ${defaultParty?.name || tr('Custom Group', 'Gruppo Personalizzato')}`
     );
   };
 
   const handleCreateNewInstance = () => {
     if (!newInstanceAdventure) return;
-    const chosenParty = db.parties.find((p) => p.id === newInstPartyId);
+    const chosenParty =
+      newInstPartyId === '__custom_empty__'
+        ? undefined
+        : db.parties.find((p) => p.id === newInstPartyId);
     const partyCharIds =
-      chosenParty?.memberCharacterIds ||
-      db.characters.filter((c) => c.kind === 'pc').map((c) => c.id);
+      newInstPartyId === '__custom_empty__'
+        ? []
+        : chosenParty?.memberCharacterIds ||
+          db.characters.filter((c) => c.kind === 'pc' && !c.isPreGenBlueprint).map((c) => c.id);
 
     const pcStatus: PlayInstance['pcStatus'] = {};
     partyCharIds.forEach((pcId) => {
@@ -216,7 +221,7 @@ export const App: React.FC = () => {
       instanceName:
         newInstName.trim() ||
         `${tr('New Session', 'Nuova Sessione')} (${newInstanceAdventure.title})`,
-      groupName: chosenParty?.name || tr('Custom Group', 'Gruppo Personalizzato'),
+      groupName: chosenParty?.name || tr('Custom Table Group', 'Tavolo Personalizzato'),
       partyCharacterIds: partyCharIds,
       status: 'active',
       sessionCount: 1,
@@ -236,10 +241,10 @@ export const App: React.FC = () => {
           title: tr('New Story Instance Started', 'Avvio Nuova Istanza della Storia'),
           details: tr(
             `Started adventure "${newInstanceAdventure.title}" with group "${
-              chosenParty?.name || 'Adventurers'
+              chosenParty?.name || 'Custom Table Group'
             }".`,
             `Iniziata l’avventura "${newInstanceAdventure.title}" con il gruppo "${
-              chosenParty?.name || 'Avventurieri'
+              chosenParty?.name || 'Tavolo Personalizzato'
             }".`
           ),
           pinnedForRecap: true,
@@ -509,6 +514,7 @@ export const App: React.FC = () => {
             activeInstanceId={activeInstanceId}
             onSelectInstance={setActiveInstanceId}
             onSaveInstance={handleSaveInstance}
+            onSaveCharacter={handleSaveCharacter}
             onDeleteInstance={handleDeleteInstance}
             onOpenNewInstanceModal={(adv) => openLaunchInstanceModal(adv)}
           />
@@ -651,8 +657,8 @@ export const App: React.FC = () => {
               <div>
                 <label className="block text-stone-400 mb-1 font-semibold">
                   {tr(
-                    'Select Party Group from Repository',
-                    'Seleziona il Gruppo (Party) dal Repository'
+                    'Select Party Group (or Custom Table)',
+                    'Seleziona il Gruppo (o Tavolo Personalizzato)'
                   )}
                 </label>
                 <select
@@ -660,13 +666,19 @@ export const App: React.FC = () => {
                   onChange={(e) => {
                     const pid = e.target.value;
                     setNewInstPartyId(pid);
-                    const p = db.parties.find((x) => x.id === pid);
-                    if (p) {
-                      const count =
-                        db.playInstances.filter(
-                          (i) => i.adventureId === newInstanceAdventure.id
-                        ).length + 1;
-                      setNewInstName(`Run #${count} — ${p.name}`);
+                    const count =
+                      db.playInstances.filter(
+                        (i) => i.adventureId === newInstanceAdventure.id
+                      ).length + 1;
+                    if (pid === '__custom_empty__') {
+                      setNewInstName(
+                        `Run #${count} — ${tr('Custom Table', 'Tavolo Personalizzato')}`
+                      );
+                    } else {
+                      const p = db.parties.find((x) => x.id === pid);
+                      if (p) {
+                        setNewInstName(`Run #${count} — ${p.name}`);
+                      }
                     }
                   }}
                   className="w-full px-3 py-2 rounded bg-stone-950 border border-stone-700 text-amber-300 font-bold"
@@ -676,6 +688,12 @@ export const App: React.FC = () => {
                       {p.name} ({p.memberCharacterIds.length} {tr('PCs', 'PG')})
                     </option>
                   ))}
+                  <option value="__custom_empty__">
+                    {tr(
+                      '✨ Custom / Empty Party (Add Pre-Gen Blueprints or Custom PCs in Console)',
+                      '✨ Gruppo Vuoto / Personalizzato (Aggiungi Blueprint Pre-Gen o PG Custom in Console)'
+                    )}
+                  </option>
                 </select>
               </div>
 
