@@ -237,6 +237,72 @@ export const SEED_DATABASE_EN: DndDatabase = {
       accentColor: '#eab308',
     },
 
+    {
+      id: 'pc-blueprint-valerius',
+      kind: 'pc',
+      name: 'Valerius Stormblade (Pre-Gen)',
+      playerOrRole: 'Unassigned (Pre-Gen Blueprint)',
+      isPreGenBlueprint: true,
+      background: 'Soldier',
+      proficiencyBonus: 2,
+      size: 'Medium',
+      creatureType: 'Humanoid (Human Variant)',
+      alignment: 'Neutral Good',
+      classOrArchetype: 'Fighter (Battle Master)',
+      levelOrCr: 'Level 4',
+      ac: 18,
+      acNote: '(Chain mail, martial shield)',
+      hpMax: 38,
+      hitDiceFormula: '4d10 + 12',
+      speed: '30 ft.',
+      initiativeBonus: 2,
+      passivePerception: 13,
+      abilities: { str: 18, dex: 14, con: 16, int: 10, wis: 12, cha: 11 },
+      savingThrowProficiencies: { str: true, con: true },
+      skillProficiencies: {
+        athletics: 1,
+        intimidation: 1,
+        perception: 1,
+        survival: 1,
+      },
+      savingThrows: 'STR +6, CON +5',
+      skills: 'Athletics +6, Intimidation +2, Perception +3, Survival +3',
+      senses: 'Passive Perception 13',
+      languages: 'Common, Orc',
+      traits: [
+        {
+          name: 'Action Surge & Second Wind',
+          description:
+            '1/short rest: take one additional action on your turn. Bonus action: regain 1d10 + 4 HP.',
+        },
+        {
+          name: 'Combat Superiority (4× d8, DC 14)',
+          description:
+            'Maneuvers: Trip Attack, Riposte, Menacing Attack.',
+        },
+      ],
+      actions: [
+        {
+          name: 'Battleaxe +1',
+          description:
+            'Melee Weapon Attack: +7 to hit, reach 5 ft. Hit: 1d8 + 5 slashing damage.',
+          attackBonus: 7,
+          damageFormula: '1d8+5',
+        },
+        {
+          name: 'Heavy Crossbow',
+          description:
+            'Ranged Weapon Attack: +4 to hit, range 100/400 ft. Hit: 1d10 + 2 piercing damage.',
+          attackBonus: 4,
+          damageFormula: '1d10+2',
+        },
+      ],
+      biographyOrLore:
+        'Ready-to-play Pre-Gen Blueprint for one-shots or new players joining mid-campaign. Print the official 5e PDF sheet or instantiate for a specific player.',
+      tags: ['Pre-Gen', 'Blueprint', 'Frontline', 'One-Shot Ready'],
+      accentColor: '#6366f1',
+    },
+
     // ================= NPCs =================
     {
       id: 'npc-garrick',
@@ -1217,6 +1283,71 @@ export const SEED_DATABASE_IT: DndDatabase = {
       biographyOrLore:
         'Custode della Fiamma Perenne, determinata a purificare la Cripta Sussurrante.',
       tags: ['Healer', 'Supporto', 'Anti-Non Morti', 'Party B'],
+      accentColor: '#eab308',
+    },
+    {
+      id: 'pc-blueprint-valerius',
+      kind: 'pc',
+      name: 'Valerius Lamatempesta (Pre-Gen)',
+      playerOrRole: 'Non assegnato (Blueprint Pre-Gen)',
+      isPreGenBlueprint: true,
+      background: 'Soldato',
+      proficiencyBonus: 2,
+      size: 'Media',
+      creatureType: 'Umanoide (Umano Variante)',
+      alignment: 'Neutrale Buono',
+      classOrArchetype: 'Guerriero (Maestro di Battaglia)',
+      levelOrCr: 'Livello 4',
+      ac: 18,
+      acNote: '(Cotta di maglia, scudo marziale)',
+      hpMax: 38,
+      hitDiceFormula: '4d10 + 12',
+      speed: '9m',
+      initiativeBonus: 2,
+      passivePerception: 13,
+      abilities: { str: 18, dex: 14, con: 16, int: 10, wis: 12, cha: 11 },
+      savingThrowProficiencies: { str: true, con: true },
+      skillProficiencies: {
+        athletics: 1,
+        intimidation: 1,
+        perception: 1,
+        survival: 1,
+      },
+      savingThrows: 'FOR +6, COS +5',
+      skills: 'Atletica +6, Intimidire +2, Percezione +3, Sopravvivenza +3',
+      senses: 'Percezione Passiva 13',
+      languages: 'Comune, Orchesco',
+      traits: [
+        {
+          name: 'Azione Impetuosa & Recuperare Energie',
+          description:
+            '1/riposo breve: un’azione aggiuntiva nel proprio turno. Azione bonus: recupera 1d10 + 4 PF.',
+        },
+        {
+          name: 'Superiorità in Combattimento (4× d8, CD 14)',
+          description:
+            'Manovre: Attacco Sbilanciante, Risposta, Attacco Minaccioso.',
+        },
+      ],
+      actions: [
+        {
+          name: 'Ascia da Battaglia +1',
+          description:
+            'Attacco con arma da mischia: +7 a colpire, portata 1,5m. Colpito: 1d8 + 5 danni taglienti.',
+          attackBonus: 7,
+          damageFormula: '1d8+5',
+        },
+        {
+          name: 'Balestra Pesante',
+          description:
+            'Attacco con arma a distanza: +4 a colpire, gittata 30/120m. Colpito: 1d10 + 2 danni perforanti.',
+          attackBonus: 4,
+          damageFormula: '1d10+2',
+        },
+      ],
+      biographyOrLore:
+        'Blueprint Pre-Gen pronto da stampare per One-Shot o nuovi giocatori. Esporta il PDF ufficiale 5e o crea un’istanza dedicata a un giocatore.',
+      tags: ['Pre-Gen', 'Blueprint', 'Frontline', 'One-Shot Ready'],
       accentColor: '#eab308',
     },
     {

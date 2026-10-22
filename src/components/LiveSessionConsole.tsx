@@ -11,11 +11,13 @@ import {
   SessionLogEntry,
   SfxItem,
   getDndConditions,
+  isPcBlueprint,
 } from '../types/dnd';
 import { useLanguage } from '../i18n/LanguageContext';
 import { HomebreweryRenderer } from './HomebreweryRenderer';
 import { StatblockCard } from './StatblockCard';
 import { soundboardEngine } from '../services/audioEngine';
+import { downloadOfficialCharacterPdf } from '../services/pdfExporter';
 import {
   Play,
   Square,
@@ -26,6 +28,7 @@ import {
   BookOpen,
   ScrollText,
   Users,
+  UserPlus,
   Plus,
   Heart,
   ChevronRight,
@@ -36,6 +39,7 @@ import {
   Eye,
   X,
   Flame,
+  FileDown,
 } from 'lucide-react';
 
 interface LiveSessionConsoleProps {
@@ -48,6 +52,7 @@ interface LiveSessionConsoleProps {
   onSelectInstance: (id: string) => void;
   onSaveInstance: (inst: PlayInstance) => void;
   onDeleteInstance: (id: string) => void;
+  onSaveCharacter: (char: CharacterEntity) => void;
   onOpenNewInstanceModal: (adventure?: AdventureBlueprint) => void;
 }
 
@@ -60,6 +65,7 @@ export const LiveSessionConsole: React.FC<LiveSessionConsoleProps> = ({
   onSelectInstance,
   onSaveInstance,
   onDeleteInstance,
+  onSaveCharacter,
   onOpenNewInstanceModal,
 }) => {
   const { lang, tr } = useLanguage();
@@ -80,6 +86,19 @@ export const LiveSessionConsole: React.FC<LiveSessionConsoleProps> = ({
 
   const [showRecapModal, setShowRecapModal] = useState(false);
   const [copiedRecap, setCopiedRecap] = useState(false);
+
+  // Modal to add an existing PC Blueprint or a custom Session-Only PC to this PlayInstance
+  const [showAddPcModal, setShowAddPcModal] = useState(false);
+  const [addPcMode, setAddPcMode] = useState<'repository' | 'custom_instance_only'>('repository');
+  const [selectedRepoPcId, setSelectedRepoPcId] = useState<string>('');
+  const [sessionPlayerOverride, setSessionPlayerOverride] = useState<string>('');
+  const [customPcName, setCustomPcName] = useState<string>('');
+  const [customPcPlayer, setCustomPcPlayer] = useState<string>('');
+  const [customPcClass, setCustomPcClass] = useState<string>('');
+  const [customPcLevel, setCustomPcLevel] = useState<string>('Level 3');
+  const [customPcAc, setCustomPcAc] = useState<number>(15);
+  const [customPcHp, setCustomPcHp] = useState<number>(28);
+  const [saveCustomToGlobalRepo, setSaveCustomToGlobalRepo] = useState<boolean>(false);
 
   const logCategoryMeta: Record<
     SessionLogCategory,
@@ -158,6 +177,91 @@ export const LiveSessionConsole: React.FC<LiveSessionConsoleProps> = ({
     });
   };
 
+  const handleAddPcToInstance = () => {
+    if (addPcMode === 'repository') {
+      if (!selectedRepoPcId) return;
+      const pc = charMap.get(selectedRepoPcId);
+      if (!pc) return;
+      const nextIds = currentInstance.partyCharacterIds.includes(pc.id)
+        ? currentInstance.partyCharacterIds
+        : [...currentInstance.partyCharacterIds, pc.id];
+      const nextStatus = {
+        ...currentInstance.pcStatus,
+        [pc.id]: {
+          characterId: pc.id,
+          playerOverride: sessionPlayerOverride.trim() || undefined,
+          hpCurrent: pc.hpMax,
+          tempHp: 0,
+          conditions: [],
+          inspiration: false,
+          sessionNotes: '',
+        },
+      };
+      updateInstance({
+        partyCharacterIds: nextIds,
+        pcStatus: nextStatus,
+      });
+      setShowAddPcModal(false);
+      setSessionPlayerOverride('');
+    } else {
+      if (!customPcName.trim()) return;
+      const newPc: CharacterEntity = {
+        id: `pc-session-${Date.now()}`,
+        kind: 'pc',
+        name: customPcName.trim(),
+        playerOrRole: customPcPlayer.trim()
+          ? `${tr('Player:', 'Giocatore:')} ${customPcPlayer.trim()}`
+          : tr('Guest Player', 'Giocatore Ospite'),
+        isPreGenBlueprint: false,
+        instanceOnlyId: saveCustomToGlobalRepo ? undefined : currentInstance.id,
+        size: tr('Medium', 'Media'),
+        creatureType: tr('Humanoid', 'Umanoide'),
+        alignment: tr('Neutral Good', 'Neutrale Buono'),
+        classOrArchetype: customPcClass.trim() || tr('Adventurer', 'Avventuriero'),
+        levelOrCr: customPcLevel.trim() || tr('Level 3', 'Livello 3'),
+        ac: customPcAc || 15,
+        hpMax: customPcHp || 28,
+        hitDiceFormula: '3d8 + 6',
+        speed: tr('30 ft.', '9m'),
+        initiativeBonus: 2,
+        passivePerception: 12,
+        abilities: { str: 14, dex: 14, con: 14, int: 12, wis: 12, cha: 12 },
+        traits: [],
+        actions: [],
+        biographyOrLore: '',
+        tags: [
+          saveCustomToGlobalRepo
+            ? tr('Player PC', 'PG Giocatore')
+            : tr('Session-Only PC', 'PG Solo Sessione'),
+        ],
+      };
+      onSaveCharacter(newPc);
+      updateInstance({
+        partyCharacterIds: [...currentInstance.partyCharacterIds, newPc.id],
+        pcStatus: {
+          ...currentInstance.pcStatus,
+          [newPc.id]: {
+            characterId: newPc.id,
+            playerOverride: customPcPlayer.trim() || undefined,
+            hpCurrent: newPc.hpMax,
+            tempHp: 0,
+            conditions: [],
+            inspiration: false,
+            sessionNotes: '',
+          },
+        },
+      });
+      setShowAddPcModal(false);
+      setCustomPcName('');
+      setCustomPcPlayer('');
+    }
+  };
+
+  const handleRemovePcFromInstance = (pcId: string) => {
+    const nextIds = currentInstance.partyCharacterIds.filter((id) => id !== pcId);
+    updateInstance({ partyCharacterIds: nextIds });
+  };
+
   const handleSelectScene = (sceneId: string) => {
     const visited = currentInstance.visitedSceneIds.includes(sceneId)
       ? currentInstance.visitedSceneIds
@@ -213,7 +317,7 @@ export const LiveSessionConsole: React.FC<LiveSessionConsoleProps> = ({
         return {
           id: `comb-pc-${ch.id}`,
           sourceCharacterId: ch.id,
-          name: ch.name,
+          name: runtime?.customNameOverride || ch.name,
           kind: 'pc' as const,
           initiative: rollD20(ch.initiativeBonus),
           ac: ch.ac,
@@ -425,6 +529,7 @@ export const LiveSessionConsole: React.FC<LiveSessionConsoleProps> = ({
     combat.participants.forEach((p) => {
       if (p.kind === 'pc' && p.sourceCharacterId) {
         nextPcStatus[p.sourceCharacterId] = {
+          ...nextPcStatus[p.sourceCharacterId],
           characterId: p.sourceCharacterId,
           hpCurrent: p.hpCurrent,
           tempHp: p.tempHp,
@@ -493,9 +598,13 @@ export const LiveSessionConsole: React.FC<LiveSessionConsoleProps> = ({
   const generateMarkdownRecap = (): string => {
     const lines: string[] = [];
     lines.push(`# ${tr('Session Recap', 'Riepilogo Partita')}: ${adventure.title}`);
-    lines.push(`**${tr('Instance / Session', 'Istanza / Sessione')}**: ${currentInstance.instanceName}`);
+    lines.push(
+      `**${tr('Instance / Session', 'Istanza / Sessione')}**: ${currentInstance.instanceName}`
+    );
     lines.push(`**${tr('Party', 'Gruppo')}**: ${currentInstance.groupName}`);
-    lines.push(`**${tr('Current Scene', 'Scena Attuale')}**: ${currentScene.code} — ${currentScene.title}`);
+    lines.push(
+      `**${tr('Current Scene', 'Scena Attuale')}**: ${currentScene.code} — ${currentScene.title}`
+    );
     lines.push('');
     lines.push(`## ${tr('Party Heroes Status', 'Stato degli Eroi del Gruppo')}`);
     currentInstance.partyCharacterIds.forEach((pcId) => {
@@ -503,10 +612,14 @@ export const LiveSessionConsole: React.FC<LiveSessionConsoleProps> = ({
       const st = currentInstance.pcStatus[pcId];
       if (pc) {
         const hp = st ? st.hpCurrent : pc.hpMax;
+        const playerInfo = st?.playerOverride ? ` [${st.playerOverride}]` : '';
         const conds = st?.conditions?.length ? ` [${st.conditions.join(', ')}]` : '';
         const notes = st?.sessionNotes ? ` — *${st.sessionNotes}*` : '';
         lines.push(
-          `- **${pc.name}** (${pc.classOrArchetype}): ${tr('HP', 'PF')} ${hp}/${pc.hpMax}${conds}${notes}`
+          `- **${st?.customNameOverride || pc.name}**${playerInfo} (${pc.classOrArchetype}): ${tr(
+            'HP',
+            'PF'
+          )} ${hp}/${pc.hpMax}${conds}${notes}`
         );
       }
     });
@@ -552,6 +665,9 @@ export const LiveSessionConsole: React.FC<LiveSessionConsoleProps> = ({
   };
 
   const conditionsList = getDndConditions(lang);
+  const availableRepoPcs = characters.filter(
+    (c) => c.kind === 'pc' && !c.instanceOnlyId
+  );
 
   return (
     <div className="space-y-4">
@@ -756,8 +872,24 @@ export const LiveSessionConsole: React.FC<LiveSessionConsoleProps> = ({
 
           {/* 3. Party Runtime Tracker (Specific to THIS Instance!) */}
           <div className="bg-stone-900/90 border border-stone-800 rounded-xl p-3.5 space-y-2.5">
-            <div className="font-header text-xs font-bold text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
-              <Users className="w-4 h-4" /> {tr('Party:', 'Gruppo:')} {currentInstance.groupName}
+            <div className="flex items-center justify-between gap-2">
+              <div className="font-header text-xs font-bold text-amber-400 uppercase tracking-wider flex items-center gap-1.5 truncate">
+                <Users className="w-4 h-4 shrink-0" /> {tr('Party:', 'Gruppo:')}{' '}
+                <span className="truncate">{currentInstance.groupName}</span>
+              </div>
+              <button
+                onClick={() => {
+                  setSelectedRepoPcId(availableRepoPcs[0]?.id || '');
+                  setShowAddPcModal(true);
+                }}
+                className="px-2 py-1 rounded bg-amber-600/20 hover:bg-amber-600 text-amber-300 hover:text-stone-950 text-[10px] font-bold flex items-center gap-1 transition shrink-0 cursor-pointer"
+                title={tr(
+                  'Add a PC Blueprint or a custom Session-Only PC to this instance',
+                  'Aggiungi un PG Blueprint o un PG creato solo per questa istanza'
+                )}
+              >
+                <UserPlus className="w-3 h-3" /> {tr('+ Add PC', '+ Aggiungi PG')}
+              </button>
             </div>
 
             <div className="space-y-2">
@@ -787,14 +919,23 @@ export const LiveSessionConsole: React.FC<LiveSessionConsoleProps> = ({
                     key={pcId}
                     className="p-2.5 rounded-lg bg-stone-950 border border-stone-800 space-y-2 text-xs"
                   >
-                    <div className="flex items-center justify-between">
-                      <button
-                        onClick={() => setInspectedChar(pc)}
-                        className="font-bold text-amber-300 hover:underline text-left"
-                      >
-                        {pc.name}
-                      </button>
-                      <div className="flex items-center gap-1.5">
+                    <div className="flex items-center justify-between gap-1">
+                      <div className="flex items-center gap-2 min-w-0">
+                        {pc.portraitUrl && (
+                          <img
+                            src={pc.portraitUrl}
+                            alt={pc.name}
+                            className="w-7 h-7 rounded object-cover border border-amber-500/40 shrink-0"
+                          />
+                        )}
+                        <button
+                          onClick={() => setInspectedChar(pc)}
+                          className="font-bold text-amber-300 hover:underline text-left truncate"
+                        >
+                          {st.customNameOverride || pc.name}
+                        </button>
+                      </div>
+                      <div className="flex items-center gap-1 shrink-0">
                         <span className="px-1.5 py-0.5 rounded bg-stone-900 text-stone-300 text-[10px]">
                           {tr('AC', 'CA')} {pc.ac}
                         </span>
@@ -812,7 +953,52 @@ export const LiveSessionConsole: React.FC<LiveSessionConsoleProps> = ({
                         >
                           ★ {tr('Insp', 'Isp')}
                         </button>
+                        <button
+                          onClick={() =>
+                            downloadOfficialCharacterPdf(pc, lang, 'pc_sheet', st)
+                          }
+                          title={tr(
+                            'Export Official 5e PDF for this instance PC',
+                            'Esporta Scheda PDF Ufficiale 5e per questo PG'
+                          )}
+                          className="p-1 rounded bg-stone-900 hover:bg-amber-600 hover:text-stone-950 text-amber-300"
+                        >
+                          <FileDown className="w-3 h-3" />
+                        </button>
+                        <button
+                          onClick={() => handleRemovePcFromInstance(pcId)}
+                          title={tr(
+                            'Remove PC from this instance',
+                            'Rimuovi PG da questa istanza'
+                          )}
+                          className="p-0.5 text-stone-500 hover:text-red-400"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
                       </div>
+                    </div>
+
+                    {/* Player Name Override in this Instance (especially handy for Pre-Gen Blueprints) */}
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-[10px] text-stone-500 shrink-0">
+                        {tr('Player:', 'Giocatore:')}
+                      </span>
+                      <input
+                        type="text"
+                        value={
+                          st.playerOverride !== undefined
+                            ? st.playerOverride
+                            : isPcBlueprint(pc)
+                            ? ''
+                            : pc.playerOrRole.replace(/^(Player:|Giocatore:)\s*/i, '')
+                        }
+                        onChange={(e) => updatePc({ playerOverride: e.target.value })}
+                        placeholder={tr(
+                          'Assign player in this run...',
+                          'Assegna giocatore in questa sessione...'
+                        )}
+                        className="flex-1 px-1.5 py-0.5 rounded bg-stone-900 border border-stone-800 text-[11px] text-amber-200"
+                      />
                     </div>
 
                     {/* HP Bar & Quick Controls */}
@@ -995,7 +1181,10 @@ export const LiveSessionConsole: React.FC<LiveSessionConsoleProps> = ({
                       className="px-4 py-2.5 rounded-xl bg-stone-800 hover:bg-stone-700 text-amber-300 border border-amber-500/30 font-bold text-xs flex items-center gap-2"
                     >
                       <Plus className="w-4 h-4" />{' '}
-                      {tr('Start Ad-Hoc Encounter (With Party)', 'Inizia Scontro al Volo (Con il Party)')}
+                      {tr(
+                        'Start Ad-Hoc Encounter (With Party)',
+                        'Inizia Scontro al Volo (Con il Party)'
+                      )}
                     </button>
                   </div>
                 </div>
@@ -1355,6 +1544,205 @@ export const LiveSessionConsole: React.FC<LiveSessionConsoleProps> = ({
         </div>
       </div>
 
+      {/* Add PC to Instance Modal (From Blueprint/Repo OR Session-Only Custom PC) */}
+      {showAddPcModal && (
+        <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-stone-900 border border-stone-700 rounded-2xl max-w-lg w-full p-6 space-y-4 shadow-2xl text-xs">
+            <div className="flex items-center justify-between">
+              <h3 className="font-header text-xl font-bold text-amber-400 flex items-center gap-2">
+                <UserPlus className="w-5 h-5" />
+                {tr(
+                  'Add Player Character to This Instance',
+                  'Aggiungi PG a Questa Istanza di Gioco'
+                )}
+              </h3>
+              <button
+                onClick={() => setShowAddPcModal(false)}
+                className="text-stone-400 hover:text-stone-200"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2 bg-stone-950 p-1 rounded-xl border border-stone-800">
+              <button
+                type="button"
+                onClick={() => setAddPcMode('repository')}
+                className={`py-2 px-3 rounded-lg font-bold transition cursor-pointer ${
+                  addPcMode === 'repository'
+                    ? 'bg-amber-600 text-stone-950'
+                    : 'text-stone-400 hover:text-stone-200'
+                }`}
+              >
+                {tr(
+                  'From Blueprint / Repository',
+                  'Da Blueprint / Repository'
+                )}
+              </button>
+              <button
+                type="button"
+                onClick={() => setAddPcMode('custom_instance_only')}
+                className={`py-2 px-3 rounded-lg font-bold transition cursor-pointer ${
+                  addPcMode === 'custom_instance_only'
+                    ? 'bg-amber-600 text-stone-950'
+                    : 'text-stone-400 hover:text-stone-200'
+                }`}
+              >
+                {tr(
+                  'New Player PC (Instance Only)',
+                  'Nuovo PG del Giocatore (Solo Istanza)'
+                )}
+              </button>
+            </div>
+
+            {addPcMode === 'repository' ? (
+              <div className="space-y-3">
+                <p className="text-stone-400">
+                  {tr(
+                    'Pick a Pre-Generated PC Blueprint (or existing PC) and optionally assign the player who will pilot it in this session without altering the original blueprint.',
+                    'Scegli un PG Blueprint pre-generato dal Master (o un PG esistente) e assegna il giocatore che lo interpreterà in questa sessione senza alterare il blueprint base.'
+                  )}
+                </p>
+                <div>
+                  <label className="block text-stone-400 mb-1 font-semibold">
+                    {tr('Select PC Sheet / Blueprint', 'Seleziona Scheda PG / Blueprint')}
+                  </label>
+                  <select
+                    value={selectedRepoPcId}
+                    onChange={(e) => setSelectedRepoPcId(e.target.value)}
+                    className="w-full px-3 py-2 rounded bg-stone-950 border border-stone-700 text-amber-300 font-bold"
+                  >
+                    {availableRepoPcs.map((pc) => (
+                      <option key={pc.id} value={pc.id}>
+                        {pc.name} — {pc.classOrArchetype} ({pc.levelOrCr}){' '}
+                        {isPcBlueprint(pc)
+                          ? `[${tr('Pre-Gen Blueprint', 'Blueprint Pre-Gen')}]`
+                          : `(${pc.playerOrRole})`}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-stone-400 mb-1 font-semibold">
+                    {tr(
+                      'Player Name for This Instance (Optional)',
+                      'Nome Giocatore per Questa Istanza (Opzionale)'
+                    )}
+                  </label>
+                  <input
+                    type="text"
+                    value={sessionPlayerOverride}
+                    onChange={(e) => setSessionPlayerOverride(e.target.value)}
+                    placeholder={tr(
+                      'e.g. Marco (playing this pre-gen today)',
+                      'es. Marco (usa questo pre-generato oggi)'
+                    )}
+                    className="w-full px-3 py-2 rounded bg-stone-950 border border-stone-700 text-stone-100"
+                  />
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <p className="text-stone-400">
+                  {tr(
+                    'Create a character brought by a player specifically for this session/instance without cluttering your global DM Blueprints.',
+                    'Crea al volo il PG portato da un giocatore solo per questa istanza/sessione, senza doverlo salvare come Blueprint globale del Master.'
+                  )}
+                </p>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-stone-400 mb-1 font-semibold">
+                      {tr('Character Name', 'Nome Personaggio')}
+                    </label>
+                    <input
+                      type="text"
+                      value={customPcName}
+                      onChange={(e) => setCustomPcName(e.target.value)}
+                      placeholder={tr('e.g. Eldrin', 'es. Eldrin')}
+                      className="w-full px-3 py-1.5 rounded bg-stone-950 border border-stone-700 text-stone-100 font-bold"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-stone-400 mb-1 font-semibold">
+                      {tr('Player Name', 'Nome Giocatore')}
+                    </label>
+                    <input
+                      type="text"
+                      value={customPcPlayer}
+                      onChange={(e) => setCustomPcPlayer(e.target.value)}
+                      placeholder={tr('e.g. Davide', 'es. Davide')}
+                      className="w-full px-3 py-1.5 rounded bg-stone-950 border border-stone-700 text-stone-100"
+                    />
+                  </div>
+                </div>
+                <div className="grid grid-cols-4 gap-2">
+                  <div className="col-span-2">
+                    <label className="block text-stone-400 mb-1">
+                      {tr('Class / Subclass', 'Classe / Sottoclasse')}
+                    </label>
+                    <input
+                      type="text"
+                      value={customPcClass}
+                      onChange={(e) => setCustomPcClass(e.target.value)}
+                      placeholder={tr('e.g. Bard', 'es. Bardo')}
+                      className="w-full px-2.5 py-1.5 rounded bg-stone-950 border border-stone-700 text-stone-200"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-stone-400 mb-1">{tr('AC', 'CA')}</label>
+                    <input
+                      type="number"
+                      value={customPcAc}
+                      onChange={(e) => setCustomPcAc(Number(e.target.value))}
+                      className="w-full px-2 py-1.5 rounded bg-stone-950 border border-stone-700 text-amber-300 font-bold"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-stone-400 mb-1">{tr('Max HP', 'PF Max')}</label>
+                    <input
+                      type="number"
+                      value={customPcHp}
+                      onChange={(e) => setCustomPcHp(Number(e.target.value))}
+                      className="w-full px-2 py-1.5 rounded bg-stone-950 border border-stone-700 text-emerald-400 font-bold"
+                    />
+                  </div>
+                </div>
+                <label className="flex items-center gap-2 pt-1 cursor-pointer text-stone-300">
+                  <input
+                    type="checkbox"
+                    checked={saveCustomToGlobalRepo}
+                    onChange={(e) => setSaveCustomToGlobalRepo(e.target.checked)}
+                    className="accent-amber-500"
+                  />
+                  <span>
+                    {tr(
+                      'Also list this PC in the global Repository for future campaigns',
+                      'Mostra questo PG anche nel Repository globale per future campagne'
+                    )}
+                  </span>
+                </label>
+              </div>
+            )}
+
+            <div className="flex justify-end gap-2 pt-3 border-t border-stone-800">
+              <button
+                onClick={() => setShowAddPcModal(false)}
+                className="px-3 py-2 rounded-lg bg-stone-800 text-stone-300 font-semibold"
+              >
+                {tr('Cancel', 'Annulla')}
+              </button>
+              <button
+                onClick={handleAddPcToInstance}
+                className="px-4 py-2 rounded-lg bg-amber-600 hover:bg-amber-500 text-stone-950 font-extrabold flex items-center gap-1.5 shadow"
+              >
+                <Check className="w-4 h-4" />
+                {tr('Add to Instance Party', 'Aggiungi al Party dell’Istanza')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Character Inspector Modal */}
       {inspectedChar && (
         <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
@@ -1367,6 +1755,7 @@ export const LiveSessionConsole: React.FC<LiveSessionConsoleProps> = ({
             </button>
             <StatblockCard
               character={inspectedChar}
+              runtimeOverrides={currentInstance.pcStatus[inspectedChar.id]}
               onAddToCombat={(ch) => {
                 handleAddCreatureToActiveCombat(ch, 1);
                 setInspectedChar(null);
