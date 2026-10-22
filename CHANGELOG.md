@@ -4,6 +4,12 @@ All notable user-facing changes to Vellum are documented in this file.
 
 ## Unreleased
 
+- App: Replace cramped modal dialogs with full-page dedicated views for Character (PG) Creation and Character Sheet Editing:
+  - Full-page Supervised PC Creator (`SupervisedPgCreateView`) with spacious race and class cards, starting level slider, live attributes preview, and dual options to either "Save Direct to Repository" or "Customize in Full Editor".
+  - Full-page Character Sheet Editor (`FullPageCharacterEditor`) providing generous workspace, sticky action header (`Save Sheet`, `Level Up ▲`, `Export Official 5e PDF`), toggleable sticky live Statblock Preview panel, and bottom actions.
+  - Fix overlapping and crowded labels in character sheet editor: decoupled presets dropdowns and Level-Up buttons from field labels so they never collide or wrap awkwardly.
+  - Fix character header and badge squeezing in `StatblockCard`: separated character identity and portrait from card action buttons into an action toolbar so titles, names, and badges never get squished into narrow columns.
+
 - App: Add Supervised PG Creation, Editing, and Level-Up system for D&D 5e Player Characters (Blueprints and Active Heroes):
   - Guided creation wizard selecting Race, Class, and Level with automatic assembly of standard D&D 5e SRD traits, HP formulas, and class features.
   - Automatic source tagging for added traits and abilities (e.g. `(Elf) Darkvision`, `(Elf) Keen Senses`, `(Fighter) Action Surge`, `(Fighter) Second Wind`).

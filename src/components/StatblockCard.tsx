@@ -87,152 +87,151 @@ export const StatblockCard: React.FC<StatblockCardProps> = ({
 
       <div className={compact ? 'p-3.5' : 'p-5'}>
         {/* Header with optional Portrait */}
-        <div className="flex items-start justify-between gap-3">
-          <div className="flex items-start gap-3.5 min-w-0">
-            {character.portraitUrl && (
-              <div className="shrink-0">
-                <img
-                  src={character.portraitUrl}
-                  alt={character.name}
-                  className={`${
-                    compact ? 'w-14 h-14' : 'w-20 h-20'
-                  } rounded-lg object-cover border-2 border-[#58180D] shadow-md bg-[#efe0bb]`}
-                />
-              </div>
-            )}
-
-            <div className="min-w-0">
-              <div className="flex items-center gap-2 flex-wrap">
-                <h3 className="font-header text-xl md:text-2xl font-extrabold tracking-wide text-[#58180D] uppercase leading-tight">
-                  {runtimeOverrides?.customNameOverride || character.name}
-                </h3>
-                <span
-                  className={`text-[10px] font-sans font-bold uppercase px-2 py-0.5 rounded-full border ${
-                    isPc
-                      ? isBlueprint
-                        ? 'bg-purple-900/15 text-purple-900 border-purple-700/40'
-                        : 'bg-amber-800/15 text-amber-900 border-amber-700/40'
-                      : character.kind === 'npc'
-                      ? 'bg-sky-900/15 text-sky-900 border-sky-700/40'
-                      : isBoss
-                      ? 'bg-red-900/20 text-red-900 border-red-800/50'
-                      : 'bg-stone-800/15 text-stone-800 border-stone-600/40'
-                  }`}
-                >
-                  {isPc
-                    ? isBlueprint
-                      ? tr('PC Blueprint / Pre-Gen', 'PG Blueprint / Pre-Gen')
-                      : character.instanceOnlyId
-                      ? tr('Session-Only PC', 'PG Solo Sessione')
-                      : tr('Assigned PC', 'PG Giocante')
-                    : character.kind === 'npc'
-                    ? 'NPC'
-                    : isBoss
-                    ? 'Boss'
-                    : tr('Monster', 'Mostro')}
-                </span>
-                {character.sourceBlueprintId && (
-                  <span className="text-[10px] font-sans font-semibold px-2 py-0.5 rounded bg-[#58180D]/10 text-[#58180D]">
-                    {tr('From Blueprint', 'Da Blueprint')}
-                  </span>
-                )}
-              </div>
-
-              <p className="italic text-sm text-[#4a2b1d] mt-0.5">
-                {character.size} {character.creatureType}, {character.alignment}
-                {character.classOrArchetype ? ` — ${character.classOrArchetype}` : ''}
-                {character.background ? ` (${character.background})` : ''}
-              </p>
-
-              <p className="text-xs font-sans font-semibold text-[#58180D]/80 mt-0.5">
-                {displayPlayerOrRole} • <span className="font-bold">{character.levelOrCr}</span> •{' '}
-                <span>
-                  {tr('Prof. Bonus', 'Bonus Comp.')} {formatSignedBonus(pb)}
-                </span>
-              </p>
+        <div className="flex items-start gap-3.5 min-w-0">
+          {character.portraitUrl && (
+            <div className="shrink-0">
+              <img
+                src={character.portraitUrl}
+                alt={character.name}
+                className={`${
+                  compact ? 'w-14 h-14' : 'w-16 h-16 sm:w-20 sm:h-20'
+                } rounded-lg object-cover border-2 border-[#58180D] shadow-md bg-[#efe0bb]`}
+              />
             </div>
-          </div>
+          )}
 
-          <div className="flex flex-wrap items-center justify-end gap-1.5 shrink-0 font-sans">
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2 flex-wrap">
+              <h3 className="font-header text-xl md:text-2xl font-extrabold tracking-wide text-[#58180D] uppercase leading-tight break-words">
+                {runtimeOverrides?.customNameOverride || character.name}
+              </h3>
+              <span
+                className={`text-[10px] font-sans font-bold uppercase px-2 py-0.5 rounded-full border whitespace-nowrap ${
+                  isPc
+                    ? isBlueprint
+                      ? 'bg-purple-900/15 text-purple-900 border-purple-700/40'
+                      : 'bg-amber-800/15 text-amber-900 border-amber-700/40'
+                    : character.kind === 'npc'
+                    ? 'bg-sky-900/15 text-sky-900 border-sky-700/40'
+                    : isBoss
+                    ? 'bg-red-900/20 text-red-900 border-red-800/50'
+                    : 'bg-stone-800/15 text-stone-800 border-stone-600/40'
+                }`}
+              >
+                {isPc
+                  ? isBlueprint
+                    ? tr('PC Blueprint / Pre-Gen', 'PG Blueprint / Pre-Gen')
+                    : character.instanceOnlyId
+                    ? tr('Session-Only PC', 'PG Solo Sessione')
+                    : tr('Assigned PC', 'PG Giocante')
+                  : character.kind === 'npc'
+                  ? 'NPC'
+                  : isBoss
+                  ? 'Boss'
+                  : tr('Monster', 'Mostro')}
+              </span>
+              {character.sourceBlueprintId && (
+                <span className="text-[10px] font-sans font-semibold px-2 py-0.5 rounded bg-[#58180D]/10 text-[#58180D] whitespace-nowrap">
+                  {tr('From Blueprint', 'Da Blueprint')}
+                </span>
+              )}
+            </div>
+
+            <p className="italic text-sm text-[#4a2b1d] mt-1 break-words">
+              {character.size} {character.creatureType}, {character.alignment}
+              {character.classOrArchetype ? ` — ${character.classOrArchetype}` : ''}
+              {character.background ? ` (${character.background})` : ''}
+            </p>
+
+            <p className="text-xs font-sans font-semibold text-[#58180D]/80 mt-0.5">
+              {displayPlayerOrRole} • <span className="font-bold">{character.levelOrCr}</span> •{' '}
+              <span>
+                {tr('Prof. Bonus', 'Bonus Comp.')} {formatSignedBonus(pb)}
+              </span>
+            </p>
+          </div>
+        </div>
+
+        {/* Action Toolbar */}
+        <div className="flex flex-wrap items-center justify-start gap-1.5 pt-2 mt-2.5 border-t border-[#58180D]/20 font-sans">
+          <button
+            onClick={() => handleExportPdf(isPc ? 'pc_sheet' : 'statblock')}
+            disabled={exportingPdf}
+            title={
+              isPc
+                ? tr(
+                    'Export Official D&D 5e Character Sheet PDF (Pre-filled & Editable)',
+                    'Esporta Scheda Personaggio Ufficiale D&D 5e in PDF (Compilata e Modificabile)'
+                  )
+                : tr(
+                    'Export Official D&D 5e Statblock PDF',
+                    'Esporta Statblock Ufficiale D&D 5e in PDF'
+                  )
+            }
+            className="px-2.5 py-1 text-xs font-bold rounded bg-[#58180D] text-amber-100 hover:bg-[#7a2213] transition flex items-center gap-1 shadow-sm cursor-pointer disabled:opacity-50"
+          >
+            <FileDown className="w-3.5 h-3.5" />
+            {exportingPdf
+              ? tr('Generating PDF...', 'Creazione PDF...')
+              : isPc
+              ? tr('Official 5e PDF Sheet', 'PDF Scheda Ufficiale 5e')
+              : tr('Official 5e PDF', 'PDF Ufficiale 5e')}
+          </button>
+
+          {isPc && !compact && (
             <button
-              onClick={() => handleExportPdf(isPc ? 'pc_sheet' : 'statblock')}
+              onClick={() => handleExportPdf('statblock')}
               disabled={exportingPdf}
-              title={
-                isPc
-                  ? tr(
-                      'Export Official D&D 5e Character Sheet PDF (Pre-filled & Editable)',
-                      'Esporta Scheda Personaggio Ufficiale D&D 5e in PDF (Compilata e Modificabile)'
-                    )
-                  : tr(
-                      'Export Official D&D 5e Statblock PDF',
-                      'Esporta Statblock Ufficiale D&D 5e in PDF'
-                    )
-              }
-              className="px-2.5 py-1 text-xs font-bold rounded bg-[#58180D] text-amber-100 hover:bg-[#7a2213] transition flex items-center gap-1 shadow-sm cursor-pointer disabled:opacity-50"
+              title={tr('Export compact Statblock PDF', 'Esporta PDF formato Statblock compatto')}
+              className="px-2 py-1 text-[11px] font-semibold rounded border border-[#58180D]/40 text-[#58180D] hover:bg-[#58180D]/10 transition cursor-pointer"
             >
-              <FileDown className="w-3.5 h-3.5" />
-              {exportingPdf
-                ? tr('Generating PDF...', 'Creazione PDF...')
-                : isPc
-                ? tr('Official 5e PDF Sheet', 'PDF Scheda Ufficiale 5e')
-                : tr('Official 5e PDF', 'PDF Ufficiale 5e')}
+              PDF Statblock
             </button>
+          )}
 
-            {isPc && !compact && (
-              <button
-                onClick={() => handleExportPdf('statblock')}
-                disabled={exportingPdf}
-                title={tr('Export compact Statblock PDF', 'Esporta PDF formato Statblock compatto')}
-                className="px-2 py-1 text-[11px] font-semibold rounded border border-[#58180D]/40 text-[#58180D] hover:bg-[#58180D]/10 transition cursor-pointer"
-              >
-                PDF Statblock
-              </button>
-            )}
+          {isPc && onCreatePcInstance && (
+            <button
+              onClick={() => onCreatePcInstance(character)}
+              title={tr(
+                'Create an assigned player instance from this PC Blueprint',
+                'Crea un’istanza assegnata a un giocatore partendo da questo Blueprint PG'
+              )}
+              className="px-2.5 py-1 text-xs font-semibold rounded bg-amber-700 text-white hover:bg-amber-800 transition flex items-center gap-1 shadow-sm cursor-pointer"
+            >
+              <UserPlus className="w-3.5 h-3.5" />
+              {tr('Instantiate for Player', 'Crea Istanza Giocatore')}
+            </button>
+          )}
 
-            {isPc && onCreatePcInstance && (
-              <button
-                onClick={() => onCreatePcInstance(character)}
-                title={tr(
-                  'Create an assigned player instance from this PC Blueprint',
-                  'Crea un’istanza assegnata a un giocatore partendo da questo Blueprint PG'
-                )}
-                className="px-2.5 py-1 text-xs font-semibold rounded bg-amber-700 text-white hover:bg-amber-800 transition flex items-center gap-1 shadow-sm cursor-pointer"
-              >
-                <UserPlus className="w-3.5 h-3.5" />
-                {tr('Instantiate for Player', 'Crea Istanza Giocatore')}
-              </button>
-            )}
+          {onAddToCombat && (
+            <button
+              onClick={() => onAddToCombat(character)}
+              title={tr('Add to active combat', 'Aggiungi al Combattimento attivo')}
+              className="px-2.5 py-1 text-xs font-semibold rounded bg-red-900 text-amber-100 hover:bg-red-800 transition flex items-center gap-1 shadow-sm cursor-pointer"
+            >
+              <Swords className="w-3.5 h-3.5" />
+              {tr('To Combat', 'In Combat')}
+            </button>
+          )}
 
-            {onAddToCombat && (
-              <button
-                onClick={() => onAddToCombat(character)}
-                title={tr('Add to active combat', 'Aggiungi al Combattimento attivo')}
-                className="px-2.5 py-1 text-xs font-semibold rounded bg-red-900 text-amber-100 hover:bg-red-800 transition flex items-center gap-1 shadow-sm cursor-pointer"
-              >
-                <Swords className="w-3.5 h-3.5" />
-                {tr('To Combat', 'In Combat')}
-              </button>
-            )}
-
-            {isPc && onLevelUp && (
-              <button
-                onClick={() => onLevelUp(character)}
-                title={tr('Level Up this character', 'Fai salire di livello questo personaggio')}
-                className="px-2.5 py-1 text-xs font-bold rounded bg-purple-800 text-purple-100 hover:bg-purple-700 transition flex items-center gap-1 shadow-sm cursor-pointer"
-              >
-                <TrendingUp className="w-3.5 h-3.5" />
-                {tr('Level Up', 'Livello +')}
-              </button>
-            )}
-            {onEdit && (
-              <button
-                onClick={() => onEdit(character)}
-                className="px-2.5 py-1 text-xs font-semibold rounded border border-[#58180D]/40 text-[#58180D] hover:bg-[#58180D]/10 transition cursor-pointer"
-              >
-                {tr('Edit', 'Modifica')}
-              </button>
-            )}
-          </div>
+          {isPc && onLevelUp && (
+            <button
+              onClick={() => onLevelUp(character)}
+              title={tr('Level Up this character', 'Fai salire di livello questo personaggio')}
+              className="px-2.5 py-1 text-xs font-bold rounded bg-purple-800 text-purple-100 hover:bg-purple-700 transition flex items-center gap-1 shadow-sm cursor-pointer"
+            >
+              <TrendingUp className="w-3.5 h-3.5" />
+              {tr('Level Up', 'Livello +')}
+            </button>
+          )}
+          {onEdit && (
+            <button
+              onClick={() => onEdit(character)}
+              className="px-2.5 py-1 text-xs font-semibold rounded border border-[#58180D]/40 text-[#58180D] hover:bg-[#58180D]/10 transition cursor-pointer"
+            >
+              {tr('Edit', 'Modifica')}
+            </button>
+          )}
         </div>
 
         {/* Tapered Crimson Rule */}
