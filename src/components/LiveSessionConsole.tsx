@@ -16,6 +16,7 @@ import {
 import { useLanguage } from '../i18n/LanguageContext';
 import { HomebreweryRenderer } from './HomebreweryRenderer';
 import { StatblockCard } from './StatblockCard';
+import { LevelUpModal } from './LevelUpModal';
 import { soundboardEngine } from '../services/audioEngine';
 import { downloadOfficialCharacterPdf } from '../services/pdfExporter';
 import {
@@ -40,6 +41,7 @@ import {
   X,
   Flame,
   FileDown,
+  TrendingUp,
 } from 'lucide-react';
 
 interface LiveSessionConsoleProps {
@@ -73,6 +75,7 @@ export const LiveSessionConsole: React.FC<LiveSessionConsoleProps> = ({
   const [centerTab, setCenterTab] = useState<'story' | 'combat'>('story');
   const [hideDmNotes, setHideDmNotes] = useState(false);
   const [inspectedChar, setInspectedChar] = useState<CharacterEntity | null>(null);
+  const [levelUpPc, setLevelUpPc] = useState<CharacterEntity | null>(null);
 
   const [logCategory, setLogCategory] = useState<SessionLogCategory>('choice');
   const [logTitle, setLogTitle] = useState('');
@@ -966,6 +969,13 @@ export const LiveSessionConsole: React.FC<LiveSessionConsoleProps> = ({
                           <FileDown className="w-3 h-3" />
                         </button>
                         <button
+                          onClick={() => setLevelUpPc(pc)}
+                          title={tr('Level Up this hero', 'Fai salire di livello questo eroe')}
+                          className="p-1 rounded bg-stone-900 hover:bg-purple-600 hover:text-white text-purple-300 transition"
+                        >
+                          <TrendingUp className="w-3 h-3" />
+                        </button>
+                        <button
                           onClick={() => handleRemovePcFromInstance(pcId)}
                           title={tr(
                             'Remove PC from this instance',
@@ -1756,6 +1766,7 @@ export const LiveSessionConsole: React.FC<LiveSessionConsoleProps> = ({
             <StatblockCard
               character={inspectedChar}
               runtimeOverrides={currentInstance.pcStatus[inspectedChar.id]}
+              onLevelUp={(ch) => setLevelUpPc(ch)}
               onAddToCombat={(ch) => {
                 handleAddCreatureToActiveCombat(ch, 1);
                 setInspectedChar(null);
@@ -1763,6 +1774,46 @@ export const LiveSessionConsole: React.FC<LiveSessionConsoleProps> = ({
             />
           </div>
         </div>
+      )}
+
+      {/* Hero Level-Up Modal in Live Session */}
+      {levelUpPc && (
+        <LevelUpModal
+          isOpen={Boolean(levelUpPc)}
+          character={levelUpPc}
+          onClose={() => setLevelUpPc(null)}
+          onSave={(updatedChar) => {
+            onSaveCharacter(updatedChar);
+            const st = currentInstance.pcStatus[updatedChar.id];
+            if (st) {
+              const hpDelta = Math.max(0, updatedChar.hpMax - levelUpPc.hpMax);
+              updateInstance({
+                pcStatus: {
+                  ...currentInstance.pcStatus,
+                  [updatedChar.id]: {
+                    ...st,
+                    hpCurrent: (st.hpCurrent || levelUpPc.hpMax) + hpDelta,
+                  },
+                },
+              });
+            }
+            appendLogEntry(
+              'choice',
+              tr(
+                `${updatedChar.name} Leveled Up to ${updatedChar.levelOrCr}`,
+                `${updatedChar.name} è salito a ${updatedChar.levelOrCr}`
+              ),
+              tr(
+                `Max HP increased to ${updatedChar.hpMax} (${updatedChar.hitDiceFormula}).`,
+                `PF Massimi aumentati a ${updatedChar.hpMax} (${updatedChar.hitDiceFormula}).`
+              )
+            );
+            if (inspectedChar?.id === updatedChar.id) {
+              setInspectedChar(updatedChar);
+            }
+            setLevelUpPc(null);
+          }}
+        />
       )}
 
       {/* Markdown Recap Modal */}

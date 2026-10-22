@@ -25,12 +25,14 @@ import {
   Sparkles,
   ChevronDown,
   ChevronUp,
+  TrendingUp,
 } from 'lucide-react';
 
 interface StatblockCardProps {
   character: CharacterEntity;
   compact?: boolean;
   onEdit?: (char: CharacterEntity) => void;
+  onLevelUp?: (char: CharacterEntity) => void;
   onAddToCombat?: (char: CharacterEntity) => void;
   onCreatePcInstance?: (blueprint: CharacterEntity) => void;
   runtimeOverrides?: {
@@ -47,6 +49,7 @@ export const StatblockCard: React.FC<StatblockCardProps> = ({
   character,
   compact = false,
   onEdit,
+  onLevelUp,
   onAddToCombat,
   onCreatePcInstance,
   runtimeOverrides,
@@ -211,6 +214,16 @@ export const StatblockCard: React.FC<StatblockCardProps> = ({
               </button>
             )}
 
+            {isPc && onLevelUp && (
+              <button
+                onClick={() => onLevelUp(character)}
+                title={tr('Level Up this character', 'Fai salire di livello questo personaggio')}
+                className="px-2.5 py-1 text-xs font-bold rounded bg-purple-800 text-purple-100 hover:bg-purple-700 transition flex items-center gap-1 shadow-sm cursor-pointer"
+              >
+                <TrendingUp className="w-3.5 h-3.5" />
+                {tr('Level Up', 'Livello +')}
+              </button>
+            )}
             {onEdit && (
               <button
                 onClick={() => onEdit(character)}

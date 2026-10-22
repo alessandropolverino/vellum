@@ -130,6 +130,14 @@ node bin/vellum.mjs <command> [subcommand] [arguments] [options]
   ```bash
   npm run cli -- characters update <characterId> --hp 45 --ac 19 --json
   ```
+- **Level up character (in-place or save as new blueprint)**:
+  ```bash
+  # In-place level-up (advances level, recalculates HP max and hit dice formula)
+  npm run cli -- characters level-up <characterId> --to-level 5 --json
+
+  # Level up and save as new blueprint template (preserves lower-level original)
+  npm run cli -- characters level-up <characterId> --to-level 5 --save-as-new --name "Valerius (Level 5)" --json
+  ```
 - **Delete character**:
   ```bash
   npm run cli -- characters delete <characterId> [--force] --json
