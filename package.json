@@ -4,11 +4,15 @@
   "version": "0.1.0",
   "description": "Vellum — D&D 5e Campaign & One-Shot Manager with Homebrewery-style editor, Multi-instance runs, Combat Tracker & SFX Soundboard",
   "type": "module",
+  "bin": {
+    "vellum": "./bin/vellum.mjs"
+  },
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
     "preview": "vite preview",
-    "tauri": "tauri"
+    "tauri": "tauri",
+    "cli": "node bin/vellum.mjs"
   },
   "dependencies": {
     "lucide-react": "^1.16.0",

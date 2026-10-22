@@ -10,7 +10,7 @@ src-tauri/target/
 src-tauri/gen/
 
 # Agent worktrees & local session state
-.claude/
+.claude/worktrees/
 
 # Local runtime database (generated at runtime)
 data/dnd5e-db.json

@@ -6,6 +6,12 @@
   - `npm run dev` — Start Vite dev server (`http://localhost:1420`) with local disk DB API (`./data/dnd5e-db.json`).
   - `npm run build` — Run `tsc -b && vite build` to verify TypeScript and bundle frontend.
   - `npm run tauri dev` / `npm run tauri build` — Run or package the native Tauri v2 desktop application.
+  - `npm run cli -- <cmd>` — Execute Vellum CLI commands for CRUD operations on stories, characters/PGs, campaigns, parties, encounters, instances, and DB maintenance.
+
+## CLI & AI Agent Skill
+- **Vellum CLI** (`bin/vellum.mjs`, executable via `npm run cli -- ...` or `node bin/vellum.mjs ...`): Allows developers and autonomous AI agents (Claude, Gemini, Codex, Antigravity) to perform full CRUD operations on all entities.
+- **Skill reference**: See [`skills/vellum-cli/SKILL.md`](./skills/vellum-cli/SKILL.md) and run `npm run cli -- agent-guide` for comprehensive schemas, patterns, and examples.
+- **Agent Rules**: Always use `--json` for tool invocations; use `@filepath` syntax for long markdown or JSON payloads; run `npm run cli -- db validate --json` to verify integrity after mutations.
 
 ## Language & Localization (i18n)
 - **English is the primary language** across the entire project: all source code identifiers, comments, commit messages, PR descriptions, `README.md`, `CHANGELOG.md`, agent instructions, and default seed data (`SEED_DATABASE_EN`) must be written in English.
