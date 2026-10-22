@@ -50,6 +50,8 @@ export function handleCharacters(action, positionals, options) {
       return updateCharacter(positionals[0], options, db);
     case 'delete':
       return deleteCharacter(positionals[0], options, db);
+    case 'level-up':
+      return levelUpCharacter(positionals[0], options, db);
     default:
       if (!action || action === 'help') {
         printCharactersHelp();
@@ -348,6 +350,94 @@ function handleCharacterActions(actionCmd, positionals, options, db) {
   }
 }
 
+
+function levelUpCharacter(id, options, db) {
+  if (!id) error('Character ID is required for level-up. e.g. vellum characters level-up <id> --to-level <N>');
+
+  const index = (db.characters || []).findIndex((c) => c.id === id);
+  if (index === -1) error(`Character '${id}' not found in database.`);
+
+  const original = db.characters[index];
+  const currentMatch = (original.levelOrCr || '').match(/(\d+)/);
+  const currentLevel = currentMatch ? parseInt(currentMatch[1], 10) : 1;
+
+  const toLevel = options['to-level'] ? Number(options['to-level']) : options.level ? Number(options.level) : currentLevel + 1;
+  if (isNaN(toLevel) || toLevel < 1 || toLevel > 20) {
+    error(`Invalid target level '${toLevel}'. Must be between 1 and 20.`);
+  }
+  if (toLevel <= currentLevel) {
+    error(`Target level (${toLevel}) must be greater than current level (${currentLevel}).`);
+  }
+
+  // Detect hit die from hitDiceFormula or class
+  let hitDie = 8;
+  const formulaMatch = (original.hitDiceFormula || '').match(/d(\d+)/);
+  if (formulaMatch) {
+    hitDie = parseInt(formulaMatch[1], 10);
+  } else {
+    const cls = (original.classOrArchetype || '').toLowerCase();
+    if (cls.includes('barbarian') || cls.includes('barbaro')) hitDie = 12;
+    else if (cls.includes('fighter') || cls.includes('guerriero') || cls.includes('paladin') || cls.includes('paladino') || cls.includes('ranger')) hitDie = 10;
+    else if (cls.includes('wizard') || cls.includes('mago') || cls.includes('sorcerer') || cls.includes('stregone')) hitDie = 6;
+  }
+
+  const conScore = original.abilities?.con || 10;
+  const conMod = Math.floor((conScore - 10) / 2);
+  const levelsGained = toLevel - currentLevel;
+
+  const avgPerLevel = Math.max(1, Math.floor(hitDie / 2) + 1 + conMod);
+  const maxPerLevel = Math.max(1, hitDie + conMod);
+  const hpGain = options['hp-mode'] === 'max' ? levelsGained * maxPerLevel : levelsGained * avgPerLevel;
+  const newHpMax = Math.max(1, (original.hpMax || 10) + hpGain);
+
+  const totalConMod = conMod * toLevel;
+  const newHitDiceFormula = totalConMod > 0 ? `${toLevel}d${hitDie} + ${totalConMod}` : totalConMod < 0 ? `${toLevel}d${hitDie} - ${Math.abs(totalConMod)}` : `${toLevel}d${hitDie}`;
+
+  const isItalian = (original.levelOrCr || '').toLowerCase().includes('livello');
+  const newLevelStr = isItalian ? `Livello ${toLevel}` : `Level ${toLevel}`;
+
+  const saveAsNew = Boolean(options['save-as-new']);
+  const updated = structuredClone(original);
+  updated.levelOrCr = newLevelStr;
+  updated.hpMax = newHpMax;
+  updated.hitDiceFormula = newHitDiceFormula;
+
+  if (saveAsNew) {
+    updated.id = `pc-bp-${Date.now()}`;
+    updated.name = options.name || `${original.name} (${newLevelStr})`;
+    updated.isPreGenBlueprint = true;
+    updated.sourceBlueprintId = original.id;
+    if (!updated.tags.includes('Pre-Gen Blueprint') && !updated.tags.includes('Blueprint Pre-Gen')) {
+      updated.tags.push(isItalian ? 'Blueprint Pre-Gen' : 'Pre-Gen Blueprint');
+    }
+    db.characters.push(updated);
+  } else {
+    db.characters[index] = updated;
+  }
+
+  saveDb(db, options);
+
+  if (options.json) {
+    printJson({
+      action: 'level-up',
+      saveMode: saveAsNew ? 'save-as-new' : 'update',
+      originalId: original.id,
+      character: updated,
+      gainedLevels: levelsGained,
+      hpGain,
+      newHpMax,
+      newHitDiceFormula,
+    });
+  } else {
+    success(
+      saveAsNew
+        ? `Created new Leveled Blueprint "${updated.name}" [${updated.id}] at ${newLevelStr} (HP: ${newHpMax}, ${newHitDiceFormula}).`
+        : `Leveled up "${updated.name}" from Lv ${currentLevel} to ${newLevelStr} (HP: ${newHpMax}, ${newHitDiceFormula}).`,
+      options
+    );
+  }
+}
+
 function printCharactersHelp() {
   console.log(`
 ${c.bold('vellum characters')} (alias: pgs, chars) — Manage PCs, NPCs, and Monsters
@@ -358,6 +448,7 @@ ${c.bold('USAGE:')}
   vellum characters create --name <name> [options]
   vellum characters update <id> [options]
   vellum characters delete <id> [--force]
+  vellum characters level-up <id> --to-level <N> [--save-as-new] [--hp-mode <average|max>] [--name <name>]
 
   vellum characters action add <characterId> --name <name> --desc <desc> [options]
   vellum characters action remove <characterId> <actionName> [options]

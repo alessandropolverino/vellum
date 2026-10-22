@@ -4,6 +4,15 @@ All notable user-facing changes to Vellum are documented in this file.
 
 ## Unreleased
 
+- App: Add Supervised PG Creation, Editing, and Level-Up system for D&D 5e Player Characters (Blueprints and Active Heroes):
+  - Guided creation wizard selecting Race, Class, and Level with automatic assembly of standard D&D 5e SRD traits, HP formulas, and class features.
+  - Automatic source tagging for added traits and abilities (e.g. `(Elf) Darkvision`, `(Elf) Keen Senses`, `(Fighter) Action Surge`, `(Fighter) Second Wind`).
+  - Real-time rules validation advisory banner checking HP ranges, hit dice formulas, saving throw proficiencies, proficiency bonus, and ability scores with one-click standard alignment.
+  - Non-blocking Master authority: The Dungeon Master is ALWAYS the final decision maker; all inputs support custom/homebrew values and a prominent "Continue anyway / Master Override" mechanism.
+  - Interactive Level-Up Wizard supporting both Pre-Gen Blueprints and active campaign PCs, with target level jumping, average or rolled HP calculation, proficiency bonus scaling (+2 to +6), new feature unlock checklists, and notification badges for pending choices (ASI/feats, subclasses, expertise).
+  - Dual-save pathways for Blueprints: "Save as New Leveled Blueprint" (preserving lower-level templates) vs "Update Existing Blueprint".
+  - CLI command `vellum characters level-up <id> --to-level <N> [--save-as-new] [--name <name>] [--json]` for AI agent automation.
+
 - App: Add cross-platform `Makefile` (Unix/Linux/macOS/Windows) and Windows PowerShell scripts (`dev.ps1` and `build.ps1`) for starting the development server and building the application.
 - App: Add Pre-Gen PC Blueprints, player/instance PC instantiation, session-only custom PCs in the Live Session Console, full D&D 5e 18-skill & 6-saving-throw matrix with proficiency/expertise calculation, character/NPC/monster portraits, and official D&D 5e PDF Character Sheet & Statblock export.
 - App: Add comprehensive Vellum CLI (`npm run cli -- ...`) and AI agent skill (`skills/vellum-cli/SKILL.md`) for programmatic CRUD operations on stories, characters/PGs, campaigns, parties, encounters, instances, and DB maintenance with `--json` support and integrity validation.

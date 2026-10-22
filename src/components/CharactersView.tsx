@@ -22,6 +22,17 @@ import {
 } from '../types/dnd';
 import { useLanguage } from '../i18n/LanguageContext';
 import { StatblockCard } from './StatblockCard';
+import { SupervisedPgCreateModal } from './SupervisedPgCreateModal';
+import { LevelUpModal } from './LevelUpModal';
+import {
+  validatePgCombination,
+  STANDARD_RACES,
+  STANDARD_CLASSES,
+  findStandardRace,
+  findStandardClass,
+  applyStandardTemplate,
+  parsePgLevel,
+} from '../data/dnd5eRules';
 import { downloadOfficialCharacterPdf } from '../services/pdfExporter';
 import {
   Users,
@@ -37,6 +48,10 @@ import {
   ImagePlus,
   Sparkles,
   X,
+  TrendingUp,
+  AlertTriangle,
+  CheckCircle2,
+  Wrench,
 } from 'lucide-react';
 
 interface CharactersViewProps {
@@ -64,6 +79,15 @@ export const CharactersView: React.FC<CharactersViewProps> = ({
   const [selectedId, setSelectedId] = useState<string>(characters[0]?.id || '');
   const [editingChar, setEditingChar] = useState<CharacterEntity | null>(null);
   const [editingParty, setEditingParty] = useState<PartyGroup | null>(null);
+
+  // Supervised creation & level-up states
+  const [showSupervisedCreate, setShowSupervisedCreate] = useState<{
+    isOpen: boolean;
+    isBlueprint: boolean;
+  } | null>(null);
+  const [levelUpTargetChar, setLevelUpTargetChar] = useState<CharacterEntity | null>(null);
+  const [masterOverrideAccepted, setMasterOverrideAccepted] = useState(false);
+  const [showWarningConfirmation, setShowWarningConfirmation] = useState(false);
 
   // Modal to instantiate an assigned Player Character from a Pre-Gen Blueprint
   const [instantiatingBlueprint, setInstantiatingBlueprint] = useState<CharacterEntity | null>(
@@ -101,72 +125,56 @@ export const CharactersView: React.FC<CharactersViewProps> = ({
     visibleCharacters[0];
 
   const handleCreateNew = (kind: EntityKind, asPreGenBlueprint = false) => {
+    if (kind === 'pc') {
+      setShowSupervisedCreate({ isOpen: true, isBlueprint: asPreGenBlueprint });
+      return;
+    }
+    const isNpc = kind === 'npc';
     const newChar: CharacterEntity = {
       id: `${kind}-${Date.now()}`,
       kind,
-      name:
-        kind === 'pc'
-          ? asPreGenBlueprint
-            ? tr('Pre-Gen Hero Archetype', 'Eroe Pre-Generato (Blueprint)')
-            : tr('New PC Hero', 'Nuovo Eroe PG')
-          : kind === 'npc'
-          ? tr('New Notable NPC', 'Nuovo PNG Importante')
-          : tr('New Creature / Monster', 'Nuova Creatura / Mostro'),
-      playerOrRole:
-        kind === 'pc'
-          ? asPreGenBlueprint
-            ? ''
-            : tr('Player: ...', 'Giocatore: ...')
-          : kind === 'npc'
-          ? tr('NPC — Ally / Contact', 'NPC — Alleato / Contatto')
-          : tr('Dungeon Monster', 'Mostro Dungeon'),
-      isPreGenBlueprint: kind === 'pc' ? asPreGenBlueprint : undefined,
-      background: kind === 'pc' ? tr('Folk Hero', 'Eroe Popolare') : undefined,
+      name: isNpc
+        ? tr('New Notable NPC', 'Nuovo PNG Importante')
+        : tr('New Creature / Monster', 'Nuova Creatura / Mostro'),
+      playerOrRole: isNpc
+        ? tr('NPC — Ally / Contact', 'NPC — Alleato / Contatto')
+        : tr('Dungeon Monster', 'Mostro Dungeon'),
+      background: undefined,
       size: tr('Medium', 'Media'),
-      creatureType: tr('Humanoid', 'Umanoide'),
-      alignment: tr('Neutral Good', 'Neutrale Buono'),
-      classOrArchetype: kind === 'pc' ? tr('Fighter', 'Guerriero') : '',
-      levelOrCr: kind === 'pc' ? tr('Level 3', 'Livello 3') : tr('CR 1 (200 XP)', 'GS 1 (200 PE)'),
-      ac: 15,
-      acNote: tr('(Chain shirt)', '(Cotta di maglia)'),
-      hpMax: 28,
-      hitDiceFormula: '3d10 + 6',
+      creatureType: isNpc ? tr('Humanoid', 'Umanoide') : tr('Monstrosity', 'Mostruosità'),
+      alignment: tr('Neutral', 'Neutrale'),
+      classOrArchetype: '',
+      levelOrCr: tr('CR 1 (200 XP)', 'GS 1 (200 PE)'),
+      ac: 13,
+      acNote: '',
+      hpMax: 22,
+      hitDiceFormula: '4d8 + 4',
       speed: tr('30 ft.', '9m'),
-      initiativeBonus: 2,
-      passivePerception: 13,
-      abilities: { str: 16, dex: 14, con: 14, int: 10, wis: 12, cha: 11 },
-      savingThrowProficiencies: { str: true, con: true },
-      skillProficiencies: { athletics: 1, perception: 1 },
-      savingThrows: tr('STR +5, CON +4', 'FOR +5, COS +4'),
-      skills: tr('Athletics +5, Perception +3', 'Atletica +5, Percezione +3'),
-      senses: tr('Passive Perception 13', 'Percezione passiva 13'),
+      initiativeBonus: 1,
+      passivePerception: 11,
+      abilities: { str: 14, dex: 12, con: 12, int: 10, wis: 12, cha: 10 },
+      savingThrowProficiencies: {},
+      skillProficiencies: {},
+      savingThrows: '',
+      skills: '',
+      senses: tr('Passive Perception 11', 'Percezione passiva 11'),
       languages: tr('Common', 'Comune'),
-      traits: [
-        {
-          name: tr('Second Wind', 'Recuperare Energie'),
-          description: tr(
-            'Use a bonus action to regain 1d10 + 3 hit points.',
-            'Usa un’azione bonus per recuperare 1d10 + 3 punti ferita.'
-          ),
-        },
-      ],
+      traits: [],
       actions: [
         {
-          name: tr('Longsword', 'Spada Lunga'),
+          name: tr('Melee Strike', 'Attacco in Mischia'),
           description: tr(
-            'Melee Weapon Attack: +5 to hit, reach 5 ft. Hit: 1d8 + 3 slashing damage.',
-            'Attacco con arma da mischia: +5 a colpire, portata 1,5m. Colpito: 1d8 + 3 danni taglienti.'
+            'Melee Weapon Attack: +4 to hit, reach 5 ft. Hit: 1d6 + 2 damage.',
+            'Attacco con arma da mischia: +4 a colpire, portata 1,5m. Colpito: 1d6 + 2 danni.'
           ),
-          attackBonus: 5,
-          damageFormula: '1d8+3',
+          attackBonus: 4,
+          damageFormula: '1d6+2',
         },
       ],
       reactionsOrLegendary: [],
       spellsNotes: '',
       biographyOrLore: '',
-      tags: asPreGenBlueprint
-        ? [tr('Pre-Gen Blueprint', 'Blueprint Pre-Gen')]
-        : [tr('New', 'Nuovo')],
+      tags: [tr('New', 'Nuovo')],
     };
     setEditingChar(newChar);
   };
@@ -610,6 +618,22 @@ export const CharactersView: React.FC<CharactersViewProps> = ({
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
+                            setLevelUpTargetChar(c);
+                          }}
+                          title={tr(
+                            'Level Up this character (Wizard)',
+                            'Fai salire di livello questo personaggio'
+                          )}
+                          className="px-2 py-0.5 text-[11px] rounded bg-purple-900/60 hover:bg-purple-700 text-purple-200 font-semibold transition flex items-center gap-1 cursor-pointer"
+                        >
+                          <TrendingUp className="w-3 h-3" />
+                          {tr('Lv +', 'Liv +')}
+                        </button>
+                      )}
+                      {c.kind === 'pc' && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
                             openInstantiateModal(c);
                           }}
                           title={tr(
@@ -693,7 +717,15 @@ export const CharactersView: React.FC<CharactersViewProps> = ({
                 </div>
                 <StatblockCard
                   character={selectedCharacter}
-                  onEdit={(ch) => setEditingChar(structuredClone(ch))}
+                  onEdit={(ch) => {
+                    setEditingChar(structuredClone(ch));
+                    setMasterOverrideAccepted(false);
+                  }}
+                  onLevelUp={
+                    selectedCharacter.kind === 'pc'
+                      ? (ch) => setLevelUpTargetChar(ch)
+                      : undefined
+                  }
                   onCreatePcInstance={
                     selectedCharacter.kind === 'pc'
                       ? (bp) => openInstantiateModal(bp)
@@ -823,27 +855,49 @@ export const CharactersView: React.FC<CharactersViewProps> = ({
                 {tr('D&D 5e Sheet Editor', 'Editor Scheda D&D 5e')} — {editingChar.name}
               </h3>
               <div className="flex items-center gap-2">
+                {editingChar.kind === 'pc' && (
+                  <button
+                    type="button"
+                    onClick={() => setLevelUpTargetChar(editingChar)}
+                    className="px-3 py-1.5 rounded-lg bg-purple-700 hover:bg-purple-600 text-purple-100 text-xs font-bold flex items-center gap-1.5 shadow cursor-pointer transition"
+                  >
+                    <TrendingUp className="w-4 h-4" />
+                    {tr('Level Up', 'Passaggio di Livello')}
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={() => downloadOfficialCharacterPdf(editingChar, lang)}
-                  className="px-3 py-1.5 rounded-lg bg-stone-800 hover:bg-stone-700 text-amber-300 border border-amber-500/30 text-xs font-bold flex items-center gap-1.5"
+                  className="px-3 py-1.5 rounded-lg bg-stone-800 hover:bg-stone-700 text-amber-300 border border-amber-500/30 text-xs font-bold flex items-center gap-1.5 cursor-pointer"
                 >
                   <FileDown className="w-4 h-4" />
                   {tr('Export Official 5e PDF', 'Esporta PDF Ufficiale 5e')}
                 </button>
                 <button
-                  onClick={() => setEditingChar(null)}
-                  className="px-3 py-1.5 rounded-lg bg-stone-800 text-stone-300 text-xs font-semibold hover:bg-stone-700"
+                  onClick={() => {
+                    setEditingChar(null);
+                    setMasterOverrideAccepted(false);
+                  }}
+                  className="px-3 py-1.5 rounded-lg bg-stone-800 text-stone-300 text-xs font-semibold hover:bg-stone-700 cursor-pointer"
                 >
                   {tr('Cancel', 'Annulla')}
                 </button>
                 <button
                   onClick={() => {
+                    const validation = validatePgCombination(editingChar, lang);
+                    if (
+                      editingChar.kind === 'pc' &&
+                      validation.advisories.length > 0 &&
+                      !masterOverrideAccepted
+                    ) {
+                      setShowWarningConfirmation(true);
+                      return;
+                    }
                     onSaveCharacter(editingChar);
                     setSelectedId(editingChar.id);
                     setEditingChar(null);
                   }}
-                  className="px-4 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-500 text-stone-950 text-xs font-bold flex items-center gap-1.5"
+                  className="px-4 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-500 text-stone-950 text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow"
                 >
                   <Check className="w-4 h-4" /> {tr('Save Sheet', 'Salva Scheda')}
                 </button>
@@ -853,6 +907,146 @@ export const CharactersView: React.FC<CharactersViewProps> = ({
             <div className="p-6 overflow-y-auto grid grid-cols-1 lg:grid-cols-12 gap-6">
               {/* Left Form (7 cols) */}
               <div className="lg:col-span-7 space-y-4 text-xs">
+                {/* Supervised Rules Advisory Banner for PCs */}
+                {editingChar.kind === 'pc' && (() => {
+                  const validation = validatePgCombination(editingChar, lang);
+                  const hasAdvisories = validation.advisories.length > 0;
+
+                  return (
+                    <div
+                      className={`p-3.5 rounded-xl border transition ${
+                        hasAdvisories
+                          ? masterOverrideAccepted
+                            ? 'bg-amber-950/20 border-amber-500/40 text-stone-300'
+                            : 'bg-amber-950/40 border-amber-500 text-amber-200'
+                          : 'bg-emerald-950/25 border-emerald-500/40 text-emerald-200'
+                      }`}
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex items-center gap-2">
+                          {hasAdvisories ? (
+                            <AlertTriangle className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
+                          ) : (
+                            <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0 mt-0.5" />
+                          )}
+                          <div>
+                            <div className="font-bold text-xs flex items-center gap-2">
+                              <span>
+                                {hasAdvisories
+                                  ? tr(
+                                      `D&D 5e Rules Advisory (${validation.advisories.length} item${
+                                        validation.advisories.length > 1 ? 's' : ''
+                                      })`,
+                                      `Promemoria Regole D&D 5e (${validation.advisories.length} avvis${
+                                        validation.advisories.length > 1 ? 'i' : 'o'
+                                      })`
+                                    )
+                                  : tr(
+                                      'Standard D&D 5e Rules Validated',
+                                      'Regole Standard D&D 5e Validate'
+                                    )}
+                              </span>
+                              <span className="text-[10px] px-2 py-0.2 rounded bg-stone-900 border border-stone-800 text-stone-400 font-normal">
+                                {validation.standardClass
+                                  ? lang === 'it'
+                                    ? validation.standardClass.nameIt
+                                    : validation.standardClass.nameEn
+                                  : tr('Custom Class', 'Classe Custom')}{' '}
+                                • Lv {validation.level}
+                              </span>
+                            </div>
+                            <div className="text-[11px] text-stone-400 mt-0.5">
+                              {tr(
+                                'The Dungeon Master is ALWAYS the final decision maker. You can align with standard 5e rules or continue anyway with custom values.',
+                                'Il Dungeon Master è SEMPRE l’arbitro finale. Puoi allinearti alle regole 5e o continuare comunque con valori personalizzati.'
+                              )}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Quick Action: Apply standard features & traits */}
+                        {(validation.standardRace || validation.standardClass) && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const updated = applyStandardTemplate(editingChar, {
+                                raceDef: validation.standardRace,
+                                classDef: validation.standardClass,
+                                level: validation.level,
+                                lang,
+                              });
+                              setEditingChar(syncSkillAndSaveStrings(updated));
+                            }}
+                            className="px-2.5 py-1 rounded-lg bg-stone-800 hover:bg-stone-700 text-amber-300 border border-stone-700 text-[11px] font-semibold flex items-center gap-1 shrink-0 transition"
+                            title={tr(
+                              'Add missing standard racial traits and class features tagged with (Race) & (Class)',
+                              'Aggiungi i tratti di razza e capacità di classe standard etichettati con (Razza) & (Classe)'
+                            )}
+                          >
+                            <Wrench className="w-3.5 h-3.5" />
+                            {tr('Apply Standard 5e Features', 'Applica Tratti Standard 5e')}
+                          </button>
+                        )}
+                      </div>
+
+                      {/* Advisory items */}
+                      {hasAdvisories && (
+                        <div className="mt-3 space-y-2 border-t border-stone-800/80 pt-2.5 text-[11px]">
+                          {validation.advisories.map((adv) => (
+                            <div
+                              key={adv.id}
+                              className="p-2 rounded bg-stone-950/80 border border-stone-800 flex items-center justify-between gap-2"
+                            >
+                              <div className="space-y-0.5 min-w-0">
+                                <div className="font-semibold text-amber-300">
+                                  {lang === 'it' ? adv.titleIt : adv.titleEn}
+                                </div>
+                                <div className="text-stone-300">
+                                  {lang === 'it' ? adv.messageIt : adv.messageEn}
+                                </div>
+                              </div>
+                              {adv.autoFix && (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    if (adv.autoFix) {
+                                      const fixed = adv.autoFix(editingChar);
+                                      setEditingChar(syncSkillAndSaveStrings(fixed));
+                                    }
+                                  }}
+                                  className="px-2 py-1 rounded bg-amber-600/20 hover:bg-amber-600 hover:text-stone-950 border border-amber-500/50 text-amber-200 text-[10px] font-bold shrink-0 transition cursor-pointer"
+                                >
+                                  {tr('Align with 5e Standard', 'Allinea a Standard')}
+                                </button>
+                              )}
+                            </div>
+                          ))}
+
+                          {/* Master Override / Continue Anyway Checkbox */}
+                          <div className="flex items-center justify-between pt-1">
+                            <label className="flex items-center gap-2 cursor-pointer text-stone-300 text-xs">
+                              <input
+                                type="checkbox"
+                                checked={masterOverrideAccepted}
+                                onChange={(e) => setMasterOverrideAccepted(e.target.checked)}
+                                className="accent-amber-500 w-4 h-4"
+                              />
+                              <span className="font-bold text-amber-400">
+                                {tr(
+                                  'Master Decision: Continue anyway (Accept custom/homebrew values)',
+                                  'Decisione del Master: Continua comunque (Accetta valori custom/homebrew)'
+                                )}
+                              </span>
+                            </label>
+                            <span className="text-[10px] text-stone-500 italic">
+                              {tr('Saves will not be blocked', 'Il salvataggio non verrà bloccato')}
+                            </span>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
                 <div className="grid grid-cols-3 gap-3">
                   <div>
                     <label className="block text-stone-400 mb-1 font-semibold">
@@ -992,9 +1186,21 @@ export const CharactersView: React.FC<CharactersViewProps> = ({
                     />
                   </div>
                   <div>
-                    <label className="block text-stone-400 mb-1 font-semibold">
-                      {tr('Level (PC) or CR', 'Livello (PG) o GS')}
-                    </label>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="block text-stone-400 font-semibold">
+                        {tr('Level (PC) or CR', 'Livello (PG) o GS')}
+                      </label>
+                      {editingChar.kind === 'pc' && (
+                        <button
+                          type="button"
+                          onClick={() => setLevelUpTargetChar(editingChar)}
+                          className="text-[10px] text-purple-300 hover:text-purple-200 font-bold flex items-center gap-0.5 cursor-pointer"
+                        >
+                          <TrendingUp className="w-3 h-3" />
+                          {tr('Level Up ▲', 'Livello + ▲')}
+                        </button>
+                      )}
+                    </div>
                     <input
                       type="text"
                       value={editingChar.levelOrCr}
@@ -1023,9 +1229,35 @@ export const CharactersView: React.FC<CharactersViewProps> = ({
 
                 <div className="grid grid-cols-3 gap-3">
                   <div>
-                    <label className="block text-stone-400 mb-1 font-semibold">
-                      {tr('Type / Species', 'Tipo / Razza')}
-                    </label>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="block text-stone-400 font-semibold">
+                        {tr('Type / Species', 'Tipo / Razza')}
+                      </label>
+                      {editingChar.kind === 'pc' && (
+                        <select
+                          value=""
+                          onChange={(e) => {
+                            if (!e.target.value) return;
+                            const r = STANDARD_RACES.find((rc) => rc.id === e.target.value);
+                            if (r) {
+                              const updated = applyStandardTemplate(editingChar, {
+                                raceDef: r,
+                                lang,
+                              });
+                              setEditingChar(syncSkillAndSaveStrings(updated));
+                            }
+                          }}
+                          className="text-[10px] bg-stone-900 border border-stone-700 text-amber-300 rounded px-1 py-0.5"
+                        >
+                          <option value="">{tr('Presets...', 'Preimpostati...')}</option>
+                          {STANDARD_RACES.map((r) => (
+                            <option key={r.id} value={r.id}>
+                              {lang === 'it' ? r.nameIt : r.nameEn}
+                            </option>
+                          ))}
+                        </select>
+                      )}
+                    </div>
                     <input
                       type="text"
                       value={editingChar.creatureType}
@@ -1036,9 +1268,37 @@ export const CharactersView: React.FC<CharactersViewProps> = ({
                     />
                   </div>
                   <div>
-                    <label className="block text-stone-400 mb-1 font-semibold">
-                      {tr('Class / Archetype', 'Classe / Archetipo')}
-                    </label>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="block text-stone-400 font-semibold">
+                        {tr('Class / Archetype', 'Classe / Archetipo')}
+                      </label>
+                      {editingChar.kind === 'pc' && (
+                        <select
+                          value=""
+                          onChange={(e) => {
+                            if (!e.target.value) return;
+                            const c = STANDARD_CLASSES.find((cl) => cl.id === e.target.value);
+                            if (c) {
+                              const lv = parsePgLevel(editingChar.levelOrCr);
+                              const updated = applyStandardTemplate(editingChar, {
+                                classDef: c,
+                                level: lv,
+                                lang,
+                              });
+                              setEditingChar(syncSkillAndSaveStrings(updated));
+                            }
+                          }}
+                          className="text-[10px] bg-stone-900 border border-stone-700 text-amber-300 rounded px-1 py-0.5"
+                        >
+                          <option value="">{tr('Presets...', 'Preimpostati...')}</option>
+                          {STANDARD_CLASSES.map((c) => (
+                            <option key={c.id} value={c.id}>
+                              {lang === 'it' ? c.nameIt : c.nameEn}
+                            </option>
+                          ))}
+                        </select>
+                      )}
+                    </div>
                     <input
                       type="text"
                       value={editingChar.classOrArchetype || ''}
@@ -1480,6 +1740,94 @@ export const CharactersView: React.FC<CharactersViewProps> = ({
                 className="px-4 py-1.5 rounded bg-amber-600 hover:bg-amber-500 text-stone-950 text-xs font-bold"
               >
                 {tr('Save Party', 'Salva Gruppo')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Supervised PC Creation Wizard Modal */}
+      {showSupervisedCreate && (
+        <SupervisedPgCreateModal
+          isOpen={showSupervisedCreate.isOpen}
+          isBlueprintDefault={showSupervisedCreate.isBlueprint}
+          onClose={() => setShowSupervisedCreate(null)}
+          onConfirm={(createdChar) => {
+            onSaveCharacter(createdChar);
+            setSelectedId(createdChar.id);
+            setEditingChar(structuredClone(createdChar));
+            setMasterOverrideAccepted(false);
+            setShowSupervisedCreate(null);
+          }}
+        />
+      )}
+
+      {/* Level-Up Wizard Modal */}
+      {levelUpTargetChar && (
+        <LevelUpModal
+          isOpen={Boolean(levelUpTargetChar)}
+          character={levelUpTargetChar}
+          onClose={() => setLevelUpTargetChar(null)}
+          onSave={(updatedChar, saveMode) => {
+            onSaveCharacter(updatedChar);
+            setSelectedId(updatedChar.id);
+            if (editingChar && editingChar.id === levelUpTargetChar.id) {
+              setEditingChar(structuredClone(updatedChar));
+            }
+            setLevelUpTargetChar(null);
+          }}
+        />
+      )}
+
+      {/* Soft Confirmation Modal for Unacknowledged Rules Advisories */}
+      {showWarningConfirmation && editingChar && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-stone-900 border border-amber-500/60 rounded-2xl max-w-lg w-full p-6 space-y-4 shadow-2xl text-xs">
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-xl bg-amber-500/10 border border-amber-500/40 text-amber-400">
+                <AlertTriangle className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 className="font-header text-lg font-bold text-amber-300">
+                  {tr('Master Authority & Rules Advisory', 'Autorità del Master & Avviso Regole')}
+                </h3>
+                <p className="text-stone-400 text-[11px] mt-0.5">
+                  {tr(
+                    'Some attributes diverge from standard D&D 5e SRD benchmarks.',
+                    'Alcuni attributi divergono dai parametri standard di D&D 5e SRD.'
+                  )}
+                </p>
+              </div>
+            </div>
+
+            <p className="text-stone-300 leading-relaxed">
+              {tr(
+                'As the Dungeon Master, you are ALWAYS the final decision maker. Would you like to review the advisories, or continue anyway with your custom/homebrew values?',
+                'In qualità di Dungeon Master, hai SEMPRE l’ultima parola. Desideri rivedere i suggerimenti o continuare comunque con i tuoi valori personalizzati/homebrew?'
+              )}
+            </p>
+
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-stone-800">
+              <button
+                type="button"
+                onClick={() => setShowWarningConfirmation(false)}
+                className="px-3 py-2 rounded-lg bg-stone-800 hover:bg-stone-700 text-stone-300 font-semibold cursor-pointer"
+              >
+                {tr('Review Advisories', 'Rivedi Suggerimenti')}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setMasterOverrideAccepted(true);
+                  setShowWarningConfirmation(false);
+                  onSaveCharacter(editingChar);
+                  setSelectedId(editingChar.id);
+                  setEditingChar(null);
+                }}
+                className="px-4 py-2 rounded-lg bg-amber-600 hover:bg-amber-500 text-stone-950 font-extrabold flex items-center gap-1.5 shadow cursor-pointer"
+              >
+                <Check className="w-4 h-4" />
+                {tr('Continue Anyway & Save', 'Continua Comunque & Salva')}
               </button>
             </div>
           </div>

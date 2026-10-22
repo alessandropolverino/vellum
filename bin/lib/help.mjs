@@ -82,6 +82,8 @@ ${c.bold('4. TYPICAL AGENT WORKFLOWS:')}
    ${c.bold('B. Creating a Player Character (PG) or Monster:')}
    ${c.dim('vellum characters create --name "Valerius" --kind pc --class "Wizard (Evocation)" --level "Level 4" --hp 26 --ac 12 --abilities 8,14,14,18,12,10 --json')}
    ${c.dim('vellum characters action add pc-valerius --name "Fireball" --desc "8d6 fire damage in 20ft radius" --damage "8d6" --json')}
+   3. Level-up PC (in-place or save as new blueprint):
+      ${c.dim('vellum characters level-up pc-valerius --to-level 5 --save-as-new --name "Valerius (Level 5)" --json')}
 
    ${c.bold('C. Session Tracking in a Live Game:')}
    1. Advance scene:
