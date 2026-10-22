@@ -1,38 +1,15 @@
 import React, { useState } from 'react';
 import {
-  AbilityKey,
   CharacterEntity,
-  DND_ABILITY_META,
-  DND_SKILLS,
   EntityKind,
   PartyGroup,
-  ProficiencyRank,
-  SkillId,
-  StatblockEntry,
-  formatMod,
-  formatProficientSavesSummary,
-  formatProficientSkillsSummary,
-  formatSignedBonus,
-  getProficiencyBonus,
-  getSavingThrowTotalBonus,
-  getSkillTotalBonus,
   isPcBlueprint,
-  resolveSavingThrowProficiencies,
-  resolveSkillProficiencies,
 } from '../types/dnd';
 import { useLanguage } from '../i18n/LanguageContext';
 import { StatblockCard } from './StatblockCard';
-import { SupervisedPgCreateModal } from './SupervisedPgCreateModal';
+import { SupervisedPgCreateView } from './SupervisedPgCreateView';
+import { FullPageCharacterEditor } from './FullPageCharacterEditor';
 import { LevelUpModal } from './LevelUpModal';
-import {
-  validatePgCombination,
-  STANDARD_RACES,
-  STANDARD_CLASSES,
-  findStandardRace,
-  findStandardClass,
-  applyStandardTemplate,
-  parsePgLevel,
-} from '../data/dnd5eRules';
 import { downloadOfficialCharacterPdf } from '../services/pdfExporter';
 import {
   Users,
@@ -45,13 +22,8 @@ import {
   Check,
   FolderPlus,
   FileDown,
-  ImagePlus,
   Sparkles,
-  X,
   TrendingUp,
-  AlertTriangle,
-  CheckCircle2,
-  Wrench,
 } from 'lucide-react';
 
 interface CharactersViewProps {
@@ -86,8 +58,6 @@ export const CharactersView: React.FC<CharactersViewProps> = ({
     isBlueprint: boolean;
   } | null>(null);
   const [levelUpTargetChar, setLevelUpTargetChar] = useState<CharacterEntity | null>(null);
-  const [masterOverrideAccepted, setMasterOverrideAccepted] = useState(false);
-  const [showWarningConfirmation, setShowWarningConfirmation] = useState(false);
 
   // Modal to instantiate an assigned Player Character from a Pre-Gen Blueprint
   const [instantiatingBlueprint, setInstantiatingBlueprint] = useState<CharacterEntity | null>(
@@ -200,24 +170,28 @@ export const CharactersView: React.FC<CharactersViewProps> = ({
       sourceBlueprintId: instantiatingBlueprint.id,
       tags: [
         ...instantiatingBlueprint.tags.filter(
-          (t) => !t.toLowerCase().includes('blueprint') && !t.toLowerCase().includes('pre-gen')
+          (t) =>
+            t.toLowerCase() !== 'blueprint' &&
+            t.toLowerCase() !== 'pre-gen' &&
+            !t.toLowerCase().includes('blueprint')
         ),
-        instPlayerName.trim() || tr('Assigned', 'Assegnato'),
+        tr('Playing PC', 'PG Giocante'),
       ],
     };
-
     onSaveCharacter(instanceChar);
+
     if (instTargetPartyId) {
-      const targetParty = parties.find((p) => p.id === instTargetPartyId);
-      if (targetParty && !targetParty.memberCharacterIds.includes(instanceChar.id)) {
+      const party = parties.find((p) => p.id === instTargetPartyId);
+      if (party && !party.memberCharacterIds.includes(instanceChar.id)) {
         onSaveParty({
-          ...targetParty,
-          memberCharacterIds: [...targetParty.memberCharacterIds, instanceChar.id],
+          ...party,
+          memberCharacterIds: [...party.memberCharacterIds, instanceChar.id],
         });
       }
     }
-    setSelectedId(instanceChar.id);
+
     setInstantiatingBlueprint(null);
+    setSelectedId(instanceChar.id);
   };
 
   const handleDuplicate = (char: CharacterEntity) => {
@@ -230,97 +204,76 @@ export const CharactersView: React.FC<CharactersViewProps> = ({
     setSelectedId(copy.id);
   };
 
-  const syncSkillAndSaveStrings = (nextChar: CharacterEntity): CharacterEntity => {
-    const savesSummary = formatProficientSavesSummary(nextChar, lang);
-    const skillsSummary = formatProficientSkillsSummary(nextChar, lang);
-    const percBonus = getSkillTotalBonus(nextChar, 'perception').total;
-    return {
-      ...nextChar,
-      savingThrows: savesSummary,
-      skills: skillsSummary,
-      passivePerception: 10 + percBonus,
-    };
-  };
-
-  const updateAbility = (key: keyof CharacterEntity['abilities'], val: number) => {
-    if (!editingChar) return;
-    const updated: CharacterEntity = {
-      ...editingChar,
-      abilities: {
-        ...editingChar.abilities,
-        [key]: Math.max(1, Math.min(30, val || 10)),
-      },
-    };
-    setEditingChar(syncSkillAndSaveStrings(updated));
-  };
-
-  const toggleSaveProficiency = (ability: AbilityKey) => {
-    if (!editingChar) return;
-    const current = resolveSavingThrowProficiencies(editingChar);
-    const nextSaves = { ...current, [ability]: !current[ability] };
-    const updated: CharacterEntity = {
-      ...editingChar,
-      savingThrowProficiencies: nextSaves,
-    };
-    setEditingChar(syncSkillAndSaveStrings(updated));
-  };
-
-  const cycleSkillProficiency = (skillId: SkillId) => {
-    if (!editingChar) return;
-    const current = resolveSkillProficiencies(editingChar);
-    const nextRank = (((current[skillId] || 0) + 1) % 3) as ProficiencyRank;
-    const nextSkills = { ...current, [skillId]: nextRank };
-    const updated: CharacterEntity = {
-      ...editingChar,
-      skillProficiencies: nextSkills,
-    };
-    setEditingChar(syncSkillAndSaveStrings(updated));
-  };
-
-  const handlePortraitUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file || !editingChar) return;
-    const reader = new FileReader();
-    reader.onload = () => {
-      setEditingChar({ ...editingChar, portraitUrl: String(reader.result) });
-    };
-    reader.readAsDataURL(file);
-  };
-
-  const updateListEntry = (
-    field: 'traits' | 'actions' | 'reactionsOrLegendary',
-    index: number,
-    patch: Partial<StatblockEntry>
-  ) => {
-    if (!editingChar) return;
-    const current = [...(editingChar[field] || [])];
-    current[index] = { ...current[index], ...patch };
-    setEditingChar({ ...editingChar, [field]: current });
-  };
-
-  const addListEntry = (field: 'traits' | 'actions' | 'reactionsOrLegendary') => {
-    if (!editingChar) return;
-    const current = [...(editingChar[field] || [])];
-    current.push({
-      name: tr('New Feature / Action', 'Nuova Capacità / Azione'),
-      description: tr(
-        'Description of effect or attack roll.',
-        'Descrizione dell’effetto o tiro per colpire.'
-      ),
-    });
-    setEditingChar({ ...editingChar, [field]: current });
-  };
-
-  const removeListEntry = (field: 'traits' | 'actions' | 'reactionsOrLegendary', index: number) => {
-    if (!editingChar) return;
-    const current = [...(editingChar[field] || [])];
-    current.splice(index, 1);
-    setEditingChar({ ...editingChar, [field]: current });
-  };
-
   const pcsOnly = visibleCharacters.filter((c) => c.kind === 'pc');
   const blueprintsCount = pcsOnly.filter((c) => isPcBlueprint(c)).length;
 
+  // 1. FULL PAGE: Supervised PC Creation View
+  if (showSupervisedCreate) {
+    return (
+      <SupervisedPgCreateView
+        isBlueprintDefault={showSupervisedCreate.isBlueprint}
+        onCancel={() => setShowSupervisedCreate(null)}
+        onSaveDirect={(createdChar) => {
+          onSaveCharacter(createdChar);
+          setSelectedId(createdChar.id);
+          setShowSupervisedCreate(null);
+        }}
+        onProceedToEditor={(createdChar) => {
+          onSaveCharacter(createdChar);
+          setSelectedId(createdChar.id);
+          setShowSupervisedCreate(null);
+          setEditingChar(structuredClone(createdChar));
+        }}
+      />
+    );
+  }
+
+  // 2. FULL PAGE: Character Sheet Editor
+  if (editingChar) {
+    return (
+      <>
+        <FullPageCharacterEditor
+          character={editingChar}
+          onSave={(savedChar) => {
+            onSaveCharacter(savedChar);
+            setSelectedId(savedChar.id);
+            setEditingChar(null);
+          }}
+          onCancel={() => setEditingChar(null)}
+          onLevelUp={(charToLevelUp) => setLevelUpTargetChar(charToLevelUp)}
+        />
+
+        {/* Level-Up Modal when invoked from inside the editor */}
+        {levelUpTargetChar && (
+          <LevelUpModal
+            isOpen={Boolean(levelUpTargetChar)}
+            character={levelUpTargetChar}
+            onClose={() => setLevelUpTargetChar(null)}
+            onSave={(updatedChar, saveMode) => {
+              if (saveMode === 'new_blueprint') {
+                const newBp: CharacterEntity = {
+                  ...updatedChar,
+                  id: `pc-bp-${Date.now()}`,
+                  isPreGenBlueprint: true,
+                  sourceBlueprintId: levelUpTargetChar.id,
+                };
+                onSaveCharacter(newBp);
+                setSelectedId(newBp.id);
+                setEditingChar(structuredClone(newBp));
+              } else {
+                onSaveCharacter(updatedChar);
+                setSelectedId(updatedChar.id);
+                setEditingChar(structuredClone(updatedChar));
+              }
+              setLevelUpTargetChar(null);
+            }}
+          />
+        )}
+      </>
+    );
+  }
+
+  // 3. MAIN REPOSITORY LIST VIEW
   return (
     <div className="h-full flex flex-col gap-5">
       {/* Top Bar */}
@@ -450,152 +403,174 @@ export const CharactersView: React.FC<CharactersViewProps> = ({
             return (
               <div
                 key={party.id}
-                className="bg-stone-900/90 border border-stone-800 rounded-xl p-5 flex flex-col justify-between gap-4"
+                className="bg-stone-900 border border-stone-800 rounded-xl p-4 flex flex-col justify-between"
               >
                 <div>
-                  <div className="flex items-start justify-between gap-2">
+                  <div className="flex items-start justify-between">
                     <div>
-                      <h3 className="font-header text-lg font-bold text-amber-400">{party.name}</h3>
-                      <p className="text-xs text-stone-400 mt-1">{party.description}</p>
+                      <h3 className="font-header text-lg font-bold text-amber-400 flex items-center gap-2">
+                        <Users className="w-5 h-5 text-amber-500" />
+                        {party.name}
+                      </h3>
+                      <p className="text-xs text-stone-400 mt-0.5">{party.description}</p>
                     </div>
-                    <div className="flex items-center gap-1.5">
+                    <div className="flex items-center gap-1">
                       <button
                         onClick={() => setEditingParty(structuredClone(party))}
-                        className="px-2.5 py-1 rounded bg-stone-800 hover:bg-stone-700 text-xs text-amber-300 font-semibold"
+                        className="px-2.5 py-1 text-xs rounded bg-stone-800 hover:bg-stone-700 text-amber-300 font-semibold"
                       >
                         {tr('Edit', 'Modifica')}
                       </button>
                       <button
                         onClick={() => onDeleteParty(party.id)}
-                        className="p-1.5 rounded bg-stone-800 hover:bg-red-900/60 text-stone-400 hover:text-red-200"
+                        className="p-1 rounded bg-stone-800 hover:bg-red-900/60 text-stone-400 hover:text-red-300"
                       >
-                        <Trash2 className="w-4 h-4" />
+                        <Trash2 className="w-3.5 h-3.5" />
                       </button>
                     </div>
                   </div>
 
-                  <div className="mt-4 space-y-2">
-                    <div className="text-[11px] font-bold uppercase tracking-wider text-stone-400">
-                      {tr(
-                        `Party Members (${members.length} PCs)`,
-                        `Membri del Gruppo (${members.length} PG)`
-                      )}
+                  <div className="mt-4">
+                    <div className="text-[11px] font-bold text-stone-400 uppercase tracking-wider mb-2">
+                      {tr('Roster Members', 'Componenti del Gruppo')} ({members.length})
                     </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                      {members.map((m) => (
-                        <div
-                          key={m.id}
-                          className="p-2.5 rounded-lg bg-stone-950 border border-stone-800 flex items-center justify-between gap-2"
-                        >
-                          <div className="flex items-center gap-2 min-w-0">
-                            {m.portraitUrl && (
-                              <img
-                                src={m.portraitUrl}
-                                alt={m.name}
-                                className="w-8 h-8 rounded object-cover border border-amber-500/40 shrink-0"
-                              />
-                            )}
-                            <div className="min-w-0">
-                              <div className="font-bold text-sm text-amber-200 truncate">
-                                {m.name}
+                    {members.length === 0 ? (
+                      <div className="text-xs text-stone-500 italic p-3 bg-stone-950/60 rounded border border-stone-800/60">
+                        {tr(
+                          'No characters assigned to this party yet.',
+                          'Nessun personaggio ancora assegnato a questo gruppo.'
+                        )}
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        {members.map((m) => {
+                          const isBp = isPcBlueprint(m);
+                          return (
+                            <div
+                              key={m.id}
+                              className="p-2.5 rounded bg-stone-950 border border-stone-800/80 flex items-center justify-between gap-2"
+                            >
+                              <div className="flex items-center gap-2 min-w-0">
+                                {m.portraitUrl && (
+                                  <img
+                                    src={m.portraitUrl}
+                                    alt={m.name}
+                                    className="w-8 h-8 rounded object-cover border border-amber-500/30 shrink-0"
+                                  />
+                                )}
+                                <div className="min-w-0">
+                                  <div className="font-bold text-xs text-stone-200 truncate">
+                                    {m.name}
+                                  </div>
+                                  <div className="text-[10px] text-stone-400 truncate">
+                                    {isBp
+                                      ? tr('Blueprint (Reusable)', 'Blueprint (Riutilizzabile)')
+                                      : m.playerOrRole || tr('Player PC', 'PG Giocatore')}{' '}
+                                    • {m.levelOrCr}
+                                  </div>
+                                </div>
                               </div>
-                              <div className="text-[11px] text-stone-400 truncate">
-                                {m.classOrArchetype} • {m.levelOrCr}
-                              </div>
+                              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-950/40 text-amber-300 border border-amber-800/40 shrink-0">
+                                {m.classOrArchetype}
+                              </span>
                             </div>
-                          </div>
-                          <div className="text-right text-xs font-mono text-stone-300 shrink-0">
-                            <div>
-                              {tr('AC', 'CA')} {m.ac}
-                            </div>
-                            <div className="text-emerald-400">
-                              {tr('HP', 'PF')} {m.hpMax}
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
+                          );
+                        })}
+                      </div>
+                    )}
                   </div>
                 </div>
 
-                <div className="text-[11px] text-stone-500 border-t border-stone-800 pt-2">
-                  {tr('Party Template ID:', 'ID Template Gruppo:')} <code>{party.id}</code> —{' '}
-                  {tr(
-                    'Can be linked to any new Play Instance.',
-                    'Associabile a qualsiasi nuova Istanza di Gioco.'
-                  )}
+                <div className="mt-4 pt-3 border-t border-stone-800 flex justify-between items-center text-xs text-stone-500">
+                  <span>ID: {party.id}</span>
+                  <span>
+                    {members.length}{' '}
+                    {members.length === 1
+                      ? tr('character', 'personaggio')
+                      : tr('characters', 'personaggi')}
+                  </span>
                 </div>
               </div>
             );
           })}
         </div>
       ) : (
-        /* Main Master-Detail Split for Characters */
+        /* Characters 2-Column View: Master list & Live statblock preview */
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 flex-1 min-h-0">
           {/* Left List */}
-          <div className="lg:col-span-5 space-y-2.5 overflow-y-auto max-h-[72vh] pr-1">
+          <div className="lg:col-span-5 space-y-2 overflow-y-auto max-h-[72vh] pr-1">
+            {filteredCharacters.length === 0 && (
+              <div className="p-8 text-center text-stone-500 bg-stone-900/50 rounded-xl border border-stone-800">
+                {tr(
+                  'No characters found matching the current filters.',
+                  'Nessun personaggio trovato con i filtri correnti.'
+                )}
+              </div>
+            )}
+
             {filteredCharacters.map((c) => {
-              const active = selectedCharacter?.id === c.id;
-              const isBlueprint = isPcBlueprint(c);
+              const isSelected = c.id === selectedCharacter?.id;
+              const isBp = isPcBlueprint(c);
               return (
                 <div
                   key={c.id}
                   onClick={() => setSelectedId(c.id)}
-                  className={`cursor-pointer p-3.5 rounded-xl border transition flex items-center justify-between gap-3 ${
-                    active
-                      ? 'bg-amber-950/30 border-amber-500/70 shadow-md'
+                  className={`p-3.5 rounded-xl border cursor-pointer transition flex items-start justify-between gap-3 ${
+                    isSelected
+                      ? 'bg-amber-950/30 border-amber-500 shadow-md ring-1 ring-amber-500'
                       : 'bg-stone-900/80 border-stone-800 hover:border-stone-700'
                   }`}
                 >
-                  <div className="flex items-center gap-3 min-w-0">
+                  <div className="flex items-start gap-3 min-w-0">
                     {c.portraitUrl ? (
                       <img
                         src={c.portraitUrl}
                         alt={c.name}
-                        className="w-12 h-12 rounded-lg object-cover border border-amber-500/40 shrink-0"
+                        className="w-12 h-12 rounded-lg object-cover border border-stone-700 shrink-0"
                       />
                     ) : (
-                      <div
-                        className={`w-10 h-10 rounded-lg flex items-center justify-center font-header font-bold text-sm shrink-0 border ${
-                          c.kind === 'pc'
-                            ? isBlueprint
-                              ? 'bg-purple-950/60 text-purple-300 border-purple-700/50'
-                              : 'bg-amber-950/60 text-amber-300 border-amber-700/50'
-                            : c.kind === 'npc'
-                            ? 'bg-sky-950/60 text-sky-300 border-sky-700/50'
-                            : 'bg-red-950/60 text-red-300 border-red-700/50'
-                        }`}
-                      >
-                        {c.name.slice(0, 2).toUpperCase()}
+                      <div className="w-12 h-12 rounded-lg bg-stone-950 border border-stone-800 flex items-center justify-center shrink-0">
+                        {c.kind === 'pc' ? (
+                          <Users className="w-6 h-6 text-amber-500" />
+                        ) : c.kind === 'npc' ? (
+                          <UserCheck className="w-6 h-6 text-sky-400" />
+                        ) : (
+                          <Skull className="w-6 h-6 text-red-400" />
+                        )}
                       </div>
                     )}
 
                     <div className="min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <h4 className="font-bold text-stone-100 truncate">{c.name}</h4>
-                        <span className="text-[10px] px-2 py-0.5 rounded bg-stone-800 text-stone-300 font-semibold">
-                          {c.levelOrCr}
-                        </span>
-                        {c.kind === 'pc' && isBlueprint && (
-                          <span className="text-[10px] px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/40 font-bold">
-                            {tr('Blueprint / Pre-Gen', 'Blueprint / Pre-Gen')}
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="font-bold text-stone-100 text-sm truncate">{c.name}</span>
+                        {isBp && (
+                          <span className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-purple-900/40 text-purple-300 border border-purple-700/50 whitespace-nowrap">
+                            {tr('Blueprint', 'Blueprint')}
                           </span>
                         )}
                       </div>
-                      <p className="text-xs text-stone-400 truncate mt-0.5">
-                        {c.kind === 'pc' && isBlueprint
-                          ? tr('Unassigned (Reusable by DM)', 'Non assegnato (Riutilizzabile dal DM)')
-                          : c.playerOrRole}{' '}
-                        {c.classOrArchetype ? `• ${c.classOrArchetype}` : ''}
-                      </p>
+
+                      <div className="text-xs text-stone-400 mt-0.5 truncate">
+                        <span className="text-amber-400 font-semibold">{c.classOrArchetype}</span>
+                        {c.classOrArchetype && ' • '}
+                        <span>{c.levelOrCr}</span>
+                        {c.playerOrRole && (
+                          <span className="opacity-75">
+                            {' '}
+                            (
+                            {isBp
+                              ? tr('Reusable Template', 'Modello Riutilizzabile')
+                              : c.playerOrRole}
+                            )
+                          </span>
+                        )}
+                      </div>
+
                       <div className="flex flex-wrap gap-1 mt-1.5">
-                        <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-stone-950 text-amber-300 border border-stone-800">
-                          @npc[{c.id}]
-                        </span>
-                        {c.tags.slice(0, 2).map((t, idx) => (
+                        {c.tags.slice(0, 3).map((t, idx) => (
                           <span
                             key={idx}
-                            className="text-[10px] px-1.5 py-0.5 rounded bg-stone-800/80 text-stone-400"
+                            className="text-[10px] px-1.5 py-0.2 rounded bg-stone-800 text-stone-400"
                           >
                             {t}
                           </span>
@@ -621,7 +596,7 @@ export const CharactersView: React.FC<CharactersViewProps> = ({
                             setLevelUpTargetChar(c);
                           }}
                           title={tr(
-                            'Level Up this character (Wizard)',
+                            'Level Up this character',
                             'Fai salire di livello questo personaggio'
                           )}
                           className="px-2 py-0.5 text-[11px] rounded bg-purple-900/60 hover:bg-purple-700 text-purple-200 font-semibold transition flex items-center gap-1 cursor-pointer"
@@ -719,7 +694,6 @@ export const CharactersView: React.FC<CharactersViewProps> = ({
                   character={selectedCharacter}
                   onEdit={(ch) => {
                     setEditingChar(structuredClone(ch));
-                    setMasterOverrideAccepted(false);
                   }}
                   onLevelUp={
                     selectedCharacter.kind === 'pc'
@@ -748,75 +722,57 @@ export const CharactersView: React.FC<CharactersViewProps> = ({
       {/* Modal: Instantiate Player Character from Blueprint */}
       {instantiatingBlueprint && (
         <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-stone-900 border border-stone-700 rounded-2xl max-w-lg w-full p-6 space-y-4 shadow-2xl text-xs">
-            <div className="flex items-center justify-between">
-              <h3 className="font-header text-xl font-bold text-amber-400 flex items-center gap-2">
-                <UserPlus className="w-5 h-5" />
-                {tr(
-                  'Create Player Instance from PC Blueprint',
-                  'Crea Istanza Giocatore da Blueprint PG'
-                )}
-              </h3>
-              <button
-                onClick={() => setInstantiatingBlueprint(null)}
-                className="text-stone-400 hover:text-stone-200"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <p className="text-stone-400 leading-relaxed">
+          <div className="bg-stone-900 border border-purple-500/50 rounded-2xl max-w-md w-full p-6 space-y-4 shadow-2xl">
+            <h3 className="font-header text-lg font-bold text-purple-300 flex items-center gap-2">
+              <Sparkles className="w-5 h-5 text-purple-400" />
+              {tr('Instantiate PC for Active Campaign', 'Crea PG Giocante da Blueprint')}
+            </h3>
+            <p className="text-xs text-stone-300 leading-relaxed">
               {tr(
-                'You are creating an independent character sheet from blueprint ',
-                'Stai generando una scheda personaggio indipendente a partire dal blueprint '
-              )}
-              <strong className="text-amber-300">{instantiatingBlueprint.name}</strong>.{' '}
-              {tr(
-                'The original blueprint will remain untouched so you can reuse or print it for other one-shots and campaigns.',
-                'Il blueprint originale resterà intatto per essere ristampato o assegnato in altre one-shot e campagne.'
-              )}
+                'Generate an independent, player-assigned PC sheet cloned from blueprint',
+                'Genera una scheda personaggio indipendente e assegnata partendo dal modello'
+              )}{' '}
+              <strong className="text-amber-400">{instantiatingBlueprint.name}</strong>.
             </p>
 
-            <div className="space-y-3">
+            <div className="space-y-3 text-xs">
               <div>
-                <label className="block text-stone-400 mb-1 font-semibold">
-                  {tr('Assigned Player Name', 'Nome del Giocatore Assegnato')}
+                <label className="block text-stone-300 mb-1 font-semibold">
+                  {tr('Assigned Player Name:', 'Nome del Giocatore Assegnato:')}
                 </label>
                 <input
                   type="text"
                   value={instPlayerName}
                   onChange={(e) => setInstPlayerName(e.target.value)}
-                  placeholder={tr('e.g. Alex / Giulia', 'es. Alessandro / Giulia')}
-                  className="w-full px-3 py-2 rounded bg-stone-950 border border-stone-700 text-stone-100 font-bold"
+                  placeholder={tr('e.g. Marco, Elena...', 'es. Marco, Elena...')}
+                  className="w-full px-3 py-2 rounded-lg bg-stone-950 border border-stone-700 text-stone-100 font-bold"
+                  autoFocus
                 />
               </div>
 
               <div>
-                <label className="block text-stone-400 mb-1 font-semibold">
-                  {tr('Character Name (can customize)', 'Nome del Personaggio (personalizzabile)')}
+                <label className="block text-stone-300 mb-1 font-semibold">
+                  {tr('Character Name (Customizable):', 'Nome Personaggio (Personalizzabile):')}
                 </label>
                 <input
                   type="text"
                   value={instCustomCharName}
                   onChange={(e) => setInstCustomCharName(e.target.value)}
-                  className="w-full px-3 py-2 rounded bg-stone-950 border border-stone-700 text-stone-100"
+                  className="w-full px-3 py-2 rounded-lg bg-stone-950 border border-stone-700 text-stone-100"
                 />
               </div>
 
               <div>
-                <label className="block text-stone-400 mb-1 font-semibold">
-                  {tr(
-                    'Add directly to a Party Group (optional)',
-                    'Aggiungi direttamente a un Gruppo / Party (opzionale)'
-                  )}
+                <label className="block text-stone-300 mb-1 font-semibold">
+                  {tr('Add Directly to Party (Optional):', 'Aggiungi Direttamente al Gruppo:')}
                 </label>
                 <select
                   value={instTargetPartyId}
                   onChange={(e) => setInstTargetPartyId(e.target.value)}
-                  className="w-full px-3 py-2 rounded bg-stone-950 border border-stone-700 text-amber-300"
+                  className="w-full px-3 py-2 rounded-lg bg-stone-950 border border-stone-700 text-stone-200"
                 >
                   <option value="">
-                    {tr('— Do not add to a party now —', '— Non aggiungere a un gruppo ora —')}
+                    {tr('Do not assign to a party now', 'Non assegnare a nessun gruppo')}
                   </option>
                   {parties.map((p) => (
                     <option key={p.id} value={p.id}>
@@ -830,823 +786,17 @@ export const CharactersView: React.FC<CharactersViewProps> = ({
             <div className="flex justify-end gap-2 pt-3 border-t border-stone-800">
               <button
                 onClick={() => setInstantiatingBlueprint(null)}
-                className="px-3 py-2 rounded-lg bg-stone-800 text-stone-300 font-semibold"
+                className="px-3 py-2 rounded-lg bg-stone-800 text-stone-300 font-semibold text-xs"
               >
                 {tr('Cancel', 'Annulla')}
               </button>
               <button
                 onClick={handleConfirmInstantiate}
-                className="px-4 py-2 rounded-lg bg-amber-600 hover:bg-amber-500 text-stone-950 font-extrabold flex items-center gap-1.5 shadow"
+                className="px-4 py-2 rounded-lg bg-amber-600 hover:bg-amber-500 text-stone-950 font-extrabold text-xs flex items-center gap-1.5 shadow"
               >
                 <Check className="w-4 h-4" />
                 {tr('Create Assigned PC Sheet', 'Crea Scheda PG Assegnata')}
               </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Character Editor Modal */}
-      {editingChar && (
-        <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-stone-900 border border-stone-700 rounded-2xl max-w-6xl w-full max-h-[92vh] flex flex-col shadow-2xl overflow-hidden">
-            <div className="px-6 py-4 border-b border-stone-800 flex flex-wrap items-center justify-between gap-2">
-              <h3 className="font-header text-xl font-bold text-amber-400">
-                {tr('D&D 5e Sheet Editor', 'Editor Scheda D&D 5e')} — {editingChar.name}
-              </h3>
-              <div className="flex items-center gap-2">
-                {editingChar.kind === 'pc' && (
-                  <button
-                    type="button"
-                    onClick={() => setLevelUpTargetChar(editingChar)}
-                    className="px-3 py-1.5 rounded-lg bg-purple-700 hover:bg-purple-600 text-purple-100 text-xs font-bold flex items-center gap-1.5 shadow cursor-pointer transition"
-                  >
-                    <TrendingUp className="w-4 h-4" />
-                    {tr('Level Up', 'Passaggio di Livello')}
-                  </button>
-                )}
-                <button
-                  type="button"
-                  onClick={() => downloadOfficialCharacterPdf(editingChar, lang)}
-                  className="px-3 py-1.5 rounded-lg bg-stone-800 hover:bg-stone-700 text-amber-300 border border-amber-500/30 text-xs font-bold flex items-center gap-1.5 cursor-pointer"
-                >
-                  <FileDown className="w-4 h-4" />
-                  {tr('Export Official 5e PDF', 'Esporta PDF Ufficiale 5e')}
-                </button>
-                <button
-                  onClick={() => {
-                    setEditingChar(null);
-                    setMasterOverrideAccepted(false);
-                  }}
-                  className="px-3 py-1.5 rounded-lg bg-stone-800 text-stone-300 text-xs font-semibold hover:bg-stone-700 cursor-pointer"
-                >
-                  {tr('Cancel', 'Annulla')}
-                </button>
-                <button
-                  onClick={() => {
-                    const validation = validatePgCombination(editingChar, lang);
-                    if (
-                      editingChar.kind === 'pc' &&
-                      validation.advisories.length > 0 &&
-                      !masterOverrideAccepted
-                    ) {
-                      setShowWarningConfirmation(true);
-                      return;
-                    }
-                    onSaveCharacter(editingChar);
-                    setSelectedId(editingChar.id);
-                    setEditingChar(null);
-                  }}
-                  className="px-4 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-500 text-stone-950 text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow"
-                >
-                  <Check className="w-4 h-4" /> {tr('Save Sheet', 'Salva Scheda')}
-                </button>
-              </div>
-            </div>
-
-            <div className="p-6 overflow-y-auto grid grid-cols-1 lg:grid-cols-12 gap-6">
-              {/* Left Form (7 cols) */}
-              <div className="lg:col-span-7 space-y-4 text-xs">
-                {/* Supervised Rules Advisory Banner for PCs */}
-                {editingChar.kind === 'pc' && (() => {
-                  const validation = validatePgCombination(editingChar, lang);
-                  const hasAdvisories = validation.advisories.length > 0;
-
-                  return (
-                    <div
-                      className={`p-3.5 rounded-xl border transition ${
-                        hasAdvisories
-                          ? masterOverrideAccepted
-                            ? 'bg-amber-950/20 border-amber-500/40 text-stone-300'
-                            : 'bg-amber-950/40 border-amber-500 text-amber-200'
-                          : 'bg-emerald-950/25 border-emerald-500/40 text-emerald-200'
-                      }`}
-                    >
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="flex items-center gap-2">
-                          {hasAdvisories ? (
-                            <AlertTriangle className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
-                          ) : (
-                            <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0 mt-0.5" />
-                          )}
-                          <div>
-                            <div className="font-bold text-xs flex items-center gap-2">
-                              <span>
-                                {hasAdvisories
-                                  ? tr(
-                                      `D&D 5e Rules Advisory (${validation.advisories.length} item${
-                                        validation.advisories.length > 1 ? 's' : ''
-                                      })`,
-                                      `Promemoria Regole D&D 5e (${validation.advisories.length} avvis${
-                                        validation.advisories.length > 1 ? 'i' : 'o'
-                                      })`
-                                    )
-                                  : tr(
-                                      'Standard D&D 5e Rules Validated',
-                                      'Regole Standard D&D 5e Validate'
-                                    )}
-                              </span>
-                              <span className="text-[10px] px-2 py-0.2 rounded bg-stone-900 border border-stone-800 text-stone-400 font-normal">
-                                {validation.standardClass
-                                  ? lang === 'it'
-                                    ? validation.standardClass.nameIt
-                                    : validation.standardClass.nameEn
-                                  : tr('Custom Class', 'Classe Custom')}{' '}
-                                • Lv {validation.level}
-                              </span>
-                            </div>
-                            <div className="text-[11px] text-stone-400 mt-0.5">
-                              {tr(
-                                'The Dungeon Master is ALWAYS the final decision maker. You can align with standard 5e rules or continue anyway with custom values.',
-                                'Il Dungeon Master è SEMPRE l’arbitro finale. Puoi allinearti alle regole 5e o continuare comunque con valori personalizzati.'
-                              )}
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Quick Action: Apply standard features & traits */}
-                        {(validation.standardRace || validation.standardClass) && (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const updated = applyStandardTemplate(editingChar, {
-                                raceDef: validation.standardRace,
-                                classDef: validation.standardClass,
-                                level: validation.level,
-                                lang,
-                              });
-                              setEditingChar(syncSkillAndSaveStrings(updated));
-                            }}
-                            className="px-2.5 py-1 rounded-lg bg-stone-800 hover:bg-stone-700 text-amber-300 border border-stone-700 text-[11px] font-semibold flex items-center gap-1 shrink-0 transition"
-                            title={tr(
-                              'Add missing standard racial traits and class features tagged with (Race) & (Class)',
-                              'Aggiungi i tratti di razza e capacità di classe standard etichettati con (Razza) & (Classe)'
-                            )}
-                          >
-                            <Wrench className="w-3.5 h-3.5" />
-                            {tr('Apply Standard 5e Features', 'Applica Tratti Standard 5e')}
-                          </button>
-                        )}
-                      </div>
-
-                      {/* Advisory items */}
-                      {hasAdvisories && (
-                        <div className="mt-3 space-y-2 border-t border-stone-800/80 pt-2.5 text-[11px]">
-                          {validation.advisories.map((adv) => (
-                            <div
-                              key={adv.id}
-                              className="p-2 rounded bg-stone-950/80 border border-stone-800 flex items-center justify-between gap-2"
-                            >
-                              <div className="space-y-0.5 min-w-0">
-                                <div className="font-semibold text-amber-300">
-                                  {lang === 'it' ? adv.titleIt : adv.titleEn}
-                                </div>
-                                <div className="text-stone-300">
-                                  {lang === 'it' ? adv.messageIt : adv.messageEn}
-                                </div>
-                              </div>
-                              {adv.autoFix && (
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    if (adv.autoFix) {
-                                      const fixed = adv.autoFix(editingChar);
-                                      setEditingChar(syncSkillAndSaveStrings(fixed));
-                                    }
-                                  }}
-                                  className="px-2 py-1 rounded bg-amber-600/20 hover:bg-amber-600 hover:text-stone-950 border border-amber-500/50 text-amber-200 text-[10px] font-bold shrink-0 transition cursor-pointer"
-                                >
-                                  {tr('Align with 5e Standard', 'Allinea a Standard')}
-                                </button>
-                              )}
-                            </div>
-                          ))}
-
-                          {/* Master Override / Continue Anyway Checkbox */}
-                          <div className="flex items-center justify-between pt-1">
-                            <label className="flex items-center gap-2 cursor-pointer text-stone-300 text-xs">
-                              <input
-                                type="checkbox"
-                                checked={masterOverrideAccepted}
-                                onChange={(e) => setMasterOverrideAccepted(e.target.checked)}
-                                className="accent-amber-500 w-4 h-4"
-                              />
-                              <span className="font-bold text-amber-400">
-                                {tr(
-                                  'Master Decision: Continue anyway (Accept custom/homebrew values)',
-                                  'Decisione del Master: Continua comunque (Accetta valori custom/homebrew)'
-                                )}
-                              </span>
-                            </label>
-                            <span className="text-[10px] text-stone-500 italic">
-                              {tr('Saves will not be blocked', 'Il salvataggio non verrà bloccato')}
-                            </span>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  );
-                })()}
-                <div className="grid grid-cols-3 gap-3">
-                  <div>
-                    <label className="block text-stone-400 mb-1 font-semibold">
-                      {tr('Category', 'Categoria')}
-                    </label>
-                    <select
-                      value={editingChar.kind}
-                      onChange={(e) =>
-                        setEditingChar({ ...editingChar, kind: e.target.value as EntityKind })
-                      }
-                      className="w-full px-2.5 py-2 rounded bg-stone-950 border border-stone-700 text-stone-100"
-                    >
-                      <option value="pc">{tr('PC (Player / Pre-Gen)', 'PG (Giocatore / Pre-Gen)')}</option>
-                      <option value="npc">{tr('NPC (Ally/Character)', 'NPC (Alleato/PNG)')}</option>
-                      <option value="monster">{tr('Monster / Boss', 'Mostro / Boss')}</option>
-                    </select>
-                  </div>
-                  <div className="col-span-2">
-                    <label className="block text-stone-400 mb-1 font-semibold">
-                      {tr('Full Name', 'Nome Completo')}
-                    </label>
-                    <input
-                      type="text"
-                      value={editingChar.name}
-                      onChange={(e) => setEditingChar({ ...editingChar, name: e.target.value })}
-                      className="w-full px-2.5 py-2 rounded bg-stone-950 border border-stone-700 text-stone-100 font-bold"
-                    />
-                  </div>
-                </div>
-
-                {/* PC Blueprint vs Assigned Player Toggle */}
-                {editingChar.kind === 'pc' && (
-                  <div className="p-3 rounded-xl bg-stone-950 border border-amber-500/30 flex flex-wrap items-center justify-between gap-3">
-                    <label className="flex items-center gap-2 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={Boolean(editingChar.isPreGenBlueprint)}
-                        onChange={(e) =>
-                          setEditingChar({
-                            ...editingChar,
-                            isPreGenBlueprint: e.target.checked,
-                            playerOrRole: e.target.checked ? '' : editingChar.playerOrRole,
-                          })
-                        }
-                        className="accent-amber-500 w-4 h-4"
-                      />
-                      <div>
-                        <div className="font-bold text-amber-300">
-                          {tr(
-                            'Pre-Generated PC Blueprint (No player required)',
-                            'PG Blueprint Pre-Generato (Senza giocatore obbligatorio)'
-                          )}
-                        </div>
-                        <div className="text-[11px] text-stone-400">
-                          {tr(
-                            'Keep this sheet as a reusable template to print or assign across multiple one-shots and campaigns.',
-                            'Mantieni questa scheda come modello riutilizzabile da stampare o assegnare in diverse one-shot e campagne.'
-                          )}
-                        </div>
-                      </div>
-                    </label>
-                  </div>
-                )}
-
-                {/* Portrait / Image Upload & URL */}
-                <div className="p-3 rounded-xl bg-stone-950 border border-stone-800 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <label className="font-semibold text-amber-400 flex items-center gap-1.5">
-                      <ImagePlus className="w-4 h-4" />
-                      {tr(
-                        'Portrait / Illustration (PC, NPC, Monster/Boss)',
-                        'Immagine / Ritratto (PG, NPC, Mostro/Boss)'
-                      )}
-                    </label>
-                    {editingChar.portraitUrl && (
-                      <button
-                        type="button"
-                        onClick={() => setEditingChar({ ...editingChar, portraitUrl: undefined })}
-                        className="text-[11px] text-red-400 hover:underline"
-                      >
-                        {tr('Remove Image', 'Rimuovi Immagine')}
-                      </button>
-                    )}
-                  </div>
-                  <div className="flex flex-wrap items-center gap-3">
-                    {editingChar.portraitUrl && (
-                      <img
-                        src={editingChar.portraitUrl}
-                        alt="Portrait preview"
-                        className="w-14 h-14 rounded-lg object-cover border border-amber-500/50 shrink-0"
-                      />
-                    )}
-                    <label className="px-3 py-1.5 rounded-lg bg-stone-800 hover:bg-stone-700 text-amber-300 font-semibold cursor-pointer border border-stone-700">
-                      {tr('Upload Image File...', 'Carica File Immagine...')}
-                      <input
-                        type="file"
-                        accept="image/*"
-                        onChange={handlePortraitUpload}
-                        className="hidden"
-                      />
-                    </label>
-                    <input
-                      type="text"
-                      value={editingChar.portraitUrl || ''}
-                      onChange={(e) =>
-                        setEditingChar({ ...editingChar, portraitUrl: e.target.value || undefined })
-                      }
-                      placeholder={tr(
-                        'Or paste image URL / DataURL...',
-                        'Oppure incolla URL immagine / DataURL...'
-                      )}
-                      className="flex-1 min-w-[180px] px-2.5 py-1.5 rounded bg-stone-900 border border-stone-700 text-stone-200"
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-3 gap-3">
-                  <div>
-                    <label className="block text-stone-400 mb-1 font-semibold">
-                      {editingChar.kind === 'pc'
-                        ? tr('Player Name (Optional)', 'Nome Giocatore (Opzionale)')
-                        : tr('Narrative Role / Title', 'Ruolo Narrativo / Titolo')}
-                    </label>
-                    <input
-                      type="text"
-                      value={editingChar.playerOrRole}
-                      disabled={editingChar.kind === 'pc' && Boolean(editingChar.isPreGenBlueprint)}
-                      placeholder={
-                        editingChar.kind === 'pc'
-                          ? tr('Unassigned (Pre-Gen)', 'Non assegnato (Pre-Gen)')
-                          : ''
-                      }
-                      onChange={(e) =>
-                        setEditingChar({ ...editingChar, playerOrRole: e.target.value })
-                      }
-                      className="w-full px-2.5 py-1.5 rounded bg-stone-950 border border-stone-700 text-stone-200 disabled:opacity-50"
-                    />
-                  </div>
-                  <div>
-                    <div className="flex items-center justify-between mb-1">
-                      <label className="block text-stone-400 font-semibold">
-                        {tr('Level (PC) or CR', 'Livello (PG) o GS')}
-                      </label>
-                      {editingChar.kind === 'pc' && (
-                        <button
-                          type="button"
-                          onClick={() => setLevelUpTargetChar(editingChar)}
-                          className="text-[10px] text-purple-300 hover:text-purple-200 font-bold flex items-center gap-0.5 cursor-pointer"
-                        >
-                          <TrendingUp className="w-3 h-3" />
-                          {tr('Level Up ▲', 'Livello + ▲')}
-                        </button>
-                      )}
-                    </div>
-                    <input
-                      type="text"
-                      value={editingChar.levelOrCr}
-                      onChange={(e) => {
-                        const updated = { ...editingChar, levelOrCr: e.target.value };
-                        setEditingChar(syncSkillAndSaveStrings(updated));
-                      }}
-                      className="w-full px-2.5 py-1.5 rounded bg-stone-950 border border-stone-700 text-stone-200"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-stone-400 mb-1 font-semibold">
-                      {tr('Background (5e)', 'Background (5e)')}
-                    </label>
-                    <input
-                      type="text"
-                      value={editingChar.background || ''}
-                      onChange={(e) =>
-                        setEditingChar({ ...editingChar, background: e.target.value })
-                      }
-                      placeholder={tr('e.g. Noble, Sage, Soldier', 'es. Nobile, Sapiente, Soldato')}
-                      className="w-full px-2.5 py-1.5 rounded bg-stone-950 border border-stone-700 text-stone-200"
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-3 gap-3">
-                  <div>
-                    <div className="flex items-center justify-between mb-1">
-                      <label className="block text-stone-400 font-semibold">
-                        {tr('Type / Species', 'Tipo / Razza')}
-                      </label>
-                      {editingChar.kind === 'pc' && (
-                        <select
-                          value=""
-                          onChange={(e) => {
-                            if (!e.target.value) return;
-                            const r = STANDARD_RACES.find((rc) => rc.id === e.target.value);
-                            if (r) {
-                              const updated = applyStandardTemplate(editingChar, {
-                                raceDef: r,
-                                lang,
-                              });
-                              setEditingChar(syncSkillAndSaveStrings(updated));
-                            }
-                          }}
-                          className="text-[10px] bg-stone-900 border border-stone-700 text-amber-300 rounded px-1 py-0.5"
-                        >
-                          <option value="">{tr('Presets...', 'Preimpostati...')}</option>
-                          {STANDARD_RACES.map((r) => (
-                            <option key={r.id} value={r.id}>
-                              {lang === 'it' ? r.nameIt : r.nameEn}
-                            </option>
-                          ))}
-                        </select>
-                      )}
-                    </div>
-                    <input
-                      type="text"
-                      value={editingChar.creatureType}
-                      onChange={(e) =>
-                        setEditingChar({ ...editingChar, creatureType: e.target.value })
-                      }
-                      className="w-full px-2.5 py-1.5 rounded bg-stone-950 border border-stone-700 text-stone-200"
-                    />
-                  </div>
-                  <div>
-                    <div className="flex items-center justify-between mb-1">
-                      <label className="block text-stone-400 font-semibold">
-                        {tr('Class / Archetype', 'Classe / Archetipo')}
-                      </label>
-                      {editingChar.kind === 'pc' && (
-                        <select
-                          value=""
-                          onChange={(e) => {
-                            if (!e.target.value) return;
-                            const c = STANDARD_CLASSES.find((cl) => cl.id === e.target.value);
-                            if (c) {
-                              const lv = parsePgLevel(editingChar.levelOrCr);
-                              const updated = applyStandardTemplate(editingChar, {
-                                classDef: c,
-                                level: lv,
-                                lang,
-                              });
-                              setEditingChar(syncSkillAndSaveStrings(updated));
-                            }
-                          }}
-                          className="text-[10px] bg-stone-900 border border-stone-700 text-amber-300 rounded px-1 py-0.5"
-                        >
-                          <option value="">{tr('Presets...', 'Preimpostati...')}</option>
-                          {STANDARD_CLASSES.map((c) => (
-                            <option key={c.id} value={c.id}>
-                              {lang === 'it' ? c.nameIt : c.nameEn}
-                            </option>
-                          ))}
-                        </select>
-                      )}
-                    </div>
-                    <input
-                      type="text"
-                      value={editingChar.classOrArchetype || ''}
-                      onChange={(e) =>
-                        setEditingChar({ ...editingChar, classOrArchetype: e.target.value })
-                      }
-                      className="w-full px-2.5 py-1.5 rounded bg-stone-950 border border-stone-700 text-stone-200"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-stone-400 mb-1 font-semibold">
-                      {tr('Alignment', 'Allineamento')}
-                    </label>
-                    <input
-                      type="text"
-                      value={editingChar.alignment}
-                      onChange={(e) =>
-                        setEditingChar({ ...editingChar, alignment: e.target.value })
-                      }
-                      className="w-full px-2.5 py-1.5 rounded bg-stone-950 border border-stone-700 text-stone-200"
-                    />
-                  </div>
-                </div>
-
-                {/* Combat Vitals */}
-                <div className="grid grid-cols-5 gap-2 bg-stone-950 p-3 rounded-lg border border-stone-800">
-                  <div>
-                    <label className="block text-stone-400 mb-1">{tr('AC', 'CA')}</label>
-                    <input
-                      type="number"
-                      value={editingChar.ac}
-                      onChange={(e) =>
-                        setEditingChar({ ...editingChar, ac: Number(e.target.value) })
-                      }
-                      className="w-full px-2 py-1 rounded bg-stone-900 border border-stone-700 text-amber-300 font-bold"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-stone-400 mb-1">{tr('Max HP', 'PF Max')}</label>
-                    <input
-                      type="number"
-                      value={editingChar.hpMax}
-                      onChange={(e) =>
-                        setEditingChar({ ...editingChar, hpMax: Number(e.target.value) })
-                      }
-                      className="w-full px-2 py-1 rounded bg-stone-900 border border-stone-700 text-emerald-400 font-bold"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-stone-400 mb-1">
-                      {tr('Hit Dice', 'Formula Dadi')}
-                    </label>
-                    <input
-                      type="text"
-                      value={editingChar.hitDiceFormula}
-                      onChange={(e) =>
-                        setEditingChar({ ...editingChar, hitDiceFormula: e.target.value })
-                      }
-                      className="w-full px-2 py-1 rounded bg-stone-900 border border-stone-700 text-stone-200"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-stone-400 mb-1">
-                      {tr('Init Bonus', 'Bonus Iniz.')}
-                    </label>
-                    <input
-                      type="number"
-                      value={editingChar.initiativeBonus}
-                      onChange={(e) =>
-                        setEditingChar({
-                          ...editingChar,
-                          initiativeBonus: Number(e.target.value),
-                        })
-                      }
-                      className="w-full px-2 py-1 rounded bg-stone-900 border border-stone-700 text-stone-200"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-stone-400 mb-1">
-                      {tr('Pass. Perc.', 'Perc. Passiva')}
-                    </label>
-                    <input
-                      type="number"
-                      value={editingChar.passivePerception}
-                      onChange={(e) =>
-                        setEditingChar({
-                          ...editingChar,
-                          passivePerception: Number(e.target.value),
-                        })
-                      }
-                      className="w-full px-2 py-1 rounded bg-stone-900 border border-stone-700 text-stone-200"
-                    />
-                  </div>
-                </div>
-
-                {/* 6 Abilities */}
-                <div>
-                  <label className="block text-stone-400 mb-1 font-semibold">
-                    {tr(
-                      'D&D 5e Ability Scores (auto-updates all 18 skills & saving throws)',
-                      'Caratteristiche D&D 5e (aggiorna in automatico tutte le 18 abilità e i TS)'
-                    )}
-                  </label>
-                  <div className="grid grid-cols-6 gap-2">
-                    {DND_ABILITY_META.map((ab) => (
-                      <div
-                        key={ab.key}
-                        className="bg-stone-950 p-2 rounded border border-stone-800 text-center"
-                      >
-                        <div className="text-[10px] font-bold text-amber-400">
-                          {lang === 'it' ? ab.shortIt : ab.shortEn}
-                        </div>
-                        <input
-                          type="number"
-                          value={editingChar.abilities[ab.key]}
-                          onChange={(e) => updateAbility(ab.key, Number(e.target.value))}
-                          className="w-full mt-1 text-center py-1 rounded bg-stone-900 border border-stone-700 text-stone-100 font-bold"
-                        />
-                        <div className="text-[10px] text-stone-400 mt-0.5">
-                          {formatMod(editingChar.abilities[ab.key])}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Interactive Saving Throws & All 18 Skills Editor */}
-                <div className="bg-stone-950 p-3.5 rounded-xl border border-stone-800 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <span className="font-bold text-amber-400">
-                      {tr(
-                        `All 18 Skills & Saving Throws (Proficiency Bonus: +${getProficiencyBonus(
-                          editingChar
-                        )})`,
-                        `Tutte le 18 Abilità & Tiri Salvezza (Bonus Competenza: +${getProficiencyBonus(
-                          editingChar
-                        )})`
-                      )}
-                    </span>
-                    <span className="text-[10px] text-stone-400">
-                      {tr(
-                        'Click a skill to cycle: None (○) → Proficient (●) → Expertise (◆)',
-                        'Clicca un’abilità per ciclare: Base (○) → Competenza (●) → Maestria (◆)'
-                      )}
-                    </span>
-                  </div>
-
-                  {/* 6 Saving Throws toggles */}
-                  <div>
-                    <div className="text-[10px] font-bold uppercase text-stone-400 mb-1">
-                      {tr('Saving Throws', 'Tiri Salvezza')}
-                    </div>
-                    <div className="grid grid-cols-3 sm:grid-cols-6 gap-1.5">
-                      {DND_ABILITY_META.map((ab) => {
-                        const { total, proficient } = getSavingThrowTotalBonus(
-                          editingChar,
-                          ab.key
-                        );
-                        return (
-                          <button
-                            key={ab.key}
-                            type="button"
-                            onClick={() => toggleSaveProficiency(ab.key)}
-                            className={`px-2 py-1.5 rounded border text-xs flex items-center justify-between transition cursor-pointer ${
-                              proficient
-                                ? 'bg-amber-600/20 border-amber-500 text-amber-200 font-bold'
-                                : 'bg-stone-900 border-stone-800 text-stone-400 hover:border-stone-700'
-                            }`}
-                          >
-                            <span>
-                              {proficient ? '● ' : '○ '}
-                              {lang === 'it' ? ab.shortIt : ab.shortEn}
-                            </span>
-                            <span className="font-mono">{formatSignedBonus(total)}</span>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-
-                  {/* 18 Skills interactive buttons */}
-                  <div>
-                    <div className="text-[10px] font-bold uppercase text-stone-400 mb-1">
-                      {tr('All 18 D&D 5e Skills', 'Tutte le 18 Abilità D&D 5e')}
-                    </div>
-                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
-                      {DND_SKILLS.map((sk) => {
-                        const { total, rank } = getSkillTotalBonus(editingChar, sk.id);
-                        const abMeta = DND_ABILITY_META.find((a) => a.key === sk.ability)!;
-                        const abShort = lang === 'it' ? abMeta.shortIt : abMeta.shortEn;
-                        const icon = rank === 2 ? '◆' : rank === 1 ? '●' : '○';
-                        return (
-                          <button
-                            key={sk.id}
-                            type="button"
-                            onClick={() => cycleSkillProficiency(sk.id)}
-                            className={`px-2.5 py-1.5 rounded border text-left text-xs flex items-center justify-between transition cursor-pointer ${
-                              rank === 2
-                                ? 'bg-purple-600/25 border-purple-400 text-purple-200 font-bold'
-                                : rank === 1
-                                ? 'bg-amber-600/20 border-amber-500 text-amber-200 font-bold'
-                                : 'bg-stone-900 border-stone-800 text-stone-300 hover:border-stone-700'
-                            }`}
-                          >
-                            <span className="truncate">
-                              <span className="mr-1">{icon}</span>
-                              {lang === 'it' ? sk.labelIt : sk.labelEn}{' '}
-                              <span className="text-[9px] opacity-60">({abShort})</span>
-                            </span>
-                            <span className="font-mono ml-1">{formatSignedBonus(total)}</span>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Traits & Actions */}
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="font-bold text-amber-400">
-                      {tr('Traits & Special Abilities', 'Tratti & Capacità Speciali')}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => addListEntry('traits')}
-                      className="px-2 py-0.5 rounded bg-stone-800 hover:bg-stone-700 text-amber-300"
-                    >
-                      {tr('+ Add Trait', '+ Aggiungi Tratto')}
-                    </button>
-                  </div>
-                  {editingChar.traits.map((t, idx) => (
-                    <div
-                      key={idx}
-                      className="flex gap-2 items-start bg-stone-950 p-2 rounded border border-stone-800"
-                    >
-                      <input
-                        type="text"
-                        value={t.name}
-                        onChange={(e) => updateListEntry('traits', idx, { name: e.target.value })}
-                        placeholder={tr('Trait name', 'Nome tratto')}
-                        className="w-1/3 px-2 py-1 rounded bg-stone-900 border border-stone-700 text-amber-200 font-semibold"
-                      />
-                      <input
-                        type="text"
-                        value={t.description}
-                        onChange={(e) =>
-                          updateListEntry('traits', idx, { description: e.target.value })
-                        }
-                        placeholder={tr('Description', 'Descrizione')}
-                        className="flex-1 px-2 py-1 rounded bg-stone-900 border border-stone-700 text-stone-200"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => removeListEntry('traits', idx)}
-                        className="p-1 text-stone-500 hover:text-red-400"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="font-bold text-amber-400">
-                      {tr('Actions & Attacks', 'Azioni & Attacchi')}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => addListEntry('actions')}
-                      className="px-2 py-0.5 rounded bg-stone-800 hover:bg-stone-700 text-amber-300"
-                    >
-                      {tr('+ Add Action', '+ Aggiungi Azione')}
-                    </button>
-                  </div>
-                  {editingChar.actions.map((a, idx) => (
-                    <div
-                      key={idx}
-                      className="flex gap-2 items-start bg-stone-950 p-2 rounded border border-stone-800"
-                    >
-                      <input
-                        type="text"
-                        value={a.name}
-                        onChange={(e) => updateListEntry('actions', idx, { name: e.target.value })}
-                        placeholder={tr('Action name', 'Nome azione')}
-                        className="w-1/3 px-2 py-1 rounded bg-stone-900 border border-stone-700 text-amber-200 font-semibold"
-                      />
-                      <input
-                        type="text"
-                        value={a.description}
-                        onChange={(e) =>
-                          updateListEntry('actions', idx, { description: e.target.value })
-                        }
-                        placeholder={tr(
-                          'Attack / damage description',
-                          'Descrizione attacco / danni'
-                        )}
-                        className="flex-1 px-2 py-1 rounded bg-stone-900 border border-stone-700 text-stone-200"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => removeListEntry('actions', idx)}
-                        className="p-1 text-stone-500 hover:text-red-400"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-stone-400 mb-1">
-                      {tr('Spells & Slots Notes', 'Note Incantesimi & Slot')}
-                    </label>
-                    <textarea
-                      rows={2}
-                      value={editingChar.spellsNotes || ''}
-                      onChange={(e) =>
-                        setEditingChar({ ...editingChar, spellsNotes: e.target.value })
-                      }
-                      className="w-full px-2.5 py-1.5 rounded bg-stone-950 border border-stone-700 text-stone-200"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-stone-400 mb-1">
-                      {tr('Backstory & Equipment Notes', 'Biografia, Personalità & Equipaggiamento')}
-                    </label>
-                    <textarea
-                      rows={2}
-                      value={editingChar.biographyOrLore}
-                      onChange={(e) =>
-                        setEditingChar({ ...editingChar, biographyOrLore: e.target.value })
-                      }
-                      className="w-full px-2.5 py-1.5 rounded bg-stone-950 border border-stone-700 text-stone-200"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* Right Live Statblock Preview (5 cols) */}
-              <div className="lg:col-span-5">
-                <div className="text-xs font-bold uppercase tracking-wider text-stone-400 mb-2">
-                  {tr('Live D&D 5e Statblock Preview', 'Anteprima Live Statblock D&D 5e')}
-                </div>
-                <StatblockCard character={editingChar} />
-              </div>
             </div>
           </div>
         </div>
@@ -1735,7 +885,6 @@ export const CharactersView: React.FC<CharactersViewProps> = ({
                 onClick={() => {
                   onSaveParty(editingParty);
                   setEditingParty(null);
-                  setFilterKind('parties');
                 }}
                 className="px-4 py-1.5 rounded bg-amber-600 hover:bg-amber-500 text-stone-950 text-xs font-bold"
               >
@@ -1746,92 +895,29 @@ export const CharactersView: React.FC<CharactersViewProps> = ({
         </div>
       )}
 
-      {/* Supervised PC Creation Wizard Modal */}
-      {showSupervisedCreate && (
-        <SupervisedPgCreateModal
-          isOpen={showSupervisedCreate.isOpen}
-          isBlueprintDefault={showSupervisedCreate.isBlueprint}
-          onClose={() => setShowSupervisedCreate(null)}
-          onConfirm={(createdChar) => {
-            onSaveCharacter(createdChar);
-            setSelectedId(createdChar.id);
-            setEditingChar(structuredClone(createdChar));
-            setMasterOverrideAccepted(false);
-            setShowSupervisedCreate(null);
-          }}
-        />
-      )}
-
-      {/* Level-Up Wizard Modal */}
+      {/* Level-Up Wizard Modal from repository cards */}
       {levelUpTargetChar && (
         <LevelUpModal
           isOpen={Boolean(levelUpTargetChar)}
           character={levelUpTargetChar}
           onClose={() => setLevelUpTargetChar(null)}
           onSave={(updatedChar, saveMode) => {
-            onSaveCharacter(updatedChar);
-            setSelectedId(updatedChar.id);
-            if (editingChar && editingChar.id === levelUpTargetChar.id) {
-              setEditingChar(structuredClone(updatedChar));
+            if (saveMode === 'new_blueprint') {
+              const newBp: CharacterEntity = {
+                ...updatedChar,
+                id: `pc-bp-${Date.now()}`,
+                isPreGenBlueprint: true,
+                sourceBlueprintId: levelUpTargetChar.id,
+              };
+              onSaveCharacter(newBp);
+              setSelectedId(newBp.id);
+            } else {
+              onSaveCharacter(updatedChar);
+              setSelectedId(updatedChar.id);
             }
             setLevelUpTargetChar(null);
           }}
         />
-      )}
-
-      {/* Soft Confirmation Modal for Unacknowledged Rules Advisories */}
-      {showWarningConfirmation && editingChar && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-stone-900 border border-amber-500/60 rounded-2xl max-w-lg w-full p-6 space-y-4 shadow-2xl text-xs">
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-xl bg-amber-500/10 border border-amber-500/40 text-amber-400">
-                <AlertTriangle className="w-6 h-6" />
-              </div>
-              <div>
-                <h3 className="font-header text-lg font-bold text-amber-300">
-                  {tr('Master Authority & Rules Advisory', 'Autorità del Master & Avviso Regole')}
-                </h3>
-                <p className="text-stone-400 text-[11px] mt-0.5">
-                  {tr(
-                    'Some attributes diverge from standard D&D 5e SRD benchmarks.',
-                    'Alcuni attributi divergono dai parametri standard di D&D 5e SRD.'
-                  )}
-                </p>
-              </div>
-            </div>
-
-            <p className="text-stone-300 leading-relaxed">
-              {tr(
-                'As the Dungeon Master, you are ALWAYS the final decision maker. Would you like to review the advisories, or continue anyway with your custom/homebrew values?',
-                'In qualità di Dungeon Master, hai SEMPRE l’ultima parola. Desideri rivedere i suggerimenti o continuare comunque con i tuoi valori personalizzati/homebrew?'
-              )}
-            </p>
-
-            <div className="flex items-center justify-end gap-2 pt-2 border-t border-stone-800">
-              <button
-                type="button"
-                onClick={() => setShowWarningConfirmation(false)}
-                className="px-3 py-2 rounded-lg bg-stone-800 hover:bg-stone-700 text-stone-300 font-semibold cursor-pointer"
-              >
-                {tr('Review Advisories', 'Rivedi Suggerimenti')}
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setMasterOverrideAccepted(true);
-                  setShowWarningConfirmation(false);
-                  onSaveCharacter(editingChar);
-                  setSelectedId(editingChar.id);
-                  setEditingChar(null);
-                }}
-                className="px-4 py-2 rounded-lg bg-amber-600 hover:bg-amber-500 text-stone-950 font-extrabold flex items-center gap-1.5 shadow cursor-pointer"
-              >
-                <Check className="w-4 h-4" />
-                {tr('Continue Anyway & Save', 'Continua Comunque & Salva')}
-              </button>
-            </div>
-          </div>
-        </div>
       )}
     </div>
   );
