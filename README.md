@@ -35,7 +35,12 @@ Web & Desktop application (**Tauri v2 + React 19 + TypeScript + Tailwind CSS**) 
 6. **Multi-Language UI (`EN` / `IT`)**:
    - Full English (`EN`, default) and Italian (`IT`) UI localization, switchable at any time from the top navigation bar.
 
-7. **Local Disk Persistence & Cloud-Ready Architecture**:
+7. **Vellum CLI & AI Agent Integration**:
+   - Built-in command line interface (`npm run cli -- ...`) providing full CRUD capabilities on stories, characters/PGs, campaigns, parties, encounters, instances, and DB maintenance.
+   - Strict `--json` output mode for automated pipelines and AI coding assistants (Claude, Gemini, Codex, Antigravity).
+   - Embedded agent instructions and skill specification in [`skills/vellum-cli/SKILL.md`](./skills/vellum-cli/SKILL.md).
+
+8. **Local Disk Persistence & Cloud-Ready Architecture**:
    - Automatically saves to `./data/dnd5e-db.json` in web/dev mode and to the OS AppData directory in the native Tauri desktop app (plus full JSON Export/Import).
    - The storage layer (`src/services/storageRepository.ts`) implements the `IStorageRepository` interface, ready to plug into a future cloud/SaaS adapter.
 
@@ -77,9 +82,35 @@ npm run dev
 # Build production frontend
 npm run build
 
+# Run CLI commands (see `npm run cli -- --help`)
+npm run cli -- stories list
+npm run cli -- characters get pc-tharion
+
 # Run or build as a native Tauri v2 desktop application
 npm run tauri dev
 npm run tauri build
+```
+
+## CLI Usage for Developers & AI Agents
+
+```bash
+# General help and command overview
+npm run cli -- --help
+
+# AI Agent protocol and usage guide
+npm run cli -- agent-guide
+
+# List stories/adventures in machine-readable JSON
+npm run cli -- stories list --json
+
+# View a character statblock formatted for terminal
+npm run cli -- characters get pc-tharion
+
+# Create a new character (PC, NPC, or Monster)
+npm run cli -- characters create --name "Valerius" --kind pc --class "Paladin" --hp 38 --ac 18 --json
+
+# Validate database integrity (foreign keys, broken references)
+npm run cli -- db validate --json
 ```
 
 ## Releases
