@@ -5,17 +5,15 @@ import {
   SfxItem,
 } from '../types/dnd';
 import { soundboardEngine } from '../services/audioEngine';
+import { useLanguage } from '../i18n/LanguageContext';
 import { StatblockCard } from './StatblockCard';
 import {
   Volume2,
-  VolumeX,
   Swords,
   UserCheck,
   Skull,
   BookOpen,
   EyeOff,
-  Sparkles,
-  Play,
   Square,
 } from 'lucide-react';
 
@@ -42,6 +40,7 @@ export const HomebreweryRenderer: React.FC<HomebreweryRendererProps> = ({
   onStartEncounter,
   onLogReadAloud,
 }) => {
+  const { tr } = useLanguage();
   const [, setAudioTick] = useState(0);
 
   useEffect(() => {
@@ -67,7 +66,7 @@ export const HomebreweryRenderer: React.FC<HomebreweryRendererProps> = ({
         if (!sfx) {
           return (
             <span key={key} className="inline-flex items-center px-2 py-0.5 text-xs bg-red-200 text-red-900 rounded">
-              [SFX non trovato: {sfxId}]
+              [{tr('SFX not found', 'SFX non trovato')}: {sfxId}]
             </span>
           );
         }
@@ -97,7 +96,7 @@ export const HomebreweryRenderer: React.FC<HomebreweryRendererProps> = ({
         if (!ch) {
           return (
             <span key={key} className="inline-flex items-center px-2 py-0.5 text-xs bg-red-200 text-red-900 rounded">
-              [Personaggio non trovato: {charId}]
+              [{tr('Character not found', 'Personaggio non trovato')}: {charId}]
             </span>
           );
         }
@@ -112,7 +111,10 @@ export const HomebreweryRenderer: React.FC<HomebreweryRendererProps> = ({
                 ? 'bg-red-900/15 text-red-900 border-red-800/40 hover:bg-red-900 hover:text-amber-100'
                 : 'bg-amber-900/15 text-[#58180D] border-amber-800/40 hover:bg-[#58180D] hover:text-amber-100'
             }`}
-            title={`Clicca per aprire la scheda di ${ch.name} (${ch.levelOrCr} • CA ${ch.ac} • PF ${ch.hpMax})`}
+            title={tr(
+              `Click to open ${ch.name}'s sheet (${ch.levelOrCr} • AC ${ch.ac} • HP ${ch.hpMax})`,
+              `Clicca per aprire la scheda di ${ch.name} (${ch.levelOrCr} • CA ${ch.ac} • PF ${ch.hpMax})`
+            )}
           >
             {isMonster ? <Skull className="w-3 h-3" /> : <UserCheck className="w-3 h-3" />}
             <span className="underline decoration-dotted underline-offset-2">{ch.name}</span>
@@ -196,7 +198,7 @@ export const HomebreweryRenderer: React.FC<HomebreweryRendererProps> = ({
             <div className="flex items-center justify-between mb-1.5 pb-1 border-b border-[#58180D]/20 font-sans">
               <span className="text-[11px] font-bold uppercase tracking-wider text-[#58180D] flex items-center gap-1.5">
                 <BookOpen className="w-3.5 h-3.5" />
-                Testo da Leggere ai Giocatori
+                {tr('Read-Aloud Text for Players', 'Testo da Leggere ai Giocatori')}
               </span>
               {onLogReadAloud && (
                 <button
@@ -204,7 +206,7 @@ export const HomebreweryRenderer: React.FC<HomebreweryRendererProps> = ({
                   onClick={() => onLogReadAloud(rawText.slice(0, 140) + (rawText.length > 140 ? '...' : ''))}
                   className="text-[11px] font-semibold px-2 py-0.5 rounded bg-[#58180D]/10 text-[#58180D] hover:bg-[#58180D] hover:text-amber-100 transition"
                 >
-                  + Segna nel Diario
+                  {tr('+ Log to Timeline', '+ Segna nel Diario')}
                 </button>
               )}
             </div>
@@ -223,7 +225,7 @@ export const HomebreweryRenderer: React.FC<HomebreweryRendererProps> = ({
           >
             <div className="flex items-center gap-1.5 text-xs font-sans font-bold uppercase tracking-wider text-[#58180D] mb-1">
               <EyeOff className="w-3.5 h-3.5" />
-              Nota Segreta del Dungeon Master
+              {tr('Dungeon Master Secret Note', 'Nota Segreta del Dungeon Master')}
             </div>
             <div className="space-y-1.5 leading-relaxed">
               {blockLines.map((bLine, bIdx) => {
@@ -254,13 +256,18 @@ export const HomebreweryRenderer: React.FC<HomebreweryRendererProps> = ({
       if (!enc) {
         elements.push(
           <div key={`enc-${i}`} className="my-3 p-3 bg-red-100 border border-red-400 text-red-900 text-xs rounded">
-            Incontro non trovato: <code>{encId}</code>
+            {tr('Encounter not found:', 'Incontro non trovato:')} <code>{encId}</code>
           </div>
         );
         continue;
       }
 
       const linkedSfx = enc.autoSfxId ? sfxMap.get(enc.autoSfxId) : undefined;
+      const isHardOrDeadly =
+        enc.difficulty === 'Hard' ||
+        enc.difficulty === 'Deadly' ||
+        enc.difficulty === 'Difficile' ||
+        enc.difficulty === 'Mortale';
 
       elements.push(
         <div
@@ -271,16 +278,16 @@ export const HomebreweryRenderer: React.FC<HomebreweryRendererProps> = ({
             <div>
               <div className="flex items-center gap-2">
                 <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-[#58180D] text-amber-100 text-[11px] font-bold uppercase tracking-wider">
-                  <Swords className="w-3.5 h-3.5" /> Incontro Previsto
+                  <Swords className="w-3.5 h-3.5" /> {tr('Planned Encounter', 'Incontro Previsto')}
                 </span>
                 <span
                   className={`text-xs font-bold px-2 py-0.5 rounded border ${
-                    enc.difficulty === 'Mortale' || enc.difficulty === 'Difficile'
+                    isHardOrDeadly
                       ? 'bg-red-900/15 text-red-900 border-red-800/40'
                       : 'bg-amber-900/15 text-amber-900 border-amber-800/40'
                   }`}
                 >
-                  Difficoltà: {enc.difficulty}
+                  {tr('Difficulty:', 'Difficoltà:')} {enc.difficulty}
                 </span>
               </div>
               <h4 className="font-header text-lg font-extrabold text-[#58180D] mt-1">{enc.name}</h4>
@@ -305,7 +312,7 @@ export const HomebreweryRenderer: React.FC<HomebreweryRendererProps> = ({
                   className="px-3.5 py-2 rounded bg-[#58180D] hover:bg-[#7a2213] text-amber-100 text-xs font-bold uppercase tracking-wider shadow flex items-center gap-1.5 transition cursor-pointer"
                 >
                   <Swords className="w-4 h-4" />
-                  Avvia Combattimento
+                  {tr('Start Combat', 'Avvia Combattimento')}
                 </button>
               )}
             </div>
@@ -327,7 +334,7 @@ export const HomebreweryRenderer: React.FC<HomebreweryRendererProps> = ({
                     <div className="font-bold text-[#2b170e]">{slot.customLabel || monster?.name || slot.characterId}</div>
                     {monster && (
                       <div className="text-[10px] text-[#58180D]/80">
-                        CA {monster.ac} • PF {monster.hpMax} • {monster.levelOrCr}
+                        {tr('AC', 'CA')} {monster.ac} • {tr('HP', 'PF')} {monster.hpMax} • {monster.levelOrCr}
                       </div>
                     )}
                   </div>
@@ -499,8 +506,8 @@ export const HomebreweryRenderer: React.FC<HomebreweryRendererProps> = ({
         {elements}
       </div>
       <div className="px-8 py-2 bg-[#f3e5c2] border-t border-[#c9ad6a]/60 flex items-center justify-between text-[11px] font-header text-[#58180D]/80 uppercase tracking-widest">
-        <span>Vellum • Edizione Dungeon Master</span>
-        <span>Pergamena Interattiva</span>
+        <span>{tr('Vellum • Dungeon Master Edition', 'Vellum • Edizione Dungeon Master')}</span>
+        <span>{tr('Interactive Parchment', 'Pergamena Interattiva')}</span>
       </div>
     </div>
   );

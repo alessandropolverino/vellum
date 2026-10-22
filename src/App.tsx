@@ -8,9 +8,10 @@ import {
   PlayInstance,
   SfxItem,
 } from './types/dnd';
-import { SEED_DATABASE } from './data/seedData';
+import { SEED_DATABASE, getSeedDatabase } from './data/seedData';
 import { storageRepository } from './services/storageRepository';
 import { soundboardEngine } from './services/audioEngine';
+import { useLanguage } from './i18n/LanguageContext';
 import { DashboardView } from './components/DashboardView';
 import { AdventureStudioView } from './components/AdventureStudioView';
 import { LiveSessionConsole } from './components/LiveSessionConsole';
@@ -30,13 +31,15 @@ import {
   Plus,
   X,
   RotateCcw,
+  Globe,
 } from 'lucide-react';
 
 type ActiveTab = 'dashboard' | 'studio' | 'console' | 'characters' | 'sfx';
 
 export const App: React.FC = () => {
+  const { lang, setLang, tr } = useLanguage();
   const [db, setDb] = useState<DndDatabase>(SEED_DATABASE);
-  const [storageSource, setStorageSource] = useState<string>('Caricamento...');
+  const [storageSource, setStorageSource] = useState<string>('Loading...');
   const [lastSaveInfo, setLastSaveInfo] = useState<string>('');
   const [activeTab, setActiveTab] = useState<ActiveTab>('dashboard');
 
@@ -73,10 +76,17 @@ export const App: React.FC = () => {
   const persistDb = (nextDb: DndDatabase) => {
     setDb(nextDb);
     storageRepository.saveDatabase(nextDb).then((res) => {
+      const adapterLabel =
+        res.adapter === 'tauri-fs'
+          ? 'Tauri FS'
+          : res.adapter === 'local-disk-api'
+          ? './data/dnd5e-db.json'
+          : tr('Local Storage', 'Storage Locale');
+      const timeLabel = new Date(res.savedAt).toLocaleTimeString(
+        lang === 'it' ? 'it-IT' : 'en-US'
+      );
       setLastSaveInfo(
-        `Salvato su ${res.adapter === 'tauri-fs' ? 'Tauri FS' : res.adapter === 'local-disk-api' ? './data/dnd5e-db.json' : 'Storage Locale'} (${new Date(
-          res.savedAt
-        ).toLocaleTimeString('it-IT')})`
+        `${tr('Saved to', 'Salvato su')} ${adapterLabel} (${timeLabel})`
       );
     });
   };
@@ -172,7 +182,9 @@ export const App: React.FC = () => {
     setNewInstPartyId(defaultParty?.id || '');
     const countForAdv =
       db.playInstances.filter((i) => i.adventureId === targetAdv.id).length + 1;
-    setNewInstName(`Run #${countForAdv} — ${defaultParty?.name || 'Nuovo Gruppo'}`);
+    setNewInstName(
+      `Run #${countForAdv} — ${defaultParty?.name || tr('New Group', 'Nuovo Gruppo')}`
+    );
   };
 
   const handleCreateNewInstance = () => {
@@ -201,8 +213,10 @@ export const App: React.FC = () => {
     const newInst: PlayInstance = {
       id: `inst-${Date.now()}`,
       adventureId: newInstanceAdventure.id,
-      instanceName: newInstName.trim() || `Nuova Sessione (${newInstanceAdventure.title})`,
-      groupName: chosenParty?.name || 'Gruppo Personalizzato',
+      instanceName:
+        newInstName.trim() ||
+        `${tr('New Session', 'Nuova Sessione')} (${newInstanceAdventure.title})`,
+      groupName: chosenParty?.name || tr('Custom Group', 'Gruppo Personalizzato'),
       partyCharacterIds: partyCharIds,
       status: 'active',
       sessionCount: 1,
@@ -215,12 +229,19 @@ export const App: React.FC = () => {
           id: `log-init-${Date.now()}`,
           timestamp: new Date().toISOString(),
           sceneId: firstScene?.id || '',
-          sceneTitle: firstScene ? `${firstScene.code}: ${firstScene.title}` : 'Inizio',
+          sceneTitle: firstScene
+            ? `${firstScene.code}: ${firstScene.title}`
+            : tr('Start', 'Inizio'),
           category: 'narrative',
-          title: 'Avvio Nuova Istanza della Storia',
-          details: `Iniziata l’avventura "${newInstanceAdventure.title}" con il gruppo "${
-            chosenParty?.name || 'Avventurieri'
-          }".`,
+          title: tr('New Story Instance Started', 'Avvio Nuova Istanza della Storia'),
+          details: tr(
+            `Started adventure "${newInstanceAdventure.title}" with group "${
+              chosenParty?.name || 'Adventurers'
+            }".`,
+            `Iniziata l’avventura "${newInstanceAdventure.title}" con il gruppo "${
+              chosenParty?.name || 'Avventurieri'
+            }".`
+          ),
           pinnedForRecap: true,
         },
       ],
@@ -244,10 +265,23 @@ export const App: React.FC = () => {
         const imported = storageRepository.importFromJsonString(String(reader.result));
         persistDb(imported);
       } catch (err: any) {
-        alert(err?.message || 'Errore importazione JSON');
+        alert(err?.message || tr('JSON import error', 'Errore importazione JSON'));
       }
     };
     reader.readAsText(file);
+  };
+
+  const handleSwitchLanguage = (nextLang: 'en' | 'it') => {
+    setLang(nextLang);
+    // If the currently loaded adventure is the unmodified demo adventure, switch seed language too
+    const isUnmodifiedDemo =
+      db.adventures.length === 2 &&
+      db.adventures[0]?.id === 'adv-cripta-sussurrante' &&
+      (db.adventures[0]?.title === 'The Secret of the Whispering Crypt' ||
+        db.adventures[0]?.title === 'Il Segreto della Cripta Sussurrante');
+    if (isUnmodifiedDemo) {
+      persistDb(getSeedDatabase(nextLang));
+    }
   };
 
   const rollQuickDie = (sides: number) => {
@@ -275,7 +309,10 @@ export const App: React.FC = () => {
                 VELLUM
               </div>
               <div className="text-[10px] text-stone-400 font-medium">
-                D&D 5e Campaign, One-Shot & Multi-Instance Studio
+                {tr(
+                  'D&D 5e Campaign, One-Shot & Multi-Instance Studio',
+                  'Studio D&D 5e per Campagne, One-Shot & Multi-Istanza'
+                )}
               </div>
             </div>
           </div>
@@ -290,7 +327,8 @@ export const App: React.FC = () => {
                   : 'text-stone-300 hover:text-amber-300'
               }`}
             >
-              <Compass className="w-4 h-4" /> Dashboard & Istanze
+              <Compass className="w-4 h-4" />{' '}
+              {tr('Dashboard & Instances', 'Dashboard & Istanze')}
             </button>
 
             <button
@@ -301,7 +339,8 @@ export const App: React.FC = () => {
                   : 'text-stone-300 hover:text-amber-300'
               }`}
             >
-              <BookOpen className="w-4 h-4" /> Editor Storia (Homebrewery)
+              <BookOpen className="w-4 h-4" />{' '}
+              {tr('Story Editor (Homebrewery)', 'Editor Storia (Homebrewery)')}
             </button>
 
             <button
@@ -312,7 +351,8 @@ export const App: React.FC = () => {
                   : 'text-stone-300 hover:text-amber-300'
               }`}
             >
-              <Flame className="w-4 h-4" /> Console Partita Live
+              <Flame className="w-4 h-4" />{' '}
+              {tr('Live Session Console', 'Console Partita Live')}
               <span className="px-1.5 py-0.2 rounded-full bg-stone-800 text-amber-300 text-[10px]">
                 {db.playInstances.length}
               </span>
@@ -326,7 +366,8 @@ export const App: React.FC = () => {
                   : 'text-stone-300 hover:text-amber-300'
               }`}
             >
-              <Users className="w-4 h-4" /> PG, NPC & Bestiario
+              <Users className="w-4 h-4" />{' '}
+              {tr('PCs, NPCs & Bestiary', 'PG, NPC & Bestiario')}
             </button>
 
             <button
@@ -337,15 +378,43 @@ export const App: React.FC = () => {
                   : 'text-stone-300 hover:text-amber-300'
               }`}
             >
-              <Volume2 className="w-4 h-4" /> Libreria SFX
+              <Volume2 className="w-4 h-4" /> {tr('SFX Library', 'Libreria SFX')}
               {activeTrackIds.length > 0 && (
                 <span className="w-2 h-2 rounded-full bg-amber-400 animate-ping" />
               )}
             </button>
           </nav>
 
-          {/* Persistence & Import/Export */}
+          {/* Language Switcher + Persistence & Import/Export */}
           <div className="flex items-center gap-2 text-xs">
+            {/* Multi-language Toggle (EN / IT) */}
+            <div
+              className="flex items-center gap-1 bg-stone-900 p-1 rounded-lg border border-stone-800"
+              title={tr('UI Language (English / Italiano)', 'Lingua Interfaccia (English / Italiano)')}
+            >
+              <Globe className="w-3.5 h-3.5 text-amber-400 ml-1" />
+              <button
+                onClick={() => handleSwitchLanguage('en')}
+                className={`px-2 py-0.5 rounded text-[11px] font-bold transition cursor-pointer ${
+                  lang === 'en'
+                    ? 'bg-amber-600 text-stone-950'
+                    : 'text-stone-400 hover:text-stone-200'
+                }`}
+              >
+                EN
+              </button>
+              <button
+                onClick={() => handleSwitchLanguage('it')}
+                className={`px-2 py-0.5 rounded text-[11px] font-bold transition cursor-pointer ${
+                  lang === 'it'
+                    ? 'bg-amber-600 text-stone-950'
+                    : 'text-stone-400 hover:text-stone-200'
+                }`}
+              >
+                IT
+              </button>
+            </div>
+
             <div
               title={lastSaveInfo || storageSource}
               className="hidden xl:flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-stone-900 border border-stone-800 text-stone-400 text-[11px]"
@@ -356,14 +425,14 @@ export const App: React.FC = () => {
 
             <button
               onClick={() => storageRepository.exportToJsonFile(db)}
-              title="Esporta intero Database in JSON"
+              title={tr('Export full database to JSON', 'Esporta intero Database in JSON')}
               className="p-2 rounded-lg bg-stone-900 hover:bg-stone-800 border border-stone-800 text-stone-300"
             >
               <Download className="w-4 h-4" />
             </button>
 
             <label
-              title="Importa Database da file JSON"
+              title={tr('Import database from JSON file', 'Importa Database da file JSON')}
               className="p-2 rounded-lg bg-stone-900 hover:bg-stone-800 border border-stone-800 text-stone-300 cursor-pointer"
             >
               <Upload className="w-4 h-4" />
@@ -372,11 +441,18 @@ export const App: React.FC = () => {
 
             <button
               onClick={() => {
-                if (confirm('Vuoi ripristinare i dati demo iniziali?')) {
-                  persistDb(structuredClone(SEED_DATABASE));
+                if (
+                  confirm(
+                    tr(
+                      'Restore initial demo data in the current language?',
+                      'Vuoi ripristinare i dati demo iniziali nella lingua corrente?'
+                    )
+                  )
+                ) {
+                  persistDb(getSeedDatabase(lang));
                 }
               }}
-              title="Ripristina dati demo iniziali"
+              title={tr('Restore initial demo data', 'Ripristina dati demo iniziali')}
               className="p-2 rounded-lg bg-stone-900 hover:bg-stone-800 border border-stone-800 text-stone-400 hover:text-amber-300"
             >
               <RotateCcw className="w-4 h-4" />
@@ -464,7 +540,8 @@ export const App: React.FC = () => {
           {/* Quick Dice Roller */}
           <div className="flex items-center gap-1.5">
             <span className="text-stone-400 font-semibold flex items-center gap-1 mr-1">
-              <Dice5 className="w-4 h-4 text-amber-500" /> Dadi Rapidi:
+              <Dice5 className="w-4 h-4 text-amber-500" />{' '}
+              {tr('Quick Dice:', 'Dadi Rapidi:')}
             </span>
             {[4, 6, 8, 10, 12, 20, 100].map((sides) => (
               <button
@@ -485,10 +562,14 @@ export const App: React.FC = () => {
           {/* Active Audio Tracks Pill Bar */}
           <div className="flex items-center gap-2">
             {activeTrackIds.length === 0 ? (
-              <span className="text-stone-500 text-[11px]">Nessun audio in riproduzione</span>
+              <span className="text-stone-500 text-[11px]">
+                {tr('No audio playing', 'Nessun audio in riproduzione')}
+              </span>
             ) : (
               <>
-                <span className="text-amber-400 font-bold text-[11px]">Audio Attivi:</span>
+                <span className="text-amber-400 font-bold text-[11px]">
+                  {tr('Active Audio:', 'Audio Attivi:')}
+                </span>
                 {activeTrackIds.map((id) => {
                   const item = db.sfxCatalog.find((s) => s.id === id);
                   if (!item) return null;
@@ -506,7 +587,7 @@ export const App: React.FC = () => {
                   onClick={() => soundboardEngine.stopAll()}
                   className="px-2.5 py-1 rounded bg-red-900/80 hover:bg-red-800 text-red-100 text-[11px] font-bold flex items-center gap-1"
                 >
-                  <VolumeX className="w-3 h-3" /> Stop Tutti
+                  <VolumeX className="w-3 h-3" /> {tr('Stop All', 'Stop Tutti')}
                 </button>
               </>
             )}
@@ -520,7 +601,7 @@ export const App: React.FC = () => {
           <div className="bg-stone-900 border border-stone-700 rounded-2xl max-w-lg w-full p-6 space-y-4 shadow-2xl text-xs">
             <div className="flex items-center justify-between">
               <h3 className="font-header text-xl font-bold text-amber-400">
-                Avvia Nuova Istanza di Gioco
+                {tr('Launch New Play Instance', 'Avvia Nuova Istanza di Gioco')}
               </h3>
               <button
                 onClick={() => setNewInstanceAdventure(null)}
@@ -531,14 +612,21 @@ export const App: React.FC = () => {
             </div>
 
             <p className="text-stone-400 leading-relaxed">
-              Stai creando una nuova istanza indipendente per la storia{' '}
-              <strong className="text-amber-300">{newInstanceAdventure.title}</strong>. Tutte le note, le scelte, i combattimenti e i PF dei PG saranno isolati per questo gruppo.
+              {tr(
+                'You are creating a new independent instance for ',
+                'Stai creando una nuova istanza indipendente per la storia '
+              )}
+              <strong className="text-amber-300">{newInstanceAdventure.title}</strong>.{' '}
+              {tr(
+                'All notes, choices, combat states, and PC hit points will be isolated for this group.',
+                'Tutte le note, le scelte, i combattimenti e i PF dei PG saranno isolati per questo gruppo.'
+              )}
             </p>
 
             <div className="space-y-3">
               <div>
                 <label className="block text-stone-400 mb-1 font-semibold">
-                  Scegli Avventura / Modulo
+                  {tr('Choose Adventure / Module', 'Scegli Avventura / Modulo')}
                 </label>
                 <select
                   value={newInstanceAdventure.id}
@@ -550,7 +638,11 @@ export const App: React.FC = () => {
                 >
                   {db.adventures.map((a) => (
                     <option key={a.id} value={a.id}>
-                      {a.title} ({a.type === 'oneshot' ? 'One-Shot' : 'Modulo Campagna'})
+                      {a.title} (
+                      {a.type === 'oneshot'
+                        ? 'One-Shot'
+                        : tr('Campaign Module', 'Modulo Campagna')}
+                      )
                     </option>
                   ))}
                 </select>
@@ -558,7 +650,10 @@ export const App: React.FC = () => {
 
               <div>
                 <label className="block text-stone-400 mb-1 font-semibold">
-                  Seleziona il Gruppo (Party) dal Repository
+                  {tr(
+                    'Select Party Group from Repository',
+                    'Seleziona il Gruppo (Party) dal Repository'
+                  )}
                 </label>
                 <select
                   value={newInstPartyId}
@@ -578,7 +673,7 @@ export const App: React.FC = () => {
                 >
                   {db.parties.map((p) => (
                     <option key={p.id} value={p.id}>
-                      {p.name} ({p.memberCharacterIds.length} PG)
+                      {p.name} ({p.memberCharacterIds.length} {tr('PCs', 'PG')})
                     </option>
                   ))}
                 </select>
@@ -586,13 +681,19 @@ export const App: React.FC = () => {
 
               <div>
                 <label className="block text-stone-400 mb-1 font-semibold">
-                  Nome Identificativo dell’Istanza / Sessione
+                  {tr(
+                    'Instance / Session Identifier Name',
+                    'Nome Identificativo dell’Istanza / Sessione'
+                  )}
                 </label>
                 <input
                   type="text"
                   value={newInstName}
                   onChange={(e) => setNewInstName(e.target.value)}
-                  placeholder="es. Gruppo del Venerdì - Sessione 1"
+                  placeholder={tr(
+                    'e.g. Friday Group - Session 1',
+                    'es. Gruppo del Venerdì - Sessione 1'
+                  )}
                   className="w-full px-3 py-2 rounded bg-stone-950 border border-stone-700 text-stone-100 font-bold"
                 />
               </div>
@@ -603,13 +704,17 @@ export const App: React.FC = () => {
                 onClick={() => setNewInstanceAdventure(null)}
                 className="px-3 py-2 rounded-lg bg-stone-800 text-stone-300 font-semibold"
               >
-                Annulla
+                {tr('Cancel', 'Annulla')}
               </button>
               <button
                 onClick={handleCreateNewInstance}
                 className="px-4 py-2 rounded-lg bg-amber-600 hover:bg-amber-500 text-stone-950 font-extrabold flex items-center gap-1.5 shadow"
               >
-                <Plus className="w-4 h-4" /> Crea Istanza & Apri Console DM
+                <Plus className="w-4 h-4" />{' '}
+                {tr(
+                  'Create Instance & Open DM Console',
+                  'Crea Istanza & Apri Console DM'
+                )}
               </button>
             </div>
           </div>

@@ -7,6 +7,7 @@ import {
   PlayInstance,
   SfxItem,
 } from '../types/dnd';
+import { useLanguage } from '../i18n/LanguageContext';
 import {
   BookOpen,
   Play,
@@ -15,10 +16,8 @@ import {
   Volume2,
   Swords,
   Layers,
-  CheckCircle2,
   Edit3,
   Sparkles,
-  Clock,
 } from 'lucide-react';
 
 interface DashboardViewProps {
@@ -46,6 +45,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   onOpenNewInstanceModal,
   onNavigateTab,
 }) => {
+  const { tr } = useLanguage();
   const pcsCount = characters.filter((c) => c.kind === 'pc').length;
   const npcsCount = characters.filter((c) => c.kind === 'npc').length;
   const monstersCount = characters.filter((c) => c.kind === 'monster').length;
@@ -59,10 +59,16 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             <Sparkles className="w-3.5 h-3.5" /> D&D 5e Campaign & One-Shot Studio
           </div>
           <h1 className="font-header text-2xl md:text-3xl font-extrabold text-amber-400">
-            Scrivi come un Manuale Ufficiale. Gioca su Infiniti Gruppi.
+            {tr(
+              'Write Like an Official Sourcebook. Run Across Infinite Groups.',
+              'Scrivi come un Manuale Ufficiale. Gioca su Infiniti Gruppi.'
+            )}
           </h1>
           <p className="text-sm text-stone-300 leading-relaxed">
-            Impagina le tue storie in stile <strong>Homebrewery 5e</strong>, collega <strong>PG, NPC, Mostri e SFX</strong> per ogni scena e avvia più <strong>Istanze parallele</strong> della stessa avventura mantenendo separati combattimenti, punti ferita e note passo-passo.
+            {tr(
+              'Typeset your stories in Homebrewery 5e style, link PCs, NPCs, Monsters, and SFX to each scene, and launch parallel Play Instances of the same adventure while keeping combat, hit points, and step-by-step notes isolated.',
+              'Impagina le tue storie in stile Homebrewery 5e, collega PG, NPC, Mostri e SFX per ogni scena e avvia più Istanze parallele della stessa avventura mantenendo separati combattimenti, punti ferita e note passo-passo.'
+            )}
           </p>
         </div>
 
@@ -71,13 +77,15 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             onClick={() => onNavigateTab('studio')}
             className="px-4 py-2.5 rounded-xl bg-stone-800 hover:bg-stone-700 text-amber-300 border border-amber-500/30 font-bold text-xs flex items-center gap-2 transition cursor-pointer"
           >
-            <Edit3 className="w-4 h-4" /> Scrivi / Impagina Storia
+            <Edit3 className="w-4 h-4" />{' '}
+            {tr('Write / Typeset Story', 'Scrivi / Impagina Storia')}
           </button>
           <button
             onClick={() => onOpenNewInstanceModal(adventures[0])}
             className="px-4 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-500 text-stone-950 font-extrabold text-xs flex items-center gap-2 shadow-lg transition cursor-pointer"
           >
-            <Play className="w-4 h-4 fill-current" /> + Nuova Istanza per un Gruppo
+            <Play className="w-4 h-4 fill-current" />{' '}
+            {tr('+ New Instance for a Group', '+ Nuova Istanza per un Gruppo')}
           </button>
         </div>
       </div>
@@ -89,14 +97,18 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           className="cursor-pointer bg-stone-900/90 hover:border-amber-500/50 border border-stone-800 rounded-xl p-4 transition"
         >
           <div className="flex items-center justify-between text-amber-400">
-            <span className="text-xs font-bold uppercase tracking-wider">Storie & Moduli</span>
+            <span className="text-xs font-bold uppercase tracking-wider">
+              {tr('Stories & Modules', 'Storie & Moduli')}
+            </span>
             <BookOpen className="w-5 h-5" />
           </div>
           <div className="text-2xl font-header font-extrabold text-stone-100 mt-2">
-            {adventures.length} Avventure
+            {adventures.length} {tr('Adventures', 'Avventure')}
           </div>
           <div className="text-xs text-stone-400 mt-1">
-            {campaigns.length} Campagne • {adventures.reduce((acc, a) => acc + a.scenes.length, 0)} Scene totali
+            {campaigns.length} {tr('Campaigns', 'Campagne')} •{' '}
+            {adventures.reduce((acc, a) => acc + a.scenes.length, 0)}{' '}
+            {tr('Total scenes', 'Scene totali')}
           </div>
         </div>
 
@@ -105,14 +117,19 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           className="cursor-pointer bg-stone-900/90 hover:border-amber-500/50 border border-stone-800 rounded-xl p-4 transition"
         >
           <div className="flex items-center justify-between text-emerald-400">
-            <span className="text-xs font-bold uppercase tracking-wider">Istanze / Gruppi Attivi</span>
+            <span className="text-xs font-bold uppercase tracking-wider">
+              {tr('Active Instances / Groups', 'Istanze / Gruppi Attivi')}
+            </span>
             <Layers className="w-5 h-5" />
           </div>
           <div className="text-2xl font-header font-extrabold text-stone-100 mt-2">
-            {instances.length} Sessioni
+            {instances.length} {tr('Sessions', 'Sessioni')}
           </div>
           <div className="text-xs text-stone-400 mt-1">
-            Stato indipendente per ogni gruppo ({parties.length} Party salvati)
+            {tr(
+              `Isolated state per group (${parties.length} saved Parties)`,
+              `Stato indipendente per ogni gruppo (${parties.length} Party salvati)`
+            )}
           </div>
         </div>
 
@@ -121,14 +138,17 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           className="cursor-pointer bg-stone-900/90 hover:border-amber-500/50 border border-stone-800 rounded-xl p-4 transition"
         >
           <div className="flex items-center justify-between text-sky-400">
-            <span className="text-xs font-bold uppercase tracking-wider">Repository Schede 5e</span>
+            <span className="text-xs font-bold uppercase tracking-wider">
+              {tr('5e Sheet Repository', 'Repository Schede 5e')}
+            </span>
             <Users className="w-5 h-5" />
           </div>
           <div className="text-2xl font-header font-extrabold text-stone-100 mt-2">
-            {characters.length} Entità
+            {characters.length} {tr('Entities', 'Entità')}
           </div>
           <div className="text-xs text-stone-400 mt-1">
-            {pcsCount} PG • {npcsCount} NPC • {monstersCount} Mostri/Boss
+            {pcsCount} {tr('PCs', 'PG')} • {npcsCount} NPCs • {monstersCount}{' '}
+            {tr('Monsters/Bosses', 'Mostri/Boss')}
           </div>
         </div>
 
@@ -137,15 +157,17 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           className="cursor-pointer bg-stone-900/90 hover:border-amber-500/50 border border-stone-800 rounded-xl p-4 transition"
         >
           <div className="flex items-center justify-between text-purple-400">
-            <span className="text-xs font-bold uppercase tracking-wider">Soundboard & SFX</span>
+            <span className="text-xs font-bold uppercase tracking-wider">
+              Soundboard & SFX
+            </span>
             <Volume2 className="w-5 h-5" />
           </div>
           <div className="text-2xl font-header font-extrabold text-stone-100 mt-2">
-            {sfxCatalog.length} Tracce Audio
+            {sfxCatalog.length} {tr('Audio Tracks', 'Tracce Audio')}
           </div>
           <div className="text-xs text-stone-400 mt-1">
-            {sfxCatalog.filter((s) => s.loop).length} Loop Ambience •{' '}
-            {sfxCatalog.filter((s) => !s.loop).length} Effetti One-Shot
+            {sfxCatalog.filter((s) => s.loop).length} {tr('Ambience Loops', 'Loop Ambience')} •{' '}
+            {sfxCatalog.filter((s) => !s.loop).length} {tr('One-Shot SFX', 'Effetti One-Shot')}
           </div>
         </div>
       </div>
@@ -156,7 +178,11 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         <div className="lg:col-span-7 space-y-4">
           <div className="flex items-center justify-between">
             <h2 className="font-header text-xl font-bold text-amber-400 flex items-center gap-2">
-              <BookOpen className="w-5 h-5" /> Avventure (One-Shot & Capitoli Campagna)
+              <BookOpen className="w-5 h-5" />{' '}
+              {tr(
+                'Adventures (One-Shots & Campaign Chapters)',
+                'Avventure (One-Shot & Capitoli Campagna)'
+              )}
             </h2>
           </div>
 
@@ -186,8 +212,11 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                           }`}
                         >
                           {adv.type === 'oneshot'
-                            ? 'One-Shot Rigiocabile'
-                            : `Modulo Campagna (Ep. ${adv.episodeNumber || 1})`}
+                            ? tr('Replayable One-Shot', 'One-Shot Rigiocabile')
+                            : tr(
+                                `Campaign Module (Ep. ${adv.episodeNumber || 1})`,
+                                `Modulo Campagna (Ep. ${adv.episodeNumber || 1})`
+                              )}
                         </span>
                         {camp && (
                           <span className="text-xs text-stone-400 font-semibold">
@@ -210,13 +239,13 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                         onClick={() => onOpenAdventureInStudio(adv.id)}
                         className="px-3 py-1.5 rounded-lg bg-stone-800 hover:bg-stone-700 text-stone-200 text-xs font-semibold flex items-center gap-1.5 cursor-pointer"
                       >
-                        <Edit3 className="w-3.5 h-3.5" /> Impagina / Modifica
+                        <Edit3 className="w-3.5 h-3.5" /> {tr('Edit / Typeset', 'Impagina / Modifica')}
                       </button>
                       <button
                         onClick={() => onOpenNewInstanceModal(adv)}
                         className="px-3 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-500 text-stone-950 text-xs font-bold flex items-center gap-1.5 shadow cursor-pointer"
                       >
-                        <Plus className="w-3.5 h-3.5" /> Nuova Istanza
+                        <Plus className="w-3.5 h-3.5" /> {tr('New Instance', 'Nuova Istanza')}
                       </button>
                     </div>
                   </div>
@@ -236,12 +265,19 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                   {/* Adventure Footer Stats & Active Instances on this Blueprint */}
                   <div className="pt-3 border-t border-stone-800/80 flex flex-wrap items-center justify-between gap-2 text-xs text-stone-400">
                     <div className="flex items-center gap-4">
-                      <span>📑 {adv.scenes.length} Scene</span>
-                      <span>⚔️ {totalEncounters} Incontri</span>
-                      <span>🔊 {totalSfx} SFX associati</span>
+                      <span>
+                        📑 {adv.scenes.length} {tr('Scenes', 'Scene')}
+                      </span>
+                      <span>
+                        ⚔️ {totalEncounters} {tr('Encounters', 'Incontri')}
+                      </span>
+                      <span>
+                        🔊 {totalSfx} {tr('Linked SFX', 'SFX associati')}
+                      </span>
                     </div>
                     <div className="text-amber-300 font-semibold">
-                      {advInstances.length} Istanze attive su questa storia
+                      {advInstances.length}{' '}
+                      {tr('active instances on this story', 'Istanze attive su questa storia')}
                     </div>
                   </div>
                 </div>
@@ -254,7 +290,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         <div className="lg:col-span-5 space-y-4">
           <div className="flex items-center justify-between">
             <h2 className="font-header text-xl font-bold text-amber-400 flex items-center gap-2">
-              <Layers className="w-5 h-5" /> Istanze di Gioco Parallele (Per Gruppo)
+              <Layers className="w-5 h-5" />{' '}
+              {tr('Parallel Play Instances (Per Group)', 'Istanze di Gioco Parallele (Per Gruppo)')}
             </h2>
           </div>
 
@@ -270,7 +307,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                   <div className="flex items-start justify-between gap-2">
                     <div>
                       <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
-                        {adv?.title || 'Avventura'}
+                        {adv?.title || tr('Adventure', 'Avventura')}
                       </span>
                       <h3 className="font-header text-base font-bold text-amber-300 mt-1">
                         {inst.instanceName}
@@ -282,26 +319,28 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                       onClick={() => onOpenInstanceInConsole(inst.id)}
                       className="px-3.5 py-2 rounded-xl bg-amber-600 hover:bg-amber-500 text-stone-950 font-extrabold text-xs flex items-center gap-1.5 shadow cursor-pointer shrink-0"
                     >
-                      <Play className="w-3.5 h-3.5 fill-current" /> Entra in Sessione
+                      <Play className="w-3.5 h-3.5 fill-current" />{' '}
+                      {tr('Open Session', 'Entra in Sessione')}
                     </button>
                   </div>
 
                   <div className="grid grid-cols-2 gap-2 bg-stone-950 p-2.5 rounded-xl border border-stone-800 text-xs">
                     <div>
                       <div className="text-[10px] uppercase text-stone-500 font-bold">
-                        Punto della Storia
+                        {tr('Current Scene', 'Punto della Storia')}
                       </div>
                       <div className="font-semibold text-stone-200 truncate">
-                        {currentSc ? `${currentSc.code}: ${currentSc.title}` : 'Inizio'}
+                        {currentSc ? `${currentSc.code}: ${currentSc.title}` : tr('Start', 'Inizio')}
                       </div>
                     </div>
                     <div>
                       <div className="text-[10px] uppercase text-stone-500 font-bold">
-                        Progresso & Diario
+                        {tr('Progress & Timeline', 'Progresso & Diario')}
                       </div>
                       <div className="font-semibold text-stone-200">
-                        {inst.visitedSceneIds.length}/{adv?.scenes.length || 1} Scene •{' '}
-                        {inst.timeline.length} Note
+                        {inst.visitedSceneIds.length}/{adv?.scenes.length || 1}{' '}
+                        {tr('Scenes', 'Scene')} • {inst.timeline.length}{' '}
+                        {tr('Notes', 'Note')}
                       </div>
                     </div>
                   </div>
@@ -309,7 +348,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                   {inst.activeCombat && (
                     <div className="px-3 py-1.5 rounded-lg bg-red-950/60 border border-red-800/50 text-red-200 text-xs font-semibold flex items-center justify-between">
                       <span className="flex items-center gap-1.5">
-                        <Swords className="w-3.5 h-3.5" /> Combattimento salvato:{' '}
+                        <Swords className="w-3.5 h-3.5" />{' '}
+                        {tr('Active combat:', 'Combattimento salvato:')}{' '}
                         {inst.activeCombat.encounterTitle}
                       </span>
                       <span>Round {inst.activeCombat.round}</span>

@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { SfxCategory, SfxItem, SynthPresetId } from '../types/dnd';
 import { soundboardEngine } from '../services/audioEngine';
+import { useLanguage } from '../i18n/LanguageContext';
 import {
   Volume2,
   VolumeX,
@@ -21,39 +22,40 @@ interface SfxManagerViewProps {
   onDeleteSfx: (id: string) => void;
 }
 
-const CATEGORY_LABELS: Record<SfxCategory, string> = {
-  ambience: 'Atmosfere & Ambience (Loop)',
-  combat_music: 'Musica & Ritmi Combat',
-  sfx_environment: 'SFX Ambientali & Dungeon',
-  sfx_creature: 'SFX Creature, Armi & Boss',
-  sfx_magic: 'SFX Incantesimi & Divino',
-  sfx_ui: 'Segnali & Effetti Vari',
-};
-
-const SYNTH_PRESETS: Array<{ id: SynthPresetId; label: string }> = [
-  { id: 'tavern_hearth', label: 'Camino Locanda / Fuoco (Loop)' },
-  { id: 'rain_storm', label: 'Pioggia & Vento Notturno (Loop)' },
-  { id: 'crypt_whispers', label: 'Echi Oscuri della Cripta (Loop)' },
-  { id: 'combat_drums', label: 'Tamburi da Guerra (Loop)' },
-  { id: 'thunder_clap', label: 'Tuono Improvviso' },
-  { id: 'creaking_door', label: 'Porta / Cancello Pesante' },
-  { id: 'trap_trigger', label: 'Scatto di Trappola' },
-  { id: 'sword_clash', label: 'Scontro di Lame' },
-  { id: 'dragon_roar', label: 'Ruggito / Urlo del Boss' },
-  { id: 'arcane_blast', label: 'Esplosione Arcana' },
-  { id: 'healing_chime', label: 'Cura / Luce Celestiale' },
-  { id: 'war_horn', label: 'Corno da Guerra' },
-];
-
 export const SfxManagerView: React.FC<SfxManagerViewProps> = ({
   sfxCatalog,
   onSaveSfx,
   onDeleteSfx,
 }) => {
+  const { tr } = useLanguage();
   const [, setTick] = useState(0);
   const [selectedCategory, setSelectedCategory] = useState<'all' | SfxCategory>('all');
   const [editingSfx, setEditingSfx] = useState<SfxItem | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+
+  const categoryLabels: Record<SfxCategory, string> = {
+    ambience: tr('Ambience & Atmospheres (Loop)', 'Atmosfere & Ambience (Loop)'),
+    combat_music: tr('Combat Music & Drums', 'Musica & Ritmi Combat'),
+    sfx_environment: tr('Environment & Dungeon SFX', 'SFX Ambientali & Dungeon'),
+    sfx_creature: tr('Creatures, Weapons & Boss SFX', 'SFX Creature, Armi & Boss'),
+    sfx_magic: tr('Spells & Divine SFX', 'SFX Incantesimi & Divino'),
+    sfx_ui: tr('Cues & Misc Effects', 'Segnali & Effetti Vari'),
+  };
+
+  const synthPresets: Array<{ id: SynthPresetId; label: string }> = [
+    { id: 'tavern_hearth', label: tr('Tavern Hearth / Fire (Loop)', 'Camino Locanda / Fuoco (Loop)') },
+    { id: 'rain_storm', label: tr('Rain & Night Wind (Loop)', 'Pioggia & Vento Notturno (Loop)') },
+    { id: 'crypt_whispers', label: tr('Dark Crypt Echoes (Loop)', 'Echi Oscuri della Cripta (Loop)') },
+    { id: 'combat_drums', label: tr('War Drums (Loop)', 'Tamburi da Guerra (Loop)') },
+    { id: 'thunder_clap', label: tr('Sudden Thunderclap', 'Tuono Improvviso') },
+    { id: 'creaking_door', label: tr('Heavy Door / Stone Gate', 'Porta / Cancello Pesante') },
+    { id: 'trap_trigger', label: tr('Mechanical Trap Trigger', 'Scatto di Trappola') },
+    { id: 'sword_clash', label: tr('Clash of Blades', 'Scontro di Lame') },
+    { id: 'dragon_roar', label: tr('Boss Roar / Howl', 'Ruggito / Urlo del Boss') },
+    { id: 'arcane_blast', label: tr('Arcane Blast', 'Esplosione Arcana') },
+    { id: 'healing_chime', label: tr('Healing / Celestial Chime', 'Cura / Luce Celestiale') },
+    { id: 'war_horn', label: tr('War Horn', 'Corno da Guerra') },
+  ];
 
   useEffect(() => {
     return soundboardEngine.subscribe(() => setTick((t) => t + 1));
@@ -87,10 +89,14 @@ export const SfxManagerView: React.FC<SfxManagerViewProps> = ({
         <div>
           <h2 className="font-header text-2xl font-bold text-amber-400 flex items-center gap-2">
             <Volume2 className="w-6 h-6 text-amber-500" />
-            Libreria SFX & Soundboard Multi-Traccia
+            {tr('SFX Library & Multi-Track Soundboard', 'Libreria SFX & Soundboard Multi-Traccia')}
           </h2>
           <p className="text-xs text-stone-400 mt-0.5">
-            Salva effetti sonori generali o atmosfere in loop e assegnali a singole scene o paragrafi della storia con <code>@sfx[id]</code>.
+            {tr(
+              'Save global sound effects or looping ambiences and assign them to individual scenes or story paragraphs using ',
+              'Salva effetti sonori generali o atmosfere in loop e assegnali a singole scene o paragrafi della storia con '
+            )}
+            <code>@sfx[id]</code>.
           </p>
         </div>
 
@@ -100,16 +106,20 @@ export const SfxManagerView: React.FC<SfxManagerViewProps> = ({
               onClick={() => soundboardEngine.stopAll()}
               className="px-3 py-2 rounded-lg bg-red-900/80 hover:bg-red-800 text-amber-100 text-xs font-bold flex items-center gap-1.5 shadow animate-pulse"
             >
-              <VolumeX className="w-4 h-4" /> Ferma Tutti ({activeIds.length} attivi)
+              <VolumeX className="w-4 h-4" />{' '}
+              {tr(`Stop All (${activeIds.length} active)`, `Ferma Tutti (${activeIds.length} attivi)`)}
             </button>
           )}
           <button
             onClick={() =>
               setEditingSfx({
                 id: `sfx-${Date.now()}`,
-                name: 'Nuovo Effetto Sonoro',
+                name: tr('New Sound Effect', 'Nuovo Effetto Sonoro'),
                 category: 'sfx_environment',
-                description: 'Descrizione dell’effetto o del momento narrativo.',
+                description: tr(
+                  'Description of the sound cue or narrative moment.',
+                  'Descrizione dell’effetto o del momento narrativo.'
+                ),
                 loop: false,
                 defaultVolume: 0.8,
                 synthPreset: 'thunder_clap',
@@ -121,7 +131,7 @@ export const SfxManagerView: React.FC<SfxManagerViewProps> = ({
             }
             className="px-3.5 py-2 rounded-lg bg-amber-600 hover:bg-amber-500 text-stone-950 font-bold text-xs flex items-center gap-1.5 shadow"
           >
-            <Plus className="w-4 h-4" /> + Nuovo SFX / Audio
+            <Plus className="w-4 h-4" /> {tr('+ New SFX / Audio', '+ Nuovo SFX / Audio')}
           </button>
         </div>
       </div>
@@ -136,9 +146,9 @@ export const SfxManagerView: React.FC<SfxManagerViewProps> = ({
               : 'text-stone-400 hover:text-stone-200'
           }`}
         >
-          Tutti ({sfxCatalog.length})
+          {tr('All', 'Tutti')} ({sfxCatalog.length})
         </button>
-        {(Object.keys(CATEGORY_LABELS) as SfxCategory[]).map((cat) => (
+        {(Object.keys(categoryLabels) as SfxCategory[]).map((cat) => (
           <button
             key={cat}
             onClick={() => setSelectedCategory(cat)}
@@ -148,7 +158,7 @@ export const SfxManagerView: React.FC<SfxManagerViewProps> = ({
                 : 'text-stone-400 hover:text-stone-200'
             }`}
           >
-            {CATEGORY_LABELS[cat]}
+            {categoryLabels[cat]}
           </button>
         ))}
       </div>
@@ -169,7 +179,7 @@ export const SfxManagerView: React.FC<SfxManagerViewProps> = ({
               <div>
                 <div className="flex items-start justify-between gap-2">
                   <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-stone-800 text-stone-300">
-                    {CATEGORY_LABELS[item.category]}
+                    {categoryLabels[item.category]}
                   </span>
                   {item.loop && (
                     <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase px-2 py-0.5 rounded bg-amber-500/15 text-amber-300 border border-amber-500/30">
@@ -183,7 +193,8 @@ export const SfxManagerView: React.FC<SfxManagerViewProps> = ({
 
                 {item.customAudioUrl && (
                   <div className="mt-2 text-[10px] text-emerald-400 font-semibold flex items-center gap-1">
-                    <Radio className="w-3 h-3" /> File Audio Custom Collegato
+                    <Radio className="w-3 h-3" />{' '}
+                    {tr('Custom Audio File Linked', 'File Audio Custom Collegato')}
                   </div>
                 )}
               </div>
@@ -200,11 +211,12 @@ export const SfxManagerView: React.FC<SfxManagerViewProps> = ({
                   >
                     {playing ? (
                       <>
-                        <Square className="w-3.5 h-3.5 fill-current" /> Ferma Audio
+                        <Square className="w-3.5 h-3.5 fill-current" />{' '}
+                        {tr('Stop Audio', 'Ferma Audio')}
                       </>
                     ) : (
                       <>
-                        <Play className="w-3.5 h-3.5 fill-current" /> Riproduci
+                        <Play className="w-3.5 h-3.5 fill-current" /> {tr('Play', 'Riproduci')}
                       </>
                     )}
                   </button>
@@ -215,7 +227,7 @@ export const SfxManagerView: React.FC<SfxManagerViewProps> = ({
                       setCopiedId(item.id);
                       setTimeout(() => setCopiedId(null), 1500);
                     }}
-                    title="Copia tag @sfx per la storia"
+                    title={tr('Copy @sfx tag for story', 'Copia tag @sfx per la storia')}
                     className="p-2 rounded-lg bg-stone-800 hover:bg-stone-700 text-stone-300 text-xs"
                   >
                     {copiedId === item.id ? (
@@ -229,7 +241,7 @@ export const SfxManagerView: React.FC<SfxManagerViewProps> = ({
                     onClick={() => setEditingSfx(structuredClone(item))}
                     className="px-2.5 py-2 rounded-lg bg-stone-800 hover:bg-stone-700 text-stone-300 text-xs font-semibold"
                   >
-                    Modifica
+                    {tr('Edit', 'Modifica')}
                   </button>
 
                   <button
@@ -241,7 +253,7 @@ export const SfxManagerView: React.FC<SfxManagerViewProps> = ({
                 </div>
 
                 <div className="text-[10px] font-mono text-stone-500 flex items-center justify-between">
-                  <span>Shortcode storia:</span>
+                  <span>{tr('Story shortcode:', 'Shortcode storia:')}</span>
                   <code className="text-amber-400/90">@sfx[{item.id}]</code>
                 </div>
               </div>
@@ -255,12 +267,14 @@ export const SfxManagerView: React.FC<SfxManagerViewProps> = ({
         <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-stone-900 border border-stone-700 rounded-2xl max-w-lg w-full p-6 space-y-4 shadow-2xl text-xs">
             <h3 className="font-header text-xl font-bold text-amber-400">
-              Configura Effetto Sonoro / Atmosfera
+              {tr('Configure Sound Effect / Ambience', 'Configura Effetto Sonoro / Atmosfera')}
             </h3>
 
             <div className="space-y-3">
               <div>
-                <label className="block text-stone-400 mb-1 font-semibold">Nome Effetto</label>
+                <label className="block text-stone-400 mb-1 font-semibold">
+                  {tr('Effect Name', 'Nome Effetto')}
+                </label>
                 <input
                   type="text"
                   value={editingSfx.name}
@@ -271,7 +285,9 @@ export const SfxManagerView: React.FC<SfxManagerViewProps> = ({
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-stone-400 mb-1 font-semibold">Categoria</label>
+                  <label className="block text-stone-400 mb-1 font-semibold">
+                    {tr('Category', 'Categoria')}
+                  </label>
                   <select
                     value={editingSfx.category}
                     onChange={(e) =>
@@ -279,16 +295,18 @@ export const SfxManagerView: React.FC<SfxManagerViewProps> = ({
                     }
                     className="w-full px-2.5 py-2 rounded bg-stone-950 border border-stone-700 text-stone-100"
                   >
-                    {(Object.keys(CATEGORY_LABELS) as SfxCategory[]).map((c) => (
+                    {(Object.keys(categoryLabels) as SfxCategory[]).map((c) => (
                       <option key={c} value={c}>
-                        {CATEGORY_LABELS[c]}
+                        {categoryLabels[c]}
                       </option>
                     ))}
                   </select>
                 </div>
 
                 <div>
-                  <label className="block text-stone-400 mb-1 font-semibold">Modalità Riproduzione</label>
+                  <label className="block text-stone-400 mb-1 font-semibold">
+                    {tr('Playback Mode', 'Modalità Riproduzione')}
+                  </label>
                   <label className="flex items-center gap-2 px-3 py-2 rounded bg-stone-950 border border-stone-700 cursor-pointer">
                     <input
                       type="checkbox"
@@ -296,13 +314,17 @@ export const SfxManagerView: React.FC<SfxManagerViewProps> = ({
                       onChange={(e) => setEditingSfx({ ...editingSfx, loop: e.target.checked })}
                       className="accent-amber-500"
                     />
-                    <span className="text-stone-200 font-semibold">Riproduzione Continua (Loop)</span>
+                    <span className="text-stone-200 font-semibold">
+                      {tr('Continuous Loop', 'Riproduzione Continua (Loop)')}
+                    </span>
                   </label>
                 </div>
               </div>
 
               <div>
-                <label className="block text-stone-400 mb-1 font-semibold">Descrizione</label>
+                <label className="block text-stone-400 mb-1 font-semibold">
+                  {tr('Description', 'Descrizione')}
+                </label>
                 <input
                   type="text"
                   value={editingSfx.description}
@@ -314,7 +336,10 @@ export const SfxManagerView: React.FC<SfxManagerViewProps> = ({
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-stone-400 mb-1 font-semibold">
-                    Sintetizzatore Integrato (Fallback / Default)
+                    {tr(
+                      'Built-in Synthesizer (Fallback / Default)',
+                      'Sintetizzatore Integrato (Fallback / Default)'
+                    )}
                   </label>
                   <select
                     value={editingSfx.synthPreset}
@@ -323,7 +348,7 @@ export const SfxManagerView: React.FC<SfxManagerViewProps> = ({
                     }
                     className="w-full px-2.5 py-2 rounded bg-stone-950 border border-stone-700 text-stone-200"
                   >
-                    {SYNTH_PRESETS.map((p) => (
+                    {synthPresets.map((p) => (
                       <option key={p.id} value={p.id}>
                         {p.label}
                       </option>
@@ -333,7 +358,8 @@ export const SfxManagerView: React.FC<SfxManagerViewProps> = ({
 
                 <div>
                   <label className="block text-stone-400 mb-1 font-semibold">
-                    Volume Predefinito ({Math.round(editingSfx.defaultVolume * 100)}%)
+                    {tr('Default Volume', 'Volume Predefinito')} (
+                    {Math.round(editingSfx.defaultVolume * 100)}%)
                   </label>
                   <input
                     type="range"
@@ -351,11 +377,15 @@ export const SfxManagerView: React.FC<SfxManagerViewProps> = ({
 
               <div className="bg-stone-950 p-3 rounded-lg border border-stone-800 space-y-2">
                 <label className="block text-amber-300 font-semibold">
-                  File Audio Personalizzato (.mp3, .wav, .ogg) — Opzionale
+                  {tr(
+                    'Custom Audio File (.mp3, .wav, .ogg) — Optional',
+                    'File Audio Personalizzato (.mp3, .wav, .ogg) — Opzionale'
+                  )}
                 </label>
                 <div className="flex items-center gap-2">
                   <label className="px-3 py-1.5 rounded bg-stone-800 hover:bg-stone-700 text-stone-200 cursor-pointer flex items-center gap-1.5 font-semibold">
-                    <Upload className="w-3.5 h-3.5" /> Scegli File Audio da Disco
+                    <Upload className="w-3.5 h-3.5" />{' '}
+                    {tr('Choose Audio File from Disk', 'Scegli File Audio da Disco')}
                     <input
                       type="file"
                       accept="audio/*"
@@ -369,7 +399,7 @@ export const SfxManagerView: React.FC<SfxManagerViewProps> = ({
                       onClick={() => setEditingSfx({ ...editingSfx, customAudioUrl: '' })}
                       className="text-red-400 hover:underline"
                     >
-                      Rimuovi file custom
+                      {tr('Remove custom file', 'Rimuovi file custom')}
                     </button>
                   )}
                 </div>
@@ -377,7 +407,10 @@ export const SfxManagerView: React.FC<SfxManagerViewProps> = ({
                   type="text"
                   value={editingSfx.customAudioUrl || ''}
                   onChange={(e) => setEditingSfx({ ...editingSfx, customAudioUrl: e.target.value })}
-                  placeholder="Oppure incolla URL / percorso locale file audio..."
+                  placeholder={tr(
+                    'Or paste audio file URL / local path...',
+                    'Oppure incolla URL / percorso locale file audio...'
+                  )}
                   className="w-full px-2.5 py-1.5 rounded bg-stone-900 border border-stone-700 text-stone-300"
                 />
               </div>
@@ -389,7 +422,7 @@ export const SfxManagerView: React.FC<SfxManagerViewProps> = ({
                 onClick={() => soundboardEngine.play(editingSfx)}
                 className="px-3 py-1.5 rounded bg-stone-800 hover:bg-stone-700 text-amber-300 font-semibold flex items-center gap-1.5"
               >
-                <Play className="w-3.5 h-3.5" /> Prova Audio
+                <Play className="w-3.5 h-3.5" /> {tr('Test Audio', 'Prova Audio')}
               </button>
 
               <div className="flex items-center gap-2">
@@ -397,7 +430,7 @@ export const SfxManagerView: React.FC<SfxManagerViewProps> = ({
                   onClick={() => setEditingSfx(null)}
                   className="px-3 py-1.5 rounded bg-stone-800 text-stone-300 font-semibold"
                 >
-                  Annulla
+                  {tr('Cancel', 'Annulla')}
                 </button>
                 <button
                   onClick={() => {
@@ -406,7 +439,7 @@ export const SfxManagerView: React.FC<SfxManagerViewProps> = ({
                   }}
                   className="px-4 py-1.5 rounded bg-amber-600 hover:bg-amber-500 text-stone-950 font-bold"
                 >
-                  Salva nella Libreria
+                  {tr('Save to Library', 'Salva nella Libreria')}
                 </button>
               </div>
             </div>

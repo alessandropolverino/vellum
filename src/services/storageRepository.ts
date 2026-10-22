@@ -36,10 +36,10 @@ export class LocalFirstRepository implements IStorageRepository {
         const raw = (await window.__TAURI_INTERNALS__!.invoke('load_local_database')) as string | null;
         if (raw) {
           const parsed = JSON.parse(raw) as DndDatabase;
-          return { db: parsed, source: 'Disco Locale (Tauri AppData)' };
+          return { db: parsed, source: 'Local Disk (Tauri AppData)' };
         }
       } catch (err) {
-        console.warn('Fallback da Tauri FS:', err);
+        console.warn('Tauri FS fallback:', err);
       }
     }
 
@@ -50,7 +50,7 @@ export class LocalFirstRepository implements IStorageRepository {
         const parsed = (await res.json()) as DndDatabase;
         if (parsed && Array.isArray(parsed.adventures)) {
           localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(parsed));
-          return { db: parsed, source: 'Disco Locale (./data/dnd5e-db.json)' };
+          return { db: parsed, source: 'Local Disk (./data/dnd5e-db.json)' };
         }
       }
     } catch {
@@ -63,7 +63,7 @@ export class LocalFirstRepository implements IStorageRepository {
       if (cached) {
         const parsed = JSON.parse(cached) as DndDatabase;
         if (parsed && Array.isArray(parsed.adventures)) {
-          return { db: parsed, source: 'Storage Locale Browser' };
+          return { db: parsed, source: 'Browser LocalStorage' };
         }
       }
     } catch {
@@ -73,7 +73,7 @@ export class LocalFirstRepository implements IStorageRepository {
     // 4. First launch: initialize with SEED_DATABASE and persist immediately to disk
     const initialDb: DndDatabase = structuredClone(SEED_DATABASE);
     await this.saveDatabase(initialDb);
-    return { db: initialDb, source: 'Database Iniziale (Salvato su Disco)' };
+    return { db: initialDb, source: 'Initial Database (Saved to Disk)' };
   }
 
   async saveDatabase(db: DndDatabase): Promise<StorageSaveResult> {
@@ -102,7 +102,7 @@ export class LocalFirstRepository implements IStorageRepository {
           savedAt: updated.lastSavedAt,
         };
       } catch (err) {
-        console.warn('Errore scrittura Tauri FS, fallback API locale:', err);
+        console.warn('Tauri FS write error, falling back to local API:', err);
       }
     }
 
@@ -152,7 +152,7 @@ export class LocalFirstRepository implements IStorageRepository {
       !Array.isArray(parsed.characters) ||
       !Array.isArray(parsed.playInstances)
     ) {
-      throw new Error('Formato file JSON non valido per Vellum.');
+      throw new Error('Invalid JSON database format for Vellum.');
     }
     return parsed;
   }
