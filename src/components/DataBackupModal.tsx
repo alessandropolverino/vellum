@@ -13,6 +13,9 @@ import {
   PlusCircle,
   Database,
   History,
+  GitMerge,
+  RotateCcw,
+  Music,
 } from 'lucide-react';
 import { DndDatabase } from '../types/dnd';
 import { useLanguage } from '../i18n/LanguageContext';
@@ -90,8 +93,8 @@ export const DataBackupModal: React.FC<DataBackupModalProps> = ({
 
   const handleRestore = async (backup: BackupEntry) => {
     const confirmMessage = tr(
-      `Are you sure you want to restore "${backup.filename}"? A safety snapshot of your current database will be saved automatically before replacing.`,
-      `Sei sicuro di voler ripristinare "${backup.filename}"? Verrà creato automaticamente uno snapshot di sicurezza dello stato attuale prima del ripristino.`
+      `Are you sure you want to RESTORE "${backup.filename}"? Current data will be replaced with this backup. A safety snapshot of your current database will be saved automatically first.`,
+      `Sei sicuro di voler RIPRISTINARE "${backup.filename}"? Lo stato attuale verrà sostituito integralmente con questo backup. Verrà prima salvato automaticamente uno snapshot di sicurezza.`
     );
     if (!window.confirm(confirmMessage)) return;
 
@@ -110,6 +113,35 @@ export const DataBackupModal: React.FC<DataBackupModalProps> = ({
     } catch (err: any) {
       setStatusMessage({
         text: tr('Failed to restore backup: ', 'Errore durante il ripristino: ') + (err?.message || ''),
+        type: 'error',
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleIntegrate = async (backup: BackupEntry) => {
+    const confirmMessage = tr(
+      `Integrate data from "${backup.filename}"? All missing campaigns, adventures, characters, sessions, and SFX will be added to your current database. NONE of your current data will be deleted or overwritten.`,
+      `Integrare i dati da "${backup.filename}"? Tutte le campagne, avventure, schede PG, sessioni e tracce audio mancanti verranno aggiunte allo stato attuale. NESSUN tuo dato esistente verrà eliminato o sovrascritto.`
+    );
+    if (!window.confirm(confirmMessage)) return;
+
+    setIsLoading(true);
+    try {
+      const { db: integratedDb, summary } = await storageRepository.integrateBackup(backup.filename, db);
+      onDatabaseReplaced(integratedDb);
+      setStatusMessage({
+        text: tr(
+          `Integration complete! Added: +${summary.addedCharacters} characters/monsters, +${summary.addedAdventures} stories, +${summary.addedCampaigns} campaigns, +${summary.addedInstances} runs, +${summary.addedSfx} audio tracks. Existing data preserved.`,
+          `Integrazione completata! Aggiunti: +${summary.addedCharacters} PG/mostri, +${summary.addedAdventures} avventure, +${summary.addedCampaigns} campagne, +${summary.addedInstances} sessioni, +${summary.addedSfx} tracce audio. Tutti i dati esistenti sono stati preservati.`
+        ),
+        type: 'success',
+      });
+      await loadBackups();
+    } catch (err: any) {
+      setStatusMessage({
+        text: tr('Failed to integrate backup: ', 'Errore integrazione backup: ') + (err?.message || ''),
         type: 'error',
       });
     } finally {
@@ -164,7 +196,7 @@ export const DataBackupModal: React.FC<DataBackupModalProps> = ({
     });
   };
 
-  const handleImportJson = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImportAndRestoreJson = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -176,12 +208,11 @@ export const DataBackupModal: React.FC<DataBackupModalProps> = ({
         if (
           window.confirm(
             tr(
-              'Import this database? Current data will be replaced. (An automatic backup of your current database will be saved first)',
-              'Importare questo database? I dati attuali verranno sostituiti. (Verrà prima salvato un backup automatico dei dati correnti)'
+              'Import and RESTORE this database? Current data will be replaced. (An automatic safety backup will be created first)',
+              'Importare e RIPRISTINARE questo database? I dati attuali verranno sostituiti. (Verrà prima salvato automaticamente un backup di sicurezza)'
             )
           )
         ) {
-          // Safety backup before import
           try {
             await storageRepository.createBackup('preimport');
           } catch {
@@ -190,7 +221,7 @@ export const DataBackupModal: React.FC<DataBackupModalProps> = ({
           await storageRepository.saveDatabase(imported);
           onDatabaseReplaced(imported);
           setStatusMessage({
-            text: tr('Database imported successfully!', 'Database importato con successo!'),
+            text: tr('Database restored successfully from file!', 'Database ripristinato con successo dal file!'),
             type: 'success',
           });
           await loadBackups();
@@ -198,6 +229,36 @@ export const DataBackupModal: React.FC<DataBackupModalProps> = ({
       } catch (err: any) {
         setStatusMessage({
           text: tr('Failed to import JSON: ', 'Errore importazione JSON: ') + (err?.message || ''),
+          type: 'error',
+        });
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = '';
+  };
+
+  const handleImportAndIntegrateJson = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = async (evt) => {
+      try {
+        const raw = evt.target?.result as string;
+        const { db: integratedDb, summary } = storageRepository.integrateFromJsonString(raw, db);
+        await storageRepository.saveDatabase(integratedDb);
+        onDatabaseReplaced(integratedDb);
+        setStatusMessage({
+          text: tr(
+            `Integrated file successfully! Added: +${summary.addedCharacters} characters/monsters, +${summary.addedAdventures} stories, +${summary.addedCampaigns} campaigns, +${summary.addedInstances} runs, +${summary.addedSfx} audio tracks. Current data preserved.`,
+            `File integrato con successo! Aggiunti: +${summary.addedCharacters} PG/mostri, +${summary.addedAdventures} avventure, +${summary.addedCampaigns} campagne, +${summary.addedInstances} sessioni, +${summary.addedSfx} tracce audio. Tutti i dati correnti sono stati preservati.`
+          ),
+          type: 'success',
+        });
+        await loadBackups();
+      } catch (err: any) {
+        setStatusMessage({
+          text: tr('Failed to integrate JSON: ', 'Errore integrazione JSON: ') + (err?.message || ''),
           type: 'error',
         });
       }
@@ -231,7 +292,7 @@ export const DataBackupModal: React.FC<DataBackupModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
-      <div className="bg-stone-900 border border-stone-800 rounded-2xl max-w-3xl w-full p-6 text-stone-100 shadow-2xl relative my-8">
+      <div className="bg-stone-900 border border-stone-800 rounded-2xl max-w-4xl w-full p-6 text-stone-100 shadow-2xl relative my-8">
         {/* Header */}
         <div className="flex items-center justify-between border-b border-stone-800 pb-4 mb-5">
           <div className="flex items-center gap-3">
@@ -240,7 +301,7 @@ export const DataBackupModal: React.FC<DataBackupModalProps> = ({
             </div>
             <div>
               <h2 className="text-xl font-bold font-serif text-amber-300">
-                {tr('Data Preservation & Backups', 'Gestione Dati & Backup')}
+                {tr('Data Preservation, Backups & Merging', 'Gestione Dati, Backup & Integrazione')}
               </h2>
               <p className="text-xs text-stone-400">
                 {tr(
@@ -301,7 +362,7 @@ export const DataBackupModal: React.FC<DataBackupModalProps> = ({
               </div>
               <div className="font-medium text-stone-200">
                 {db.characters.length} {tr('PCs/NPCs', 'PG/PNG')}, {db.adventures.length} {tr('Stories', 'Storie')},{' '}
-                {db.playInstances.length} {tr('Runs', 'Sessioni')}
+                {db.campaigns.length} {tr('Campaigns', 'Campagne')}, {db.playInstances.length} {tr('Runs', 'Sessioni')}
               </div>
             </div>
           </div>
@@ -319,6 +380,20 @@ export const DataBackupModal: React.FC<DataBackupModalProps> = ({
           </div>
         </div>
 
+        {/* Media & Audio Storage Callout */}
+        <div className="mb-5 p-3 rounded-xl bg-amber-950/20 border border-amber-800/40 flex items-start gap-3 text-xs text-stone-300">
+          <Music className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+          <div>
+            <span className="font-semibold text-amber-300">
+              {tr('Dedicated Media Storage (3–5 min audio):', 'Cartella Media Dedicata (audio 3–5 min):')}
+            </span>{' '}
+            {tr(
+              'Custom sound effects, music tracks, and portraits are stored directly in your local "media/audio/" folder. This keeps database backups ultra-lightweight and lightning fast with zero memory bloat.',
+              'I brani musicali personalizzati, gli effetti sonori e i ritratti vengono salvati direttamente nella cartella locale "media/audio/". Questo mantiene i backup del database ultra-leggeri, istantanei e privi di sovraccarico.'
+            )}
+          </div>
+        </div>
+
         {/* Action Toolbar */}
         <div className="flex flex-wrap items-center gap-2 mb-6">
           <button
@@ -333,7 +408,7 @@ export const DataBackupModal: React.FC<DataBackupModalProps> = ({
           <button
             onClick={handleOpenFolder}
             className="px-3.5 py-2 rounded-lg bg-stone-800 hover:bg-stone-700 text-stone-200 text-xs font-medium flex items-center gap-1.5 transition border border-stone-700"
-            title={tr('Open the folder containing your database files in Explorer/Finder', 'Apri la cartella contenente i tuoi file in Esplora Risorse / Finder')}
+            title={tr('Open the folder containing your database files and audio in Explorer/Finder', 'Apri la cartella contenente i tuoi file di database e audio in Esplora Risorse / Finder')}
           >
             <FolderOpen className="w-4 h-4 text-amber-400" />
             {tr('Open Data Folder', 'Apri Cartella Dati')}
@@ -345,25 +420,39 @@ export const DataBackupModal: React.FC<DataBackupModalProps> = ({
             title={tr('Non-destructively add newly released official 5e adventures and pre-gens from updates without touching your custom work', 'Aggiunge in modo sicuro nuove avventure o PG ufficiali degli aggiornamenti senza alterare i tuoi dati personalizzati')}
           >
             <Sparkles className="w-4 h-4 text-amber-400" />
-            {tr('Sync Official Content', 'Sincronizza Contenuti Ufficiali')}
+            {tr('Sync Official 5e Content', 'Sincronizza Contenuti Ufficiali')}
           </button>
 
           <div className="flex-1" />
 
+          {/* Export JSON */}
           <button
             onClick={handleExportJson}
-            className="p-2 rounded-lg bg-stone-800 hover:bg-stone-700 text-stone-300 transition border border-stone-700"
-            title={tr('Export full database to JSON file', 'Esporta intero database su file JSON')}
+            className="px-3 py-2 rounded-lg bg-stone-800 hover:bg-stone-700 text-stone-200 text-xs font-medium flex items-center gap-1.5 transition border border-stone-700"
+            title={tr('Export full database to a JSON backup file', 'Esporta l’intero database su file JSON')}
           >
-            <Download className="w-4 h-4" />
+            <Download className="w-4 h-4 text-emerald-400" />
+            {tr('Export Backup', 'Esporta Backup')}
           </button>
 
+          {/* Import & Integrate External JSON */}
           <label
-            className="p-2 rounded-lg bg-stone-800 hover:bg-stone-700 text-stone-300 transition border border-stone-700 cursor-pointer"
-            title={tr('Import database from JSON file', 'Importa database da file JSON')}
+            className="px-3 py-2 rounded-lg bg-stone-800 hover:bg-stone-700 text-stone-200 text-xs font-medium flex items-center gap-1.5 transition border border-stone-700 cursor-pointer"
+            title={tr('Import a JSON backup and INTEGRATE its missing data into current database without deleting anything', 'Importa un backup JSON e INTEGRA i dati mancanti nello stato attuale senza cancellare nulla')}
           >
-            <Upload className="w-4 h-4" />
-            <input type="file" accept=".json" onChange={handleImportJson} className="hidden" />
+            <GitMerge className="w-4 h-4 text-amber-400" />
+            {tr('Import & Integrate', 'Importa & Integra')}
+            <input type="file" accept=".json" onChange={handleImportAndIntegrateJson} className="hidden" />
+          </label>
+
+          {/* Import & Restore External JSON */}
+          <label
+            className="px-3 py-2 rounded-lg bg-stone-800 hover:bg-stone-700 text-stone-300 text-xs font-medium flex items-center gap-1.5 transition border border-stone-700 cursor-pointer"
+            title={tr('Import a JSON backup and RESTORE it (replaces current database, with safety auto-backup)', 'Importa un backup JSON e RIPRISTINALO (sostituisce i dati correnti, con backup di sicurezza automatico)')}
+          >
+            <Upload className="w-4 h-4 text-cyan-400" />
+            {tr('Import & Restore', 'Importa & Ripristina')}
+            <input type="file" accept=".json" onChange={handleImportAndRestoreJson} className="hidden" />
           </label>
         </div>
 
@@ -460,13 +549,29 @@ export const DataBackupModal: React.FC<DataBackupModalProps> = ({
                       </div>
                     </div>
 
-                    <button
-                      onClick={() => handleRestore(b)}
-                      disabled={isLoading}
-                      className="px-3 py-1.5 rounded-lg bg-stone-800 hover:bg-amber-600 hover:text-stone-950 text-stone-300 text-xs font-semibold transition border border-stone-700 shrink-0"
-                    >
-                      {tr('Restore', 'Ripristina')}
-                    </button>
+                    <div className="flex items-center gap-2 shrink-0">
+                      {/* Integra Backup */}
+                      <button
+                        onClick={() => handleIntegrate(b)}
+                        disabled={isLoading}
+                        title={tr('Add missing data from this backup without deleting or modifying current work', 'Aggiunge i dati mancanti di questo backup senza toccare o cancellare i dati attuali')}
+                        className="px-2.5 py-1.5 rounded-lg bg-stone-800 hover:bg-amber-600 hover:text-stone-950 text-stone-200 text-xs font-semibold flex items-center gap-1 transition border border-stone-700"
+                      >
+                        <GitMerge className="w-3.5 h-3.5 text-amber-400 group-hover:text-stone-950" />
+                        {tr('Integrate', 'Integra')}
+                      </button>
+
+                      {/* Ripristina Backup */}
+                      <button
+                        onClick={() => handleRestore(b)}
+                        disabled={isLoading}
+                        title={tr('Restore full state to this backup (creates a safety copy of current state first)', 'Riporta lo stato a questo backup (salva prima una copia di sicurezza dei dati attuali)')}
+                        className="px-2.5 py-1.5 rounded-lg bg-stone-800 hover:bg-red-900/60 hover:text-red-200 text-stone-300 text-xs font-medium flex items-center gap-1 transition border border-stone-700"
+                      >
+                        <RotateCcw className="w-3.5 h-3.5 text-red-400" />
+                        {tr('Restore', 'Ripristina')}
+                      </button>
+                    </div>
                   </div>
                 ))}
               </div>

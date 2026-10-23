@@ -7,8 +7,14 @@ All notable user-facing changes to Vellum are documented in this file.
 - App: Add comprehensive Data Preservation, Automatic Backup, and Schema Migration engine across frequent application updates:
   - Atomic disk writes (`fs::write` to temporary file + disk flush + atomic rename) in Tauri desktop backend and local dev API to guarantee zero file truncation or corruption even during power failure or sudden crashes.
   - Automatic rolling snapshots in `backups/` directory (up to 20 retained snapshots) created every 15 minutes of activity, prior to database imports/restores, and before schema upgrades.
+  - Dedicated local media storage (`media/audio/` in AppData) for 3–5 minute audio files and soundscapes: audio files are saved directly to disk and referenced cleanly, keeping the JSON database lightweight, instantaneous to save, and under 200 KB.
   - Schema migration runner and defensive normalizer (`normalizeDatabase` / `migrateDatabase`) ensuring old or partial database snapshots always initialize with safe defaults without crashing UI components or losing custom entities.
-  - Dedicated interactive Data Preservation & Backups Manager modal (`DataBackupModal`) accessible from the top storage indicator or shield icon: create labeled manual snapshots, inspect local backup history, one-click restore with automatic pre-restore safety copy, reveal local storage folder in Windows Explorer or macOS Finder, and non-destructively sync newly released official 5e adventures and pre-gen blueprints without overwriting user creations.
+  - Dedicated interactive Data Preservation & Backups Manager modal (`DataBackupModal`):
+    - **Ripristina Backup ("Restore Backup")**: restores the full application state to any historical snapshot, with an automatic pre-restore safety copy taken first.
+    - **Integra Backup ("Integrate / Merge Backup")**: merges all missing campaigns, adventures, characters, sessions, and SFX from a backup (local or uploaded JSON) into the active database, without deleting or overwriting any unrelated current data.
+    - **Esporta Backup**: downloads a standalone JSON snapshot.
+    - **Sync Official 5e Content**: non-destructively syncs newly released official adventures, pre-gens, and SFX.
+    - **Open Data Folder**: reveals the AppData / local data directory in Windows Explorer or macOS Finder with one click.
 
 - App: Replace cramped modal dialogs with full-page dedicated views for Character (PG) Creation and Character Sheet Editing:
   - Full-page Supervised PC Creator (`SupervisedPgCreateView`) with spacious race and class cards, starting level slider, live attributes preview, and dual options to either "Save Direct to Repository" or "Customize in Full Editor".

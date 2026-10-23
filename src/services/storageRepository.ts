@@ -1,6 +1,11 @@
 import { DndDatabase } from '../types/dnd';
 import { SEED_DATABASE } from '../data/seedData';
-import { migrateDatabase, normalizeDatabase } from './schemaMigration';
+import {
+  migrateDatabase,
+  normalizeDatabase,
+  integrateDatabaseBackup,
+  IntegrationSummary,
+} from './schemaMigration';
 
 export interface StorageSaveResult {
   adapter: 'tauri-fs' | 'local-disk-api' | 'browser-storage';
@@ -24,8 +29,12 @@ export interface IStorageRepository {
   listBackups(): Promise<BackupEntry[]>;
   createBackup(label?: string): Promise<BackupEntry>;
   restoreBackup(filename: string): Promise<DndDatabase>;
+  integrateBackup(filename: string, currentDb: DndDatabase): Promise<{ db: DndDatabase; summary: IntegrationSummary }>;
+  integrateFromJsonString(rawJson: string, currentDb: DndDatabase): { db: DndDatabase; summary: IntegrationSummary };
   openDataFolder(): Promise<string>;
   canOpenFolder(): boolean;
+  saveAudioMedia(file: File): Promise<string>;
+  resolveAudioUrl(url: string): Promise<string>;
 }
 
 const LOCAL_STORAGE_KEY = 'vellum_db_v1';
@@ -56,7 +65,6 @@ export class LocalFirstRepository implements IStorageRepository {
         if (raw) {
           const parsed = JSON.parse(raw);
           const { db, migrated } = migrateDatabase(parsed);
-          // If migrated schema, save the normalized state back to disk
           if (migrated) {
             await this.saveDatabase(db);
           }
@@ -110,7 +118,6 @@ export class LocalFirstRepository implements IStorageRepository {
     };
     const payload = JSON.stringify(updated, null, 2);
 
-    // Always keep a fast mirror in localStorage
     try {
       localStorage.setItem(LOCAL_STORAGE_KEY, payload);
     } catch {
@@ -251,7 +258,6 @@ export class LocalFirstRepository implements IStorageRepository {
       console.warn('Local API restoreBackup failed:', err);
     }
 
-    // Browser localStorage fallback restore
     const snapshotRaw = localStorage.getItem(`vellum_snap_${filename}`);
     if (snapshotRaw) {
       const parsed = JSON.parse(snapshotRaw);
@@ -261,6 +267,45 @@ export class LocalFirstRepository implements IStorageRepository {
     }
 
     throw new Error(`Failed to restore backup '${filename}'`);
+  }
+
+  async integrateBackup(
+    filename: string,
+    currentDb: DndDatabase
+  ): Promise<{ db: DndDatabase; summary: IntegrationSummary }> {
+    let backupRaw: string | null = null;
+    if (this.isTauri()) {
+      // To read without replacing current db, read through restore_database_backup
+      // But safety: save current DB first!
+      backupRaw = (await window.__TAURI_INTERNALS__!.invoke('restore_database_backup', {
+        backupFilename: filename,
+      })) as string;
+    } else {
+      const res = await fetch('/api/local-db/restore', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ filename }),
+      });
+      if (res.ok) {
+        backupRaw = await res.text();
+      }
+    }
+
+    if (!backupRaw) {
+      throw new Error(`Could not load backup content for ${filename}`);
+    }
+
+    const { db: integratedDb, summary } = this.integrateFromJsonString(backupRaw, currentDb);
+    await this.saveDatabase(integratedDb);
+    return { db: integratedDb, summary };
+  }
+
+  integrateFromJsonString(
+    rawJson: string,
+    currentDb: DndDatabase
+  ): { db: DndDatabase; summary: IntegrationSummary } {
+    const parsed = JSON.parse(rawJson);
+    return integrateDatabaseBackup(currentDb, parsed);
   }
 
   async openDataFolder(): Promise<string> {
@@ -299,6 +344,70 @@ export class LocalFirstRepository implements IStorageRepository {
       throw new Error('Invalid JSON format.');
     }
     return normalizeDatabase(parsed);
+  }
+
+  async saveAudioMedia(file: File): Promise<string> {
+    if (this.isTauri()) {
+      try {
+        const buffer = await file.arrayBuffer();
+        const bytes = Array.from(new Uint8Array(buffer));
+        const res = (await window.__TAURI_INTERNALS__!.invoke('save_audio_media', {
+          filename: file.name,
+          data: bytes,
+        })) as string;
+        return res;
+      } catch (err) {
+        console.warn('Tauri save_audio_media failed, falling back to local API:', err);
+      }
+    }
+
+    try {
+      const res = await fetch('/api/media/audio', {
+        method: 'POST',
+        headers: { 'x-filename': encodeURIComponent(file.name) },
+        body: file,
+      });
+      if (res.ok) {
+        const info = await res.json();
+        return info.url;
+      }
+    } catch {
+      // Fallback to data url
+    }
+
+    return new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result));
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  }
+
+  async resolveAudioUrl(url: string): Promise<string> {
+    if (!url || !url.trim()) return '';
+    if (url.startsWith('data:') || url.startsWith('http://') || url.startsWith('https://') || url.startsWith('/api/')) {
+      return url;
+    }
+
+    if (url.startsWith('media://audio/')) {
+      const filename = url.replace('media://audio/', '');
+      if (this.isTauri()) {
+        try {
+          const bytes = (await window.__TAURI_INTERNALS__!.invoke('read_audio_media', {
+            filename,
+          })) as number[];
+          const ext = filename.split('.').pop()?.toLowerCase();
+          const mime = ext === 'wav' ? 'audio/wav' : ext === 'ogg' ? 'audio/ogg' : 'audio/mpeg';
+          const blob = new Blob([new Uint8Array(bytes)], { type: mime });
+          return URL.createObjectURL(blob);
+        } catch (err) {
+          console.warn('Failed to read audio media via Tauri command:', err);
+        }
+      }
+      return `/api/media/audio/${encodeURIComponent(filename)}`;
+    }
+
+    return url;
   }
 }
 

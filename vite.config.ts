@@ -8,6 +8,7 @@ function localDiskDbPlugin() {
   const dataDir = path.resolve(process.cwd(), 'data');
   const dbFile = path.join(dataDir, 'dnd5e-db.json');
   const backupsDir = path.join(dataDir, 'backups');
+  const mediaAudioDir = path.join(dataDir, 'media', 'audio');
 
   function ensureDirs() {
     if (!fs.existsSync(dataDir)) {
@@ -15,6 +16,9 @@ function localDiskDbPlugin() {
     }
     if (!fs.existsSync(backupsDir)) {
       fs.mkdirSync(backupsDir, { recursive: true });
+    }
+    if (!fs.existsSync(mediaAudioDir)) {
+      fs.mkdirSync(mediaAudioDir, { recursive: true });
     }
   }
 
@@ -98,6 +102,51 @@ function localDiskDbPlugin() {
   return {
     name: 'local-disk-db-plugin',
     configureServer(server: any) {
+      // Media Audio Handler
+      server.middlewares.use('/api/media/audio', (req: any, res: any) => {
+        ensureDirs();
+        const parsedUrl = new URL(req.url, 'http://localhost');
+        const filename = decodeURIComponent(parsedUrl.pathname.replace(/^\//, ''));
+
+        if (req.method === 'POST') {
+          const rawName = req.headers['x-filename'] || `audio_${Date.now()}.mp3`;
+          const safeName = String(rawName).replace(/[^a-zA-Z0-9._-]/g, '_');
+          const targetPath = path.join(mediaAudioDir, safeName);
+          const chunks: Buffer[] = [];
+
+          req.on('data', (chunk: Buffer) => chunks.push(chunk));
+          req.on('end', () => {
+            const buffer = Buffer.concat(chunks);
+            fs.writeFileSync(targetPath, buffer);
+            res.setHeader('Content-Type', 'application/json');
+            res.end(JSON.stringify({ url: `/api/media/audio/${encodeURIComponent(safeName)}` }));
+          });
+          return;
+        }
+
+        if (req.method === 'GET' && filename) {
+          const safeName = path.basename(filename);
+          const targetPath = path.join(mediaAudioDir, safeName);
+          if (fs.existsSync(targetPath)) {
+            const ext = path.extname(safeName).toLowerCase();
+            const mime = ext === '.wav' ? 'audio/wav' : ext === '.ogg' ? 'audio/ogg' : 'audio/mpeg';
+            const stat = fs.statSync(targetPath);
+            res.setHeader('Content-Type', mime);
+            res.setHeader('Content-Length', stat.size);
+            res.setHeader('Accept-Ranges', 'bytes');
+            fs.createReadStream(targetPath).pipe(res);
+            return;
+          }
+          res.statusCode = 404;
+          res.end('Not Found');
+          return;
+        }
+
+        res.statusCode = 405;
+        res.end('Method Not Allowed');
+      });
+
+      // Database & Backups Handler
       server.middlewares.use('/api/local-db', (req: any, res: any) => {
         try {
           ensureDirs();

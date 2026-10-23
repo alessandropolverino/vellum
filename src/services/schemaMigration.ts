@@ -18,6 +18,16 @@ export interface MigrationResult {
   newVersion: number;
 }
 
+export interface IntegrationSummary {
+  addedCampaigns: number;
+  addedAdventures: number;
+  addedCharacters: number;
+  addedParties: number;
+  addedInstances: number;
+  addedSfx: number;
+  totalEntitiesAdded: number;
+}
+
 /**
  * Defensive normalizer: guarantees that any loaded JSON (even from an older version,
  * partial export, or legacy state) conforms strictly to DndDatabase structure with
@@ -203,12 +213,6 @@ export function migrateDatabase(raw: unknown): MigrationResult {
   let current = normalized;
   let migrated = false;
 
-  // In the future:
-  // if (current.version === 1) {
-  //   current = migrateV1ToV2(current);
-  //   migrated = true;
-  // }
-
   if (current.version < CURRENT_SCHEMA_VERSION) {
     current = {
       ...current,
@@ -289,5 +293,108 @@ export function mergeSeedContent(
     addedAdventures,
     addedCharacters,
     addedSfx,
+  };
+}
+
+/**
+ * Non-destructive integration of an external or local backup into the current database:
+ * Adds all campaigns, adventures, characters, parties, instances, and SFX
+ * present in the incoming backup that do not already exist in currentDb.
+ * Preserves all current data without deleting or overwriting anything.
+ */
+export function integrateDatabaseBackup(
+  currentDb: DndDatabase,
+  incomingRaw: unknown
+): {
+  db: DndDatabase;
+  summary: IntegrationSummary;
+} {
+  const incoming = normalizeDatabase(incomingRaw);
+
+  let addedCampaigns = 0;
+  let addedAdventures = 0;
+  let addedCharacters = 0;
+  let addedParties = 0;
+  let addedInstances = 0;
+  let addedSfx = 0;
+
+  const nextCampaigns = [...currentDb.campaigns];
+  for (const c of incoming.campaigns) {
+    if (!nextCampaigns.some((existing) => existing.id === c.id)) {
+      nextCampaigns.push(c);
+      addedCampaigns++;
+    }
+  }
+
+  const nextAdventures = [...currentDb.adventures];
+  for (const a of incoming.adventures) {
+    if (!nextAdventures.some((existing) => existing.id === a.id)) {
+      nextAdventures.push(a);
+      addedAdventures++;
+    }
+  }
+
+  const nextCharacters = [...currentDb.characters];
+  for (const ch of incoming.characters) {
+    if (!nextCharacters.some((existing) => existing.id === ch.id)) {
+      nextCharacters.push(ch);
+      addedCharacters++;
+    }
+  }
+
+  const nextParties = [...currentDb.parties];
+  for (const p of incoming.parties) {
+    if (!nextParties.some((existing) => existing.id === p.id)) {
+      nextParties.push(p);
+      addedParties++;
+    }
+  }
+
+  const nextInstances = [...currentDb.playInstances];
+  for (const inst of incoming.playInstances) {
+    if (!nextInstances.some((existing) => existing.id === inst.id)) {
+      nextInstances.push(inst);
+      addedInstances++;
+    }
+  }
+
+  const nextSfx = [...currentDb.sfxCatalog];
+  for (const s of incoming.sfxCatalog) {
+    if (!nextSfx.some((existing) => existing.id === s.id)) {
+      nextSfx.push(s);
+      addedSfx++;
+    }
+  }
+
+  const totalEntitiesAdded =
+    addedCampaigns +
+    addedAdventures +
+    addedCharacters +
+    addedParties +
+    addedInstances +
+    addedSfx;
+
+  const nextDb: DndDatabase = {
+    ...currentDb,
+    campaigns: nextCampaigns,
+    adventures: nextAdventures,
+    characters: nextCharacters,
+    parties: nextParties,
+    playInstances: nextInstances,
+    sfxCatalog: nextSfx,
+    lastSavedAt: new Date().toISOString(),
+  };
+
+  return {
+    db: nextDb,
+    summary: {
+      addedCampaigns,
+      addedAdventures,
+      addedCharacters,
+      addedParties,
+      addedInstances,
+      addedSfx,
+      totalEntitiesAdded,
+    },
   };
 }

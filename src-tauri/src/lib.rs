@@ -41,38 +41,36 @@ fn get_backups_dir(app: &tauri::AppHandle) -> Result<PathBuf, String> {
     Ok(backups_dir)
 }
 
+fn get_media_audio_dir(app: &tauri::AppHandle) -> Result<PathBuf, String> {
+    let base_dir = get_base_dir(app)?;
+    let media_dir = base_dir.join("media").join("audio");
+    if !media_dir.exists() {
+        fs::create_dir_all(&media_dir)
+            .map_err(|e| format!("Failed to create media audio directory: {}", e))?;
+    }
+    Ok(media_dir)
+}
+
 /// Helper to format system time into readable ISO-like string
 fn format_system_time(time: SystemTime) -> String {
     let duration = time.duration_since(UNIX_EPOCH).unwrap_or_default();
     let secs = duration.as_secs();
-    // Rough ISO-8601 UTC timestamp format without external chrono crate
     let days = secs / 86400;
     let rem_secs = secs % 86400;
     let hours = rem_secs / 3600;
     let mins = (rem_secs % 3600) / 60;
     let s = rem_secs % 60;
 
-    // Approximate year/month/day calculation
     let mut y = 1970i64;
     let mut d = days as i64;
     loop {
-        let leap = if (y % 4 == 0 && y % 100 != 0) || (y % 400 == 0) {
-            1
-        } else {
-            0
-        };
+        let leap = if (y % 4 == 0 && y % 100 != 0) || (y % 400 == 0) { 1 } else { 0 };
         let year_days = 365 + leap;
-        if d < year_days {
-            break;
-        }
+        if d < year_days { break; }
         d -= year_days;
         y += 1;
     }
-    let leap = if (y % 4 == 0 && y % 100 != 0) || (y % 400 == 0) {
-        1
-    } else {
-        0
-    };
+    let leap = if (y % 4 == 0 && y % 100 != 0) || (y % 400 == 0) { 1 } else { 0 };
     let month_days = [31, 28 + leap, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
     let mut m = 0;
     while m < 12 && d >= month_days[m] {
@@ -147,7 +145,6 @@ fn atomic_write_file(target: &Path, content: &str) -> Result<(), String> {
     }
 
     if let Err(e) = fs::rename(&tmp_path, target) {
-        // Fallback for filesystem where rename over existing might fail
         if fs::copy(&tmp_path, target).is_ok() {
             let _ = fs::remove_file(&tmp_path);
             Ok(())
@@ -172,7 +169,6 @@ fn prune_backups(backups_dir: &Path, max_keep: usize) {
             })
             .collect();
 
-        // Sort by modification time descending (newest first)
         files.sort_by(|a, b| {
             let time_a = fs::metadata(a).and_then(|m| m.modified()).unwrap_or(UNIX_EPOCH);
             let time_b = fs::metadata(b).and_then(|m| m.modified()).unwrap_or(UNIX_EPOCH);
@@ -239,8 +235,6 @@ fn load_local_database(app: tauri::AppHandle) -> Result<Option<String>, String> 
     if db_path.exists() {
         let meta = fs::metadata(&db_path).map_err(|e| format!("Failed to inspect database: {}", e))?;
         if meta.len() == 0 {
-            // Self-healing: if file is 0 bytes (corrupted by sudden power loss before atomic writes),
-            // check if there is a recent backup in backups/
             let backups_dir = get_backups_dir(&app)?;
             if let Ok(entries) = fs::read_dir(&backups_dir) {
                 let mut backups: Vec<PathBuf> = entries
@@ -256,7 +250,6 @@ fn load_local_database(app: tauri::AppHandle) -> Result<Option<String>, String> 
                 if let Some(newest_backup) = backups.first() {
                     let recovered = fs::read_to_string(newest_backup)
                         .map_err(|e| format!("Failed to recover from backup: {}", e))?;
-                    // Restore recovered file atomically
                     let _ = atomic_write_file(&db_path, &recovered);
                     return Ok(Some(recovered));
                 }
@@ -276,7 +269,6 @@ fn load_local_database(app: tauri::AppHandle) -> Result<Option<String>, String> 
 fn save_local_database(app: tauri::AppHandle, payload: String) -> Result<String, String> {
     let db_path = get_db_path(&app)?;
 
-    // Auto-backup policy: if db exists and is not empty, check if we should create an auto-backup
     if db_path.exists() {
         if let Ok(meta) = fs::metadata(&db_path) {
             if meta.len() > 0 {
@@ -291,7 +283,6 @@ fn save_local_database(app: tauri::AppHandle, payload: String) -> Result<String,
                             if let Ok(m) = fs::metadata(&path) {
                                 if let Ok(modified) = m.modified() {
                                     if let Ok(diff) = now.duration_since(modified) {
-                                        // If an auto-backup was created within the last 15 minutes, skip
                                         if diff.as_secs() < 900 {
                                             recent_auto_exists = true;
                                             break;
@@ -313,7 +304,6 @@ fn save_local_database(app: tauri::AppHandle, payload: String) -> Result<String,
         }
     }
 
-    // Atomic write to prevent file corruption
     atomic_write_file(&db_path, &payload)?;
     Ok(db_path.to_string_lossy().to_string())
 }
@@ -364,7 +354,6 @@ fn list_database_backups(app: tauri::AppHandle) -> Result<Vec<BackupEntry>, Stri
         }
     }
 
-    // Sort newest first
     result.sort_by(|a, b| b.created_at.cmp(&a.created_at));
     Ok(result)
 }
@@ -374,7 +363,6 @@ fn restore_database_backup(
     app: tauri::AppHandle,
     backup_filename: String,
 ) -> Result<String, String> {
-    // Sanitize filename to prevent directory traversal
     if backup_filename.contains("..") || backup_filename.contains('/') || backup_filename.contains('\\') {
         return Err("Invalid backup filename".to_string());
     }
@@ -386,7 +374,6 @@ fn restore_database_backup(
     }
 
     let db_path = get_db_path(&app)?;
-    // Safety: make a pre-restore backup of the current database before replacing it
     if db_path.exists() {
         let _ = create_backup_internal(&app, "prerestore", true);
     }
@@ -394,7 +381,6 @@ fn restore_database_backup(
     let content = fs::read_to_string(&backup_file)
         .map_err(|e| format!("Failed to read backup file: {}", e))?;
 
-    // Atomic write to database file
     atomic_write_file(&db_path, &content)?;
     Ok(content)
 }
@@ -431,6 +417,44 @@ fn open_data_folder(app: tauri::AppHandle) -> Result<String, String> {
     Ok(path_str)
 }
 
+#[tauri::command]
+fn save_audio_media(
+    app: tauri::AppHandle,
+    filename: String,
+    data: Vec<u8>,
+) -> Result<String, String> {
+    let media_dir = get_media_audio_dir(&app)?;
+    let safe_name: String = filename
+        .chars()
+        .filter(|c| c.is_alphanumeric() || *c == '.' || *c == '-' || *c == '_')
+        .collect();
+    let safe_name = if safe_name.is_empty() {
+        format!("audio_{}.mp3", get_timestamp_slug())
+    } else {
+        safe_name
+    };
+    let target = media_dir.join(&safe_name);
+    fs::write(&target, data).map_err(|e| format!("Failed to write audio file: {}", e))?;
+    Ok(format!("media://audio/{}", safe_name))
+}
+
+#[tauri::command]
+fn read_audio_media(
+    app: tauri::AppHandle,
+    filename: String,
+) -> Result<Vec<u8>, String> {
+    let safe_name: String = filename
+        .chars()
+        .filter(|c| c.is_alphanumeric() || *c == '.' || *c == '-' || *c == '_')
+        .collect();
+    let media_dir = get_media_audio_dir(&app)?;
+    let target = media_dir.join(&safe_name);
+    if !target.exists() {
+        return Err(format!("Audio file '{}' not found", safe_name));
+    }
+    fs::read(&target).map_err(|e| format!("Failed to read audio file: {}", e))
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -440,7 +464,9 @@ pub fn run() {
             create_database_backup,
             list_database_backups,
             restore_database_backup,
-            open_data_folder
+            open_data_folder,
+            save_audio_media,
+            read_audio_media
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
