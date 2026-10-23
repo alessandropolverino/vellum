@@ -4,6 +4,12 @@ All notable user-facing changes to Vellum are documented in this file.
 
 ## Unreleased
 
+- App: Add comprehensive Data Preservation, Automatic Backup, and Schema Migration engine across frequent application updates:
+  - Atomic disk writes (`fs::write` to temporary file + disk flush + atomic rename) in Tauri desktop backend and local dev API to guarantee zero file truncation or corruption even during power failure or sudden crashes.
+  - Automatic rolling snapshots in `backups/` directory (up to 20 retained snapshots) created every 15 minutes of activity, prior to database imports/restores, and before schema upgrades.
+  - Schema migration runner and defensive normalizer (`normalizeDatabase` / `migrateDatabase`) ensuring old or partial database snapshots always initialize with safe defaults without crashing UI components or losing custom entities.
+  - Dedicated interactive Data Preservation & Backups Manager modal (`DataBackupModal`) accessible from the top storage indicator or shield icon: create labeled manual snapshots, inspect local backup history, one-click restore with automatic pre-restore safety copy, reveal local storage folder in Windows Explorer or macOS Finder, and non-destructively sync newly released official 5e adventures and pre-gen blueprints without overwriting user creations.
+
 - App: Replace cramped modal dialogs with full-page dedicated views for Character (PG) Creation and Character Sheet Editing:
   - Full-page Supervised PC Creator (`SupervisedPgCreateView`) with spacious race and class cards, starting level slider, live attributes preview, and dual options to either "Save Direct to Repository" or "Customize in Full Editor".
   - Full-page Character Sheet Editor (`FullPageCharacterEditor`) providing generous workspace, sticky action header (`Save Sheet`, `Level Up ▲`, `Export Official 5e PDF`), toggleable sticky live Statblock Preview panel, and bottom actions.
