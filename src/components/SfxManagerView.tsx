@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { SfxCategory, SfxItem, SynthPresetId } from '../types/dnd';
 import { soundboardEngine } from '../services/audioEngine';
+import { storageRepository } from '../services/storageRepository';
 import { useLanguage } from '../i18n/LanguageContext';
 import {
   Volume2,
@@ -66,20 +67,24 @@ export const SfxManagerView: React.FC<SfxManagerViewProps> = ({
   );
 
   const activeIds = soundboardEngine.getActiveTrackIds();
+  const [isUploading, setIsUploading] = useState(false);
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !editingSfx) return;
-    const reader = new FileReader();
-    reader.onload = () => {
-      if (typeof reader.result === 'string') {
-        setEditingSfx({
-          ...editingSfx,
-          customAudioUrl: reader.result,
-        });
-      }
-    };
-    reader.readAsDataURL(file);
+    setIsUploading(true);
+    try {
+      const url = await storageRepository.saveAudioMedia(file);
+      setEditingSfx({
+        ...editingSfx,
+        customAudioUrl: url,
+      });
+    } catch (err) {
+      console.warn('Errore salvataggio media audio:', err);
+    } finally {
+      setIsUploading(false);
+      e.target.value = '';
+    }
   };
 
   return (

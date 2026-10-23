@@ -17,6 +17,7 @@ import { AdventureStudioView } from './components/AdventureStudioView';
 import { LiveSessionConsole } from './components/LiveSessionConsole';
 import { CharactersView } from './components/CharactersView';
 import { SfxManagerView } from './components/SfxManagerView';
+import { DataBackupModal } from './components/DataBackupModal';
 import {
   BookOpen,
   Compass,
@@ -27,6 +28,7 @@ import {
   Download,
   Upload,
   HardDrive,
+  ShieldCheck,
   Dice5,
   Plus,
   X,
@@ -41,6 +43,7 @@ export const App: React.FC = () => {
   const [db, setDb] = useState<DndDatabase>(SEED_DATABASE);
   const [storageSource, setStorageSource] = useState<string>('Loading...');
   const [lastSaveInfo, setLastSaveInfo] = useState<string>('');
+  const [isBackupModalOpen, setIsBackupModalOpen] = useState<boolean>(false);
   const [activeTab, setActiveTab] = useState<ActiveTab>('dashboard');
 
   const [selectedAdventureId, setSelectedAdventureId] = useState<string>(
@@ -420,13 +423,22 @@ export const App: React.FC = () => {
               </button>
             </div>
 
-            <div
-              title={lastSaveInfo || storageSource}
-              className="hidden xl:flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-stone-900 border border-stone-800 text-stone-400 text-[11px]"
+            <button
+              onClick={() => setIsBackupModalOpen(true)}
+              title={`${lastSaveInfo || storageSource} — ${tr('Click to open Data & Backups', 'Clicca per aprire Gestione Dati & Backup')}`}
+              className="hidden xl:flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-stone-900 hover:bg-stone-800 border border-stone-800 text-stone-400 hover:text-stone-200 text-[11px] transition cursor-pointer"
             >
               <HardDrive className="w-3.5 h-3.5 text-emerald-400" />
               <span>{lastSaveInfo || storageSource}</span>
-            </div>
+            </button>
+
+            <button
+              onClick={() => setIsBackupModalOpen(true)}
+              title={tr('Data Preservation & Backups Manager', 'Gestione Dati & Backup')}
+              className="p-2 rounded-lg bg-stone-900 hover:bg-stone-800 border border-stone-800 text-amber-400 hover:text-amber-300 transition cursor-pointer"
+            >
+              <ShieldCheck className="w-4 h-4" />
+            </button>
 
             <button
               onClick={() => storageRepository.exportToJsonFile(db)}
@@ -738,6 +750,16 @@ export const App: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* Data Preservation & Backups Modal */}
+      <DataBackupModal
+        isOpen={isBackupModalOpen}
+        onClose={() => setIsBackupModalOpen(false)}
+        db={db}
+        storageSource={storageSource}
+        lastSaveInfo={lastSaveInfo}
+        onDatabaseReplaced={(nextDb) => persistDb(nextDb)}
+      />
     </div>
   );
 };
