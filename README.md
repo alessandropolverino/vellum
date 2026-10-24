@@ -46,6 +46,8 @@ Web & Desktop application (**Tauri v2 + React 19 + TypeScript + Tailwind CSS**) 
 
 ## Install & Quick Start
 
+**Windows:** download the latest installer from [GitHub Releases](https://github.com/alessandropolverino/vellum/releases/latest). Windows SmartScreen may warn on first run (the installer is not code-signed): click *More info* → *Run anyway*. The app then keeps itself up to date.
+
 ### Using `Makefile` (Unix / Linux / macOS / Windows)
 
 ```bash
@@ -122,3 +124,4 @@ Installers are published on [GitHub Releases](https://github.com/alessandropolve
 | Version | Date | Platform | Notes |
 | :--- | :--- | :--- | :--- |
 | *Unreleased* | — | Windows / macOS | [CHANGELOG.md](./CHANGELOG.md) |
+| 0.1.0 | 2026-10-24 | Windows | [Release notes](https://github.com/alessandropolverino/vellum/releases/tag/windows-v0.1.0) |

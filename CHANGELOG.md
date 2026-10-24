@@ -4,6 +4,8 @@ All notable user-facing changes to Vellum are documented in this file.
 
 ## Unreleased
 
+## Windows 0.1.0 — 2026-10-24
+
 - Windows: In-app updates. The app checks GitHub Releases a few seconds after launch and shows a dot on the new download icon in the header when a newer version exists; the dialog shows the release notes, takes an automatic data backup, then downloads the signed installer and restarts the app. You can also check manually at any time. Pre-release builds (`-rc`) are never offered.
 
 - Windows: Calmer, less cluttered UI: muted color palette, slimmer header with a single Data & Backups button (export, import and restore live there), quieter footer, and a new layout for every page: Dashboard with a "continue playing" card and compact lists, Story Editor with a tabbed scene-details panel and a collapsible adventure details bar, Live Session with a single tabbed side panel (Scenes, Party, Sounds, Log), Characters with one filter row and a single "New" menu, and SFX as a compact list.
