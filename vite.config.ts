@@ -6,13 +6,27 @@ import { exec } from 'node:child_process';
 
 function localDiskDbPlugin() {
   const dataDir = path.resolve(process.cwd(), 'data');
-  const dbFile = path.join(dataDir, 'dnd5e-db.json');
+  const dbFile = path.join(dataDir, 'vellum-db.json');
+  const legacyDbFile = path.join(dataDir, 'dnd5e-db.json');
   const backupsDir = path.join(dataDir, 'backups');
   const mediaAudioDir = path.join(dataDir, 'media', 'audio');
 
   function ensureDirs() {
     if (!fs.existsSync(dataDir)) {
       fs.mkdirSync(dataDir, { recursive: true });
+    }
+    // Backward compatibility: migrate dnd5e-db.json to vellum-db.json if new file doesn't exist
+    if (!fs.existsSync(dbFile) && fs.existsSync(legacyDbFile)) {
+      try {
+        fs.renameSync(legacyDbFile, dbFile);
+      } catch {
+        fs.copyFileSync(legacyDbFile, dbFile);
+        try {
+          fs.unlinkSync(legacyDbFile);
+        } catch {
+          // ignore
+        }
+      }
     }
     if (!fs.existsSync(backupsDir)) {
       fs.mkdirSync(backupsDir, { recursive: true });

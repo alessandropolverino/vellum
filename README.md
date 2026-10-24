@@ -36,12 +36,12 @@ Web & Desktop application (**Tauri v2 + React 19 + TypeScript + Tailwind CSS**) 
    - Full English (`EN`, default) and Italian (`IT`) UI localization, switchable at any time from the top navigation bar.
 
 7. **Vellum CLI & AI Agent Integration**:
-   - Built-in command line interface (`npm run cli -- ...`) providing full CRUD capabilities on stories, characters/PGs, campaigns, parties, encounters, instances, and DB maintenance.
+   - Built-in command line interface (`vellum` / `npm run cli -- ...`) bundled with desktop installers, providing full CRUD capabilities on stories, characters/PGs, campaigns, parties, encounters, instances, and DB maintenance.
    - Strict `--json` output mode for automated pipelines and AI coding assistants (Claude, Gemini, Codex, Antigravity).
    - Embedded agent instructions and skill specification in [`skills/vellum-cli/SKILL.md`](./skills/vellum-cli/SKILL.md).
 
 8. **Local Disk Persistence & Cloud-Ready Architecture**:
-   - Automatically saves to `./data/dnd5e-db.json` in web/dev mode and to the OS AppData directory in the native Tauri desktop app (plus full JSON Export/Import).
+   - Automatically saves to `./data/vellum-db.json` in web/dev mode and to the OS AppData directory in the native Tauri desktop app (plus full JSON Export/Import).
    - The storage layer (`src/services/storageRepository.ts`) implements the `IStorageRepository` interface, ready to plug into a future cloud/SaaS adapter.
 
 ## Install & Quick Start
@@ -78,7 +78,7 @@ make clean        # Remove ./dist build artifacts
 # Install dependencies
 npm install
 
-# Start Web UI + local disk persistence (./data/dnd5e-db.json)
+# Start Web UI + local disk persistence (./data/vellum-db.json)
 npm run dev
 
 # Build production frontend

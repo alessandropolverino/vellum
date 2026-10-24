@@ -28,7 +28,21 @@ fn get_base_dir(app: &tauri::AppHandle) -> Result<PathBuf, String> {
 
 fn get_db_path(app: &tauri::AppHandle) -> Result<PathBuf, String> {
     let base_dir = get_base_dir(app)?;
-    Ok(base_dir.join("dnd5e-db.json"))
+    let new_db = base_dir.join("vellum-db.json");
+    let legacy_db = base_dir.join("dnd5e-db.json");
+
+    // Backward compatibility: if new database does not exist but legacy exists, migrate by renaming
+    if !new_db.exists() && legacy_db.exists() {
+        if let Err(e) = fs::rename(&legacy_db, &new_db) {
+            if fs::copy(&legacy_db, &new_db).is_ok() {
+                let _ = fs::remove_file(&legacy_db);
+            } else {
+                eprintln!("Failed to migrate legacy db {:?}: {}", legacy_db, e);
+            }
+        }
+    }
+
+    Ok(new_db)
 }
 
 fn get_backups_dir(app: &tauri::AppHandle) -> Result<PathBuf, String> {

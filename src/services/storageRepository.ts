@@ -75,7 +75,7 @@ export class LocalFirstRepository implements IStorageRepository {
       }
     }
 
-    // 2. Try local disk endpoint (/api/local-db -> ./data/dnd5e-db.json)
+    // 2. Try local disk endpoint (/api/local-db -> ./data/vellum-db.json)
     try {
       const res = await fetch('/api/local-db', { method: 'GET' });
       if (res.ok) {
@@ -86,7 +86,7 @@ export class LocalFirstRepository implements IStorageRepository {
           if (migrated) {
             await this.saveDatabase(db);
           }
-          return { db, source: 'Local Disk (./data/dnd5e-db.json)', migrated };
+          return { db, source: 'Local Disk (./data/vellum-db.json)', migrated };
         }
       }
     } catch {
@@ -140,7 +140,7 @@ export class LocalFirstRepository implements IStorageRepository {
       }
     }
 
-    // 2. Local project disk write (./data/dnd5e-db.json with atomic + auto backup)
+    // 2. Local project disk write (./data/vellum-db.json with atomic + auto backup)
     try {
       const res = await fetch('/api/local-db', {
         method: 'POST',
@@ -151,7 +151,7 @@ export class LocalFirstRepository implements IStorageRepository {
         const info = await res.json();
         return {
           adapter: 'local-disk-api',
-          location: info.path || './data/dnd5e-db.json',
+          location: info.path || './data/vellum-db.json',
           savedAt: updated.lastSavedAt,
         };
       }

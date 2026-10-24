@@ -4,6 +4,10 @@ All notable user-facing changes to Vellum are documented in this file.
 
 ## Unreleased
 
+- Windows: Bundle the Vellum CLI (`vellum`) and agent skills inside the Windows installer, automatically adding the Vellum installation path to the user's PATH environment variable so AI coding agents and users can run `vellum` from any terminal.
+- App: Rename database storage file from `dnd5e-db.json` to `vellum-db.json` across desktop and local server storage with transparent backward compatibility (existing `dnd5e-db.json` databases are automatically migrated and renamed upon first run).
+- App: Add automatic desktop AppData discovery in the Vellum CLI so it can directly inspect, create, and update adventures, scenes, encounters, and characters from the installed desktop app without needing manual `--db` path configuration.
+
 ## Windows 0.1.2 — 2026-10-24
 
 - Windows: Deleting an adventure, scene, encounter, character sheet, party, play instance or sound now asks for confirmation first.
