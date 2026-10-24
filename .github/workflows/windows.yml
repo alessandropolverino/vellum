@@ -33,6 +33,7 @@ jobs:
           done
 
       - name: Extract release notes from CHANGELOG
+        id: notes
         shell: bash
         run: |
           VERSION="${GITHUB_REF_NAME#windows-v}"
@@ -44,7 +45,11 @@ jobs:
           if [ ! -s release-notes.md ]; then
             echo "See [CHANGELOG.md](https://github.com/${GITHUB_REPOSITORY}/blob/main/CHANGELOG.md)." > release-notes.md
           fi
-          cat release-notes.md
+          {
+            echo 'body<<NOTES_EOF'
+            cat release-notes.md
+            echo 'NOTES_EOF'
+          } >> "$GITHUB_OUTPUT"
 
       - uses: actions/setup-node@v4
         with:
@@ -67,7 +72,8 @@ jobs:
         with:
           tagName: ${{ github.ref_name }}
           releaseName: Vellum ${{ github.ref_name }}
-          releaseBodyPath: release-notes.md
+          releaseBody: ${{ steps.notes.outputs.body }}
           releaseDraft: false
           prerelease: ${{ contains(github.ref_name, '-rc') }}
-          uploadUpdaterJson: true
+          includeUpdaterJson: true
+          updaterJsonPreferNsis: true
