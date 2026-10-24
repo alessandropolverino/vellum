@@ -4,6 +4,8 @@ All notable user-facing changes to Vellum are documented in this file.
 
 ## Unreleased
 
+## Windows 0.1.2 — 2026-10-24
+
 - Windows: Deleting an adventure, scene, encounter, character sheet, party, play instance or sound now asks for confirmation first.
 - Windows: Leaving the character sheet editor or the PC creation wizard with unsaved changes now asks whether to save, discard or keep editing.
 - Windows: Update dialog is now centered in the window and scrolls when tall, instead of being cut off at the top.
