@@ -4,6 +4,8 @@ All notable user-facing changes to Vellum are documented in this file.
 
 ## Unreleased
 
+- Windows: Calmer, less cluttered UI: muted color palette, slimmer header with a single Data & Backups button (export, import and restore live there), quieter footer, and a new layout for every page: Dashboard with a "continue playing" card and compact lists, Story Editor with a tabbed scene-details panel and a collapsible adventure details bar, Live Session with a single tabbed side panel (Scenes, Party, Sounds, Log), Characters with one filter row and a single "New" menu, and SFX as a compact list.
+- Windows: A fresh install no longer ships demo adventures, characters, parties or sessions; only the built-in sound library is included. Built-in sounds are now generic (no demo-specific names), with two new ones (Cave Wind, Dice Roll), and their names follow the UI language. Existing data is untouched.
 - App: Add real-time auto-save status indicator and manual save trigger in Adventure Studio:
   - Contextual status badges displaying real-time save state (`Saving...`, `Saved (HH:MM:SS)`, `Save Error`) in the Adventure Studio top bar and directly above the Homebrewery Markdown editor.
   - Interactive save trigger and keyboard shortcut (`Ctrl+S` / `Cmd+S`) allowing users and DMs to instantly verify or force persistence with visual feedback while authoring one-shots, campaign modules, and scenes.
