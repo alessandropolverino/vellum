@@ -21,6 +21,7 @@ import {
   resolveSkillProficiencies,
 } from '../types/dnd';
 import { useLanguage } from '../i18n/LanguageContext';
+import { useDialogs } from './ConfirmDialog';
 import { StatblockCard } from './StatblockCard';
 import {
   validatePgCombination,
@@ -89,6 +90,7 @@ export const FullPageCharacterEditor: React.FC<FullPageCharacterEditorProps> = (
 }) => {
   const { lang, tr } = useLanguage();
 
+  const { ask } = useDialogs();
   const [editingChar, setEditingChar] = useState<CharacterEntity>(structuredClone(initialChar));
   const [masterOverrideAccepted, setMasterOverrideAccepted] = useState(false);
   const [showWarningConfirmation, setShowWarningConfirmation] = useState(false);
@@ -193,6 +195,27 @@ export const FullPageCharacterEditor: React.FC<FullPageCharacterEditorProps> = (
     onSave(editingChar);
   };
 
+  const isDirty = JSON.stringify(editingChar) !== JSON.stringify(initialChar);
+
+  const handleCancel = async () => {
+    if (!isDirty) {
+      onCancel();
+      return;
+    }
+    const choice = await ask({
+      title: tr('Save your changes?', 'Salvare le modifiche?'),
+      message: tr(
+        'This sheet has unsaved changes. If you leave without saving, they will be lost.',
+        'Questa scheda ha modifiche non salvate. Se esci senza salvare andranno perse.'
+      ),
+      confirmLabel: tr('Save', 'Salva'),
+      secondaryLabel: tr('Discard', 'Scarta'),
+      cancelLabel: tr('Keep editing', 'Continua a modificare'),
+    });
+    if (choice === 'confirm') handleSaveClick();
+    else if (choice === 'secondary') onCancel();
+  };
+
   const validation = validatePgCombination(editingChar, lang);
   const spellStats = editingChar.spellcastingAbility
     ? (() => {
@@ -210,7 +233,7 @@ export const FullPageCharacterEditor: React.FC<FullPageCharacterEditorProps> = (
         <div className="flex items-center gap-3">
           <button
             type="button"
-            onClick={onCancel}
+            onClick={handleCancel}
             className="p-2.5 rounded-xl bg-stone-800 hover:bg-stone-700 text-stone-300 hover:text-white transition cursor-pointer flex items-center gap-1.5 text-xs font-semibold"
           >
             <ArrowLeft className="w-4 h-4" />
@@ -296,7 +319,7 @@ export const FullPageCharacterEditor: React.FC<FullPageCharacterEditorProps> = (
 
           <button
             type="button"
-            onClick={onCancel}
+            onClick={handleCancel}
             className="px-3.5 py-2 rounded-xl bg-stone-800 hover:bg-stone-700 text-stone-300 text-xs font-semibold cursor-pointer transition"
           >
             {tr('Cancel', 'Annulla')}
@@ -1146,7 +1169,7 @@ export const FullPageCharacterEditor: React.FC<FullPageCharacterEditorProps> = (
           <div className="bg-stone-900/90 border border-stone-800 p-4 rounded-2xl flex items-center justify-between gap-4">
             <button
               type="button"
-              onClick={onCancel}
+              onClick={handleCancel}
               className="px-4 py-2 rounded-xl bg-stone-800 hover:bg-stone-700 text-stone-300 font-semibold text-xs cursor-pointer transition"
             >
               {tr('Cancel', 'Annulla')}

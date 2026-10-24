@@ -1,4 +1,5 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
+import { useDialogs } from './ConfirmDialog';
 import {
   AbilityKey,
   CharacterEntity,
@@ -95,6 +96,7 @@ export const SupervisedPgCreateView: React.FC<SupervisedPgCreateViewProps> = ({
   onProceedToEditor,
 }) => {
   const { lang, tr } = useLanguage();
+  const { ask } = useDialogs();
 
   const [name, setName] = useState('');
   const [isBlueprint, setIsBlueprint] = useState(isBlueprintDefault);
@@ -311,6 +313,33 @@ export const SupervisedPgCreateView: React.FC<SupervisedPgCreateViewProps> = ({
     };
   };
 
+  const signature = JSON.stringify([
+    name, isBlueprint, playerName, selectedRaceId, customRaceName, selectedClassId, customClassName,
+    customHitDie, level, method, baseScores, background, alignmentIdx, classSkills, bgSkills,
+    size, speed, senses, languages, equipment,
+  ]);
+  const initialSignature = useRef(signature);
+  const isDirty = signature !== initialSignature.current;
+
+  const handleCancel = async () => {
+    if (!isDirty) {
+      onCancel();
+      return;
+    }
+    const choice = await ask({
+      title: tr('Save this character?', 'Salvare questo personaggio?'),
+      message: tr(
+        'You have started creating a character. If you leave without saving, your progress will be lost.',
+        'Hai iniziato a creare un personaggio. Se esci senza salvare perderai i progressi.'
+      ),
+      confirmLabel: tr('Save', 'Salva'),
+      secondaryLabel: tr('Discard', 'Scarta'),
+      cancelLabel: tr('Keep editing', 'Continua a modificare'),
+    });
+    if (choice === 'confirm') onSaveDirect(buildCharacterEntity());
+    else if (choice === 'secondary') onCancel();
+  };
+
   const handleSaveDirect = () => {
     const character = buildCharacterEntity();
     onSaveDirect(character);
@@ -328,7 +357,7 @@ export const SupervisedPgCreateView: React.FC<SupervisedPgCreateViewProps> = ({
         <div className="flex items-center gap-3">
           <button
             type="button"
-            onClick={onCancel}
+            onClick={handleCancel}
             className="p-2.5 rounded-xl bg-stone-800 hover:bg-stone-700 text-stone-300 hover:text-white transition cursor-pointer flex items-center gap-1.5 text-xs font-semibold"
           >
             <ArrowLeft className="w-4 h-4" />
@@ -360,7 +389,7 @@ export const SupervisedPgCreateView: React.FC<SupervisedPgCreateViewProps> = ({
         <div className="flex flex-wrap items-center gap-2.5">
           <button
             type="button"
-            onClick={onCancel}
+            onClick={handleCancel}
             className="px-4 py-2 rounded-xl bg-stone-800 hover:bg-stone-700 text-stone-300 font-semibold text-xs transition cursor-pointer"
           >
             {tr('Cancel', 'Annulla')}

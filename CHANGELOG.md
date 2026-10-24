@@ -4,6 +4,8 @@ All notable user-facing changes to Vellum are documented in this file.
 
 ## Unreleased
 
+- Windows: Deleting an adventure, scene, encounter, character sheet, party, play instance or sound now asks for confirmation first.
+- Windows: Leaving the character sheet editor or the PC creation wizard with unsaved changes now asks whether to save, discard or keep editing.
 - Windows: Update dialog is now centered in the window and scrolls when tall, instead of being cut off at the top.
 - Windows: Character sheet editor is organised in tabs that follow the official sheet (Identity, Abilities & Skills, Combat, Senses & Proficiencies, Features & Spells, Gear & Story). New fields: size, senses and languages with one-click presets, other proficiencies, damage and condition immunities, spellcasting ability with spell DC / attack bonus, equipment, personality, ideals, bonds and flaws. All controls keep a fixed minimum size. The official PDF export includes the new fields.
 - Windows: PC creation wizard now has five steps: identity, race and class, ability scores (standard array, point buy, 4d6 roll or manual), background and skills, details and equipment. Saving throws, skills and passive perception are computed on creation.
