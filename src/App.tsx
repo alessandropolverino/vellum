@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   AdventureBlueprint,
   Campaign,
@@ -39,6 +39,9 @@ export const App: React.FC = () => {
   const [db, setDb] = useState<DndDatabase>(SEED_DATABASE);
   const [storageSource, setStorageSource] = useState<string>('Loading...');
   const [lastSaveInfo, setLastSaveInfo] = useState<string>('');
+  const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'error'>('saved');
+  const [lastSavedTime, setLastSavedTime] = useState<string>('');
+  const pendingSavesRef = useRef<number>(0);
   const [isBackupModalOpen, setIsBackupModalOpen] = useState<boolean>(false);
   const [activeTab, setActiveTab] = useState<ActiveTab>('dashboard');
 
@@ -63,6 +66,9 @@ export const App: React.FC = () => {
     storageRepository.loadDatabase().then(({ db: loaded, source }) => {
       setDb(loaded);
       setStorageSource(source);
+      if (loaded.lastSavedAt) {
+        setLastSavedTime(new Date(loaded.lastSavedAt).toLocaleTimeString(lang === 'it' ? 'it-IT' : 'en-US'));
+      }
       if (loaded.adventures[0]) setSelectedAdventureId(loaded.adventures[0].id);
       if (loaded.playInstances[0]) setActiveInstanceId(loaded.playInstances[0].id);
     });
@@ -74,6 +80,8 @@ export const App: React.FC = () => {
 
   const persistDb = (nextDb: DndDatabase) => {
     setDb(nextDb);
+    setSaveStatus('saving');
+    pendingSavesRef.current += 1;
     storageRepository.saveDatabase(nextDb).then((res) => {
       const adapterLabel =
         res.adapter === 'tauri-fs'
@@ -84,9 +92,18 @@ export const App: React.FC = () => {
       const timeLabel = new Date(res.savedAt).toLocaleTimeString(
         lang === 'it' ? 'it-IT' : 'en-US'
       );
+      pendingSavesRef.current = Math.max(0, pendingSavesRef.current - 1);
+      if (pendingSavesRef.current === 0) {
+        setSaveStatus('saved');
+      }
+      setLastSavedTime(timeLabel);
       setLastSaveInfo(
         `${tr('Saved to', 'Salvato su')} ${adapterLabel} (${timeLabel})`
       );
+    }).catch((err) => {
+      console.error('Failed to save database:', err);
+      pendingSavesRef.current = Math.max(0, pendingSavesRef.current - 1);
+      setSaveStatus('error');
     });
   };
 
@@ -397,6 +414,9 @@ export const App: React.FC = () => {
             onDeleteAdventure={handleDeleteAdventure}
             onSaveCampaign={handleSaveCampaign}
             onLaunchInstanceModal={(adv) => openLaunchInstanceModal(adv)}
+            saveStatus={saveStatus}
+            lastSavedTime={lastSavedTime}
+            lastSaveInfo={lastSaveInfo}
           />
         )}
 

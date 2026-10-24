@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   AdventureBlueprint,
   AdventureScene,
@@ -27,6 +27,10 @@ import {
   ChevronUp,
   ChevronDown,
   X,
+  CheckCircle2,
+  Loader2,
+  AlertCircle,
+  Save,
 } from 'lucide-react';
 
 interface AdventureStudioViewProps {
@@ -40,6 +44,9 @@ interface AdventureStudioViewProps {
   onDeleteAdventure: (id: string) => void;
   onSaveCampaign: (camp: Campaign) => void;
   onLaunchInstanceModal: (adventure: AdventureBlueprint) => void;
+  saveStatus?: 'saved' | 'saving' | 'error';
+  lastSavedTime?: string;
+  lastSaveInfo?: string;
 }
 
 export const AdventureStudioView: React.FC<AdventureStudioViewProps> = ({
@@ -53,6 +60,9 @@ export const AdventureStudioView: React.FC<AdventureStudioViewProps> = ({
   onDeleteAdventure,
   onSaveCampaign,
   onLaunchInstanceModal,
+  saveStatus = 'saved',
+  lastSavedTime,
+  lastSaveInfo,
 }) => {
   const { tr } = useLanguage();
   const currentAdventure =
@@ -116,6 +126,17 @@ export const AdventureStudioView: React.FC<AdventureStudioViewProps> = ({
     onSelectAdventure(newAdv.id);
     setSelectedSceneId(newAdv.scenes[0].id);
   };
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
+        e.preventDefault();
+        if (currentAdventure) onSaveAdventure(currentAdventure);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [currentAdventure, onSaveAdventure]);
+
 
   if (!currentAdventure) {
     return (
@@ -150,6 +171,43 @@ export const AdventureStudioView: React.FC<AdventureStudioViewProps> = ({
   const currentScene =
     currentAdventure.scenes.find((s) => s.id === selectedSceneId) ||
     currentAdventure.scenes[0];
+
+  const saveBadge = (
+    <button
+      type="button"
+      onClick={() => onSaveAdventure(currentAdventure)}
+      title={
+        lastSaveInfo
+          ? `${lastSaveInfo} — ${tr('Click to save again (Ctrl+S)', 'Clicca per salvare nuovamente (Ctrl+S)')}`
+          : tr(
+              'All changes are automatically saved to disk. Click to save now (Ctrl+S).',
+              'Tutte le modifiche sono salvate automaticamente su disco. Clicca per salvare adesso (Ctrl+S).'
+            )
+      }
+      className={`px-2.5 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1.5 transition select-none cursor-pointer hover:bg-stone-900 ${
+        saveStatus === 'error' ? 'text-red-300' : 'text-stone-400'
+      }`}
+    >
+      {saveStatus === 'saving' ? (
+        <>
+          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+          <span>{tr('Saving…', 'Salvataggio…')}</span>
+        </>
+      ) : saveStatus === 'error' ? (
+        <>
+          <AlertCircle className="w-3.5 h-3.5" />
+          <span>{tr('Save error — retry', 'Errore — riprova')}</span>
+        </>
+      ) : (
+        <>
+          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+          <span>
+            {lastSavedTime ? tr(`Saved ${lastSavedTime}`, `Salvato ${lastSavedTime}`) : tr('Saved', 'Salvato')}
+          </span>
+        </>
+      )}
+    </button>
+  );
 
   const updateAdventure = (patch: Partial<AdventureBlueprint>) => {
     onSaveAdventure({
@@ -314,6 +372,49 @@ export const AdventureStudioView: React.FC<AdventureStudioViewProps> = ({
           </div>
 
           <div className="flex items-center gap-2">
+            {/* Auto-save Status Badge & Manual Trigger */}
+            <button
+              type="button"
+              onClick={() => onSaveAdventure(currentAdventure)}
+              title={
+                lastSaveInfo
+                  ? `${lastSaveInfo} — ${tr('Click to save again (Ctrl+S)', 'Clicca per salvare nuovamente (Ctrl+S)')}`
+                  : tr(
+                      'All changes are automatically saved to disk. Click to save now (Ctrl+S).',
+                      'Tutte le modifiche sono salvate automaticamente su disco. Clicca per salvare adesso (Ctrl+S).'
+                    )
+              }
+              className={`px-3 py-1.5 rounded-lg border text-xs font-semibold flex items-center gap-1.5 transition select-none cursor-pointer ${
+                saveStatus === 'saving'
+                  ? 'bg-amber-950/60 border-amber-700/70 text-amber-300 animate-pulse'
+                  : saveStatus === 'error'
+                  ? 'bg-red-950/60 border-red-700/80 text-red-300 hover:bg-red-900/60'
+                  : 'bg-stone-950 border-emerald-900/60 text-emerald-400 hover:bg-stone-900 hover:border-emerald-700/70'
+              }`}
+            >
+              {saveStatus === 'saving' ? (
+                <>
+                  <Loader2 className="w-3.5 h-3.5 animate-spin text-amber-400" />
+                  <span>{tr('Saving...', 'Salvataggio in corso...')}</span>
+                </>
+              ) : saveStatus === 'error' ? (
+                <>
+                  <AlertCircle className="w-3.5 h-3.5 text-red-400" />
+                  <span>{tr('Save Error — Click to retry', 'Errore salvataggio — Clicca per riprovare')}</span>
+                </>
+              ) : (
+                <>
+                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                  <span>
+                    {lastSavedTime
+                      ? tr(`Saved (${lastSavedTime})`, `Salvato (${lastSavedTime})`)
+                      : tr('Saved', 'Salvato')}
+                  </span>
+                </>
+              )}
+            </button>
+
+            {saveBadge}
             <button
               onClick={() => onDeleteAdventure(currentAdventure.id)}
               title={tr('Delete this adventure', 'Elimina questa avventura')}
