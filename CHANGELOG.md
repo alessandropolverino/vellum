@@ -4,7 +4,9 @@ All notable user-facing changes to Vellum are documented in this file.
 
 ## Unreleased
 
-- App: Story Editor layout. The Sounds / Encounters / NPCs panel now sits under the scenes list in a fixed-width left column (scrolling internally), so the Markdown source and Page preview get the full remaining width.
+## Windows 0.1.1 — 2026-10-24
+
+- Windows: Story Editor layout. The Sounds / Encounters / NPCs panel now sits under the scenes list in a fixed-width left column (scrolling internally), so the Markdown source and Page preview get the full remaining width.
 
 ## Windows 0.1.0 — 2026-10-24
 

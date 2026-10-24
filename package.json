@@ -1,7 +1,7 @@
 {
   "name": "vellum",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Vellum — D&D 5e Campaign & One-Shot Manager with Homebrewery-style editor, Multi-instance runs, Combat Tracker & SFX Soundboard",
   "type": "module",
   "bin": {
