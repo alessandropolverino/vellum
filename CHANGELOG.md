@@ -4,6 +4,8 @@ All notable user-facing changes to Vellum are documented in this file.
 
 ## Unreleased
 
+- App: Story Editor layout. The Sounds / Encounters / NPCs panel now sits under the scenes list in a fixed-width left column (scrolling internally), so the Markdown source and Page preview get the full remaining width.
+
 ## Windows 0.1.0 — 2026-10-24
 
 - Windows: In-app updates. The app checks GitHub Releases a few seconds after launch and shows a dot on the new download icon in the header when a newer version exists; the dialog shows the release notes, takes an automatic data backup, then downloads the signed installer and restarts the app. You can also check manually at any time. Pre-release builds (`-rc`) are never offered.
