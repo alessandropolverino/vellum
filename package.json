@@ -12,9 +12,13 @@
     "build": "tsc -b && vite build",
     "preview": "vite preview",
     "tauri": "tauri",
-    "cli": "node bin/vellum.mjs"
+    "cli": "node bin/vellum.mjs",
+    "release:bump": "node scripts/bump-version.mjs"
   },
   "dependencies": {
+    "@tauri-apps/api": "^2.12.4",
+    "@tauri-apps/plugin-process": "^2.4.0",
+    "@tauri-apps/plugin-updater": "^2.14.0",
     "lucide-react": "^1.16.0",
     "pdf-lib": "^1.17.1",
     "react": "^19.0.0",

@@ -115,6 +115,10 @@ npm run cli -- db validate --json
 
 ## Releases
 
+Installers are published on [GitHub Releases](https://github.com/alessandropolverino/vellum/releases). The desktop app updates itself from there: updates are signed, and a data backup is taken before each install.
+
+**Cutting a release** (maintainers): `npm run release:bump -- X.Y.Z` on the release PR (`dev` → `main`), merge it, then push the tag `windows-vX.Y.Z` on `main`. The `Windows release` workflow builds, signs and publishes the installer and `latest.json`. It needs the repository secrets `TAURI_SIGNING_PRIVATE_KEY` and `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`; keep a backup of that key, because without it installed apps can no longer be updated.
+
 | Version | Date | Platform | Notes |
 | :--- | :--- | :--- | :--- |
 | *Unreleased* | — | Windows / macOS | [CHANGELOG.md](./CHANGELOG.md) |

@@ -33,6 +33,23 @@
       "icons/128x128@2x.png",
       "icons/icon.icns",
       "icons/icon.ico"
-    ]
+    ],
+    "createUpdaterArtifacts": true,
+    "windows": {
+      "nsis": {
+        "installMode": "currentUser"
+      }
+    }
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEQzRUIyRkMyODhFNUJCM0UKUldRK3UrV0l3aS9yMHhnQ3Z1dHJkNGZMek56eVc5U1ZGUzduUkVoZGpLakFUZ2tSQ2Y3OEdNaysK",
+      "endpoints": [
+        "https://github.com/alessandropolverino/vellum/releases/latest/download/latest.json"
+      ],
+      "windows": {
+        "installMode": "passive"
+      }
+    }
   }
 }

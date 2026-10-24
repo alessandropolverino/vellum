@@ -1,0 +1,73 @@
+name: Windows release
+
+# Tag `windows-vX.Y.Z` on `main` to publish a release; `windows-vX.Y.Z-rc.N` publishes a pre-release.
+# Pre-releases are never offered by the in-app updater (it follows `releases/latest`).
+on:
+  push:
+    tags:
+      - 'windows-v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check tag matches app version
+        shell: bash
+        run: |
+          TAG_VERSION="${GITHUB_REF_NAME#windows-v}"
+          APP_VERSION=$(node -p "require('./src-tauri/tauri.conf.json').version")
+          PKG_VERSION=$(node -p "require('./package.json').version")
+          CARGO_VERSION=$(grep -m1 '^version' src-tauri/Cargo.toml | sed 's/.*"\(.*\)"/\1/')
+          BASE_VERSION="${TAG_VERSION%%-*}"
+          echo "tag=$TAG_VERSION tauri.conf=$APP_VERSION package.json=$PKG_VERSION Cargo.toml=$CARGO_VERSION"
+          for v in "$APP_VERSION" "$PKG_VERSION" "$CARGO_VERSION"; do
+            if [ "$v" != "$TAG_VERSION" ] && [ "$v" != "$BASE_VERSION" ]; then
+              echo "::error::Version mismatch: tag is $TAG_VERSION but a version file says $v"
+              exit 1
+            fi
+          done
+
+      - name: Extract release notes from CHANGELOG
+        shell: bash
+        run: |
+          VERSION="${GITHUB_REF_NAME#windows-v}"
+          BASE="${VERSION%%-*}"
+          awk -v v="$BASE" '
+            /^## / { if (found) exit; if (index($0, v)) { found = 1; next } }
+            found { print }
+          ' CHANGELOG.md > release-notes.md
+          if [ ! -s release-notes.md ]; then
+            echo "See [CHANGELOG.md](https://github.com/${GITHUB_REPOSITORY}/blob/main/CHANGELOG.md)." > release-notes.md
+          fi
+          cat release-notes.md
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - run: npm ci
+
+      - uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        with:
+          tagName: ${{ github.ref_name }}
+          releaseName: Vellum ${{ github.ref_name }}
+          releaseBodyPath: release-notes.md
+          releaseDraft: false
+          prerelease: ${{ contains(github.ref_name, '-rc') }}
+          uploadUpdaterJson: true
