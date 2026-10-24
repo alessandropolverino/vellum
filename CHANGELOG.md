@@ -4,6 +4,10 @@ All notable user-facing changes to Vellum are documented in this file.
 
 ## Unreleased
 
+- Windows: Update dialog is now centered in the window and scrolls when tall, instead of being cut off at the top.
+- Windows: Character sheet editor is organised in tabs that follow the official sheet (Identity, Abilities & Skills, Combat, Senses & Proficiencies, Features & Spells, Gear & Story). New fields: size, senses and languages with one-click presets, other proficiencies, damage and condition immunities, spellcasting ability with spell DC / attack bonus, equipment, personality, ideals, bonds and flaws. All controls keep a fixed minimum size. The official PDF export includes the new fields.
+- Windows: PC creation wizard now has five steps: identity, race and class, ability scores (standard array, point buy, 4d6 roll or manual), background and skills, details and equipment. Saving throws, skills and passive perception are computed on creation.
+
 ## Windows 0.1.1 — 2026-10-24
 
 - Windows: Story Editor layout. The Sounds / Encounters / NPCs panel now sits under the scenes list in a fixed-width left column (scrolling internally), so the Markdown source and Page preview get the full remaining width.

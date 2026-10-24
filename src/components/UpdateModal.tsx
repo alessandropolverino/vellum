@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { ArrowDownCircle, CheckCircle2, Loader2, RefreshCw, X, AlertTriangle } from 'lucide-react';
+import { createPortal } from 'react-dom';
 import type { Update } from '@tauri-apps/plugin-updater';
 import { useLanguage } from '../i18n/LanguageContext';
 import { storageRepository } from '../services/storageRepository';
@@ -97,9 +98,9 @@ export const UpdateControl: React.FC = () => {
         {hasUpdate && <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-amber-500" />}
       </button>
 
-      {isOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-          <div className="w-full max-w-md rounded-xl border border-stone-800 bg-stone-950 p-5 shadow-xl">
+      {isOpen && createPortal(
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 p-4">
+          <div className="w-full max-w-md max-h-[calc(100vh-2rem)] overflow-y-auto rounded-xl border border-stone-800 bg-stone-950 p-5 shadow-xl">
             <div className="flex items-start justify-between mb-3">
               <h2 className="text-base font-semibold text-stone-100">{tr('Updates', 'Aggiornamenti')}</h2>
               <button
@@ -136,7 +137,7 @@ export const UpdateControl: React.FC = () => {
                   {tr(`Version ${update.version} is available.`, `È disponibile la versione ${update.version}.`)}
                 </p>
                 {update.body && (
-                  <pre className="max-h-40 overflow-auto whitespace-pre-wrap rounded-lg bg-stone-900 p-3 text-xs text-stone-400">
+                  <pre className="max-h-[40vh] overflow-auto whitespace-pre-wrap rounded-lg bg-stone-900 p-3 text-xs text-stone-400">
                     {update.body}
                   </pre>
                 )}
@@ -190,7 +191,8 @@ export const UpdateControl: React.FC = () => {
               </button>
             )}
           </div>
-        </div>
+        </div>,
+        document.body,
       )}
     </>
   );
