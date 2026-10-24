@@ -12,6 +12,7 @@ import {
   formatProficientSavesSummary,
   formatProficientSkillsSummary,
   formatSignedBonus,
+  getModValue,
   getProficiencyBonus,
   getSavingThrowTotalBonus,
   getSkillTotalBonus,
@@ -20,6 +21,7 @@ import {
   resolveSkillProficiencies,
 } from '../types/dnd';
 import { useLanguage } from '../i18n/LanguageContext';
+import { useDialogs } from './ConfirmDialog';
 import { StatblockCard } from './StatblockCard';
 import {
   validatePgCombination,
@@ -28,6 +30,30 @@ import {
   applyStandardTemplate,
   parsePgLevel,
 } from '../data/dnd5eRules';
+import {
+  ALIGNMENT_OPTIONS,
+  BACKGROUND_OPTIONS,
+  DAMAGE_PRESETS,
+  LANGUAGE_PRESETS,
+  SENSE_PRESETS,
+  SIZE_OPTIONS,
+  SPELLCASTING_ABILITIES,
+  localizeSize,
+} from '../data/sheetOptions';
+import {
+  ChipField,
+  Field,
+  ListEditor,
+  NextButton,
+  ReadOnlyStat,
+  SHEET_TABS,
+  SheetTabId,
+  cardCls,
+  cardTitleCls,
+  inputCls,
+  numCls,
+  presetCls,
+} from './sheetFields';
 import { downloadOfficialCharacterPdf } from '../services/pdfExporter';
 import {
   ArrowLeft,
@@ -64,13 +90,19 @@ export const FullPageCharacterEditor: React.FC<FullPageCharacterEditorProps> = (
 }) => {
   const { lang, tr } = useLanguage();
 
+  const { ask } = useDialogs();
   const [editingChar, setEditingChar] = useState<CharacterEntity>(structuredClone(initialChar));
   const [masterOverrideAccepted, setMasterOverrideAccepted] = useState(false);
   const [showWarningConfirmation, setShowWarningConfirmation] = useState(false);
   const [showStatblockPreview, setShowStatblockPreview] = useState(true);
+  const [tab, setTab] = useState<SheetTabId>('identity');
 
   const isPc = editingChar.kind === 'pc';
   const isBlueprint = isPcBlueprint(editingChar);
+
+  const patch = (changes: Partial<CharacterEntity>) =>
+    setEditingChar((prev) => ({ ...prev, ...changes }));
+  const apply = (next: CharacterEntity) => setEditingChar(syncSkillAndSaveStrings(next));
 
   const syncSkillAndSaveStrings = (nextChar: CharacterEntity): CharacterEntity => {
     const savesSummary = formatProficientSavesSummary(nextChar, lang);
@@ -163,7 +195,35 @@ export const FullPageCharacterEditor: React.FC<FullPageCharacterEditorProps> = (
     onSave(editingChar);
   };
 
+  const isDirty = JSON.stringify(editingChar) !== JSON.stringify(initialChar);
+
+  const handleCancel = async () => {
+    if (!isDirty) {
+      onCancel();
+      return;
+    }
+    const choice = await ask({
+      title: tr('Save your changes?', 'Salvare le modifiche?'),
+      message: tr(
+        'This sheet has unsaved changes. If you leave without saving, they will be lost.',
+        'Questa scheda ha modifiche non salvate. Se esci senza salvare andranno perse.'
+      ),
+      confirmLabel: tr('Save', 'Salva'),
+      secondaryLabel: tr('Discard', 'Scarta'),
+      cancelLabel: tr('Keep editing', 'Continua a modificare'),
+    });
+    if (choice === 'confirm') handleSaveClick();
+    else if (choice === 'secondary') onCancel();
+  };
+
   const validation = validatePgCombination(editingChar, lang);
+  const spellStats = editingChar.spellcastingAbility
+    ? (() => {
+        const mod = getModValue(editingChar.abilities[editingChar.spellcastingAbility]);
+        const pb = getProficiencyBonus(editingChar);
+        return { dc: 8 + pb + mod, attack: pb + mod };
+      })()
+    : null;
   const hasAdvisories = isPc && validation.advisories.length > 0;
 
   return (
@@ -173,7 +233,7 @@ export const FullPageCharacterEditor: React.FC<FullPageCharacterEditorProps> = (
         <div className="flex items-center gap-3">
           <button
             type="button"
-            onClick={onCancel}
+            onClick={handleCancel}
             className="p-2.5 rounded-xl bg-stone-800 hover:bg-stone-700 text-stone-300 hover:text-white transition cursor-pointer flex items-center gap-1.5 text-xs font-semibold"
           >
             <ArrowLeft className="w-4 h-4" />
@@ -259,7 +319,7 @@ export const FullPageCharacterEditor: React.FC<FullPageCharacterEditorProps> = (
 
           <button
             type="button"
-            onClick={onCancel}
+            onClick={handleCancel}
             className="px-3.5 py-2 rounded-xl bg-stone-800 hover:bg-stone-700 text-stone-300 text-xs font-semibold cursor-pointer transition"
           >
             {tr('Cancel', 'Annulla')}
@@ -420,58 +480,85 @@ export const FullPageCharacterEditor: React.FC<FullPageCharacterEditorProps> = (
             </div>
           )}
 
-          {/* Section: General Info & Identity */}
-          <div className="bg-stone-900/80 border border-stone-800 p-5 rounded-2xl space-y-4">
-            <h3 className="font-header text-sm font-bold text-amber-400">
-              {tr('General Info & Character Identity', 'Anagrafica & Identità del Personaggio')}
-            </h3>
+          {/* Section tabs (mirrors the pages of the official sheet) */}
+          <div
+            role="tablist"
+            className="flex flex-wrap gap-1.5 p-1.5 rounded-2xl bg-stone-900/80 border border-stone-800"
+          >
+            {SHEET_TABS.map((t, i) => (
+              <button
+                key={t.id}
+                type="button"
+                role="tab"
+                aria-selected={tab === t.id}
+                onClick={() => setTab(t.id)}
+                className={`flex-1 min-w-[7.5rem] px-3 py-2 rounded-xl text-xs font-bold transition cursor-pointer ${
+                  tab === t.id
+                    ? 'bg-amber-600 text-stone-950 shadow'
+                    : 'text-stone-300 hover:bg-stone-800'
+                }`}
+              >
+                <span className="opacity-60 mr-1">{i + 1}.</span>
+                {tr(t.en, t.it)}
+              </button>
+            ))}
+          </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div>
-                <label className="block text-stone-400 mb-1 font-semibold">
-                  {tr('Category', 'Categoria')}
-                </label>
-                <select
-                  value={editingChar.kind}
-                  onChange={(e) =>
-                    setEditingChar({ ...editingChar, kind: e.target.value as EntityKind })
+          {/* TAB 1: Identity */}
+          {tab === 'identity' && (
+            <div className={cardCls}>
+              <h3 className={cardTitleCls}>{tr('Identity', 'Identità')}</h3>
+
+              <div className="grid grid-cols-[repeat(auto-fit,minmax(14rem,1fr))] gap-4">
+                <Field label={tr('Category', 'Categoria')}>
+                  <select
+                    value={editingChar.kind}
+                    onChange={(e) => patch({ kind: e.target.value as EntityKind })}
+                    className={`${inputCls} font-semibold`}
+                  >
+                    <option value="pc">{tr('PC (Player / Pre-Gen)', 'PG (Giocatore / Pre-Gen)')}</option>
+                    <option value="npc">{tr('NPC (Ally / NPC)', 'NPC (Alleato / PNG)')}</option>
+                    <option value="monster">{tr('Monster / Boss', 'Mostro / Boss')}</option>
+                  </select>
+                </Field>
+                <Field label={tr('Full Name', 'Nome Completo')}>
+                  <input
+                    type="text"
+                    value={editingChar.name}
+                    onChange={(e) => patch({ name: e.target.value })}
+                    className={`${inputCls} font-bold text-sm`}
+                  />
+                </Field>
+                <Field
+                  label={
+                    isPc
+                      ? tr('Player Name (Optional)', 'Nome Giocatore (Opzionale)')
+                      : tr('Narrative Role / Title', 'Ruolo Narrativo / Titolo')
                   }
-                  className="w-full px-3 py-2 rounded-xl bg-stone-950 border border-stone-700 text-stone-100 font-semibold"
                 >
-                  <option value="pc">{tr('PC (Player / Pre-Gen)', 'PG (Giocatore / Pre-Gen)')}</option>
-                  <option value="npc">{tr('NPC (Ally / NPC)', 'NPC (Alleato / PNG)')}</option>
-                  <option value="monster">{tr('Monster / Boss', 'Mostro / Boss')}</option>
-                </select>
+                  <input
+                    type="text"
+                    value={editingChar.playerOrRole}
+                    disabled={isPc && Boolean(editingChar.isPreGenBlueprint)}
+                    placeholder={isPc ? tr('Unassigned (Pre-Gen)', 'Non assegnato (Pre-Gen)') : ''}
+                    onChange={(e) => patch({ playerOrRole: e.target.value })}
+                    className={`${inputCls} disabled:opacity-50`}
+                  />
+                </Field>
               </div>
 
-              <div className="md:col-span-2">
-                <label className="block text-stone-400 mb-1 font-semibold">
-                  {tr('Full Name', 'Nome Completo')}
-                </label>
-                <input
-                  type="text"
-                  value={editingChar.name}
-                  onChange={(e) => setEditingChar({ ...editingChar, name: e.target.value })}
-                  className="w-full px-3 py-2 rounded-xl bg-stone-950 border border-stone-700 text-stone-100 font-bold text-sm"
-                />
-              </div>
-            </div>
-
-            {/* PC Blueprint Toggle */}
-            {isPc && (
-              <div className="p-3.5 rounded-xl bg-stone-950 border border-amber-500/30 flex flex-wrap items-center justify-between gap-3">
-                <label className="flex items-center gap-2.5 cursor-pointer">
+              {isPc && (
+                <label className="p-3.5 rounded-xl bg-stone-950 border border-amber-500/30 flex items-start gap-2.5 cursor-pointer">
                   <input
                     type="checkbox"
                     checked={Boolean(editingChar.isPreGenBlueprint)}
                     onChange={(e) =>
-                      setEditingChar({
-                        ...editingChar,
+                      patch({
                         isPreGenBlueprint: e.target.checked,
                         playerOrRole: e.target.checked ? '' : editingChar.playerOrRole,
                       })
                     }
-                    className="accent-amber-500 w-4 h-4"
+                    className="accent-amber-500 w-4 h-4 mt-0.5 shrink-0"
                   />
                   <div>
                     <div className="font-bold text-amber-300 text-xs">
@@ -488,609 +575,601 @@ export const FullPageCharacterEditor: React.FC<FullPageCharacterEditorProps> = (
                     </div>
                   </div>
                 </label>
-              </div>
-            )}
+              )}
 
-            {/* Portrait / Illustration */}
-            <div className="p-3.5 rounded-xl bg-stone-950 border border-stone-800 space-y-2">
-              <div className="flex items-center justify-between">
-                <label className="font-semibold text-amber-400 flex items-center gap-1.5">
-                  <ImagePlus className="w-4 h-4" />
-                  {tr(
-                    'Portrait / Illustration (PC, NPC, Monster/Boss)',
-                    'Immagine / Ritratto (PG, NPC, Mostro/Boss)'
-                  )}
-                </label>
-                {editingChar.portraitUrl && (
-                  <button
-                    type="button"
-                    onClick={() => setEditingChar({ ...editingChar, portraitUrl: undefined })}
-                    className="text-[11px] text-red-400 hover:underline"
-                  >
-                    {tr('Remove Image', 'Rimuovi Immagine')}
-                  </button>
-                )}
-              </div>
-              <div className="flex flex-wrap items-center gap-3">
-                {editingChar.portraitUrl && (
-                  <img
-                    src={editingChar.portraitUrl}
-                    alt="Portrait preview"
-                    className="w-16 h-16 rounded-xl object-cover border border-amber-500/50 shrink-0"
-                  />
-                )}
-                <label className="px-3.5 py-2 rounded-xl bg-stone-800 hover:bg-stone-700 text-amber-300 font-semibold cursor-pointer border border-stone-700 text-xs transition">
-                  {tr('Upload Image File...', 'Carica File Immagine...')}
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={handlePortraitUpload}
-                    className="hidden"
-                  />
-                </label>
-                <input
-                  type="text"
-                  value={editingChar.portraitUrl || ''}
-                  onChange={(e) =>
-                    setEditingChar({ ...editingChar, portraitUrl: e.target.value || undefined })
-                  }
-                  placeholder={tr(
-                    'Or paste image URL / DataURL...',
-                    'Oppure incolla URL immagine / DataURL...'
-                  )}
-                  className="flex-1 min-w-[200px] px-3 py-2 rounded-xl bg-stone-900 border border-stone-700 text-stone-200 text-xs"
-                />
-              </div>
-            </div>
-
-            {/* Row: Player Name, Level/CR with Level Up Button, Background */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div>
-                <label className="block text-stone-400 mb-1 font-semibold">
-                  {isPc
-                    ? tr('Player Name (Optional)', 'Nome Giocatore (Opzionale)')
-                    : tr('Narrative Role / Title', 'Ruolo Narrativo / Titolo')}
-                </label>
-                <input
-                  type="text"
-                  value={editingChar.playerOrRole}
-                  disabled={isPc && Boolean(editingChar.isPreGenBlueprint)}
-                  placeholder={
-                    isPc
-                      ? tr('Unassigned (Pre-Gen)', 'Non assegnato (Pre-Gen)')
-                      : ''
-                  }
-                  onChange={(e) =>
-                    setEditingChar({ ...editingChar, playerOrRole: e.target.value })
-                  }
-                  className="w-full px-3 py-2 rounded-xl bg-stone-950 border border-stone-700 text-stone-200 disabled:opacity-50"
-                />
-              </div>
-
-              <div>
-                <label className="block text-stone-400 mb-1 font-semibold">
-                  {tr('Level (PC) or CR', 'Livello (PG) o GS')}
-                </label>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="text"
-                    value={editingChar.levelOrCr}
-                    onChange={(e) => {
-                      const updated = { ...editingChar, levelOrCr: e.target.value };
-                      setEditingChar(syncSkillAndSaveStrings(updated));
-                    }}
-                    className="w-full px-3 py-2 rounded-xl bg-stone-950 border border-stone-700 text-stone-200 font-bold"
-                  />
-                  {isPc && (
-                    <button
-                      type="button"
-                      onClick={() => onLevelUp(editingChar)}
-                      className="px-3 py-2 rounded-xl bg-purple-700 hover:bg-purple-600 text-purple-100 text-xs font-bold flex items-center gap-1 shrink-0 transition shadow cursor-pointer"
-                      title={tr('Level Up', 'Passaggio di Livello')}
-                    >
-                      <TrendingUp className="w-3.5 h-3.5" />
-                      <span className="hidden sm:inline">{tr('Level Up', 'Livello')}</span> ▲
-                    </button>
-                  )}
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-stone-400 mb-1 font-semibold">
-                  {tr('Background (5e)', 'Background (5e)')}
-                </label>
-                <input
-                  type="text"
-                  value={editingChar.background || ''}
-                  onChange={(e) =>
-                    setEditingChar({ ...editingChar, background: e.target.value })
-                  }
-                  placeholder={tr('e.g. Noble, Sage, Soldier', 'es. Nobile, Sapiente, Soldato')}
-                  className="w-full px-3 py-2 rounded-xl bg-stone-950 border border-stone-700 text-stone-200"
-                />
-              </div>
-            </div>
-
-            {/* Row: Race, Class, Alignment (With clean non-overlapping preset dropdowns!) */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {/* Race / Species */}
-              <div>
-                <label className="block text-stone-400 mb-1 font-semibold">
-                  {tr('Race / Species', 'Razza / Specie')}
-                </label>
-                <div className="flex flex-col sm:flex-row gap-1.5">
-                  <input
-                    type="text"
-                    value={editingChar.creatureType}
-                    onChange={(e) =>
-                      setEditingChar({ ...editingChar, creatureType: e.target.value })
-                    }
-                    placeholder={
-                      isPc
-                        ? tr('e.g. Elf, Human...', 'es. Elfo, Umano...')
-                        : tr('e.g. Humanoid, Fiend', 'es. Umanoide, Immondo')
-                    }
-                    className="w-full px-3 py-2 rounded-xl bg-stone-950 border border-stone-700 text-stone-200"
-                  />
-                  {isPc && (
-                    <select
-                      value=""
-                      onChange={(e) => {
-                        if (!e.target.value) return;
-                        const r = STANDARD_RACES.find((rc) => rc.id === e.target.value);
-                        if (r) {
-                          const updated = applyStandardTemplate(editingChar, {
-                            raceDef: r,
-                            lang,
-                          });
-                          setEditingChar(syncSkillAndSaveStrings(updated));
-                        }
-                      }}
-                      className="px-2.5 py-2 rounded-xl bg-stone-900 border border-amber-500/40 text-amber-300 text-xs shrink-0 cursor-pointer hover:border-amber-400"
-                      title={tr('Apply 5e standard race traits & stats', 'Applica tratti e statistiche della razza standard 5e')}
-                    >
-                      <option value="">{tr('5e Preset...', 'Preimpostati 5e...')}</option>
-                      {STANDARD_RACES.map((r) => (
-                        <option key={r.id} value={r.id}>
-                          {lang === 'it' ? r.nameIt : r.nameEn}
-                        </option>
-                      ))}
-                    </select>
-                  )}
-                </div>
-              </div>
-
-              {/* Class / Archetype */}
-              <div>
-                <label className="block text-stone-400 mb-1 font-semibold">
-                  {tr('Class / Archetype', 'Classe / Archetipo')}
-                </label>
-                <div className="flex flex-col sm:flex-row gap-1.5">
-                  <input
-                    type="text"
-                    value={editingChar.classOrArchetype || ''}
-                    onChange={(e) =>
-                      setEditingChar({ ...editingChar, classOrArchetype: e.target.value })
-                    }
-                    placeholder={tr('e.g. Fighter, Wizard...', 'es. Guerriero, Mago...')}
-                    className="w-full px-3 py-2 rounded-xl bg-stone-950 border border-stone-700 text-stone-200"
-                  />
-                  {isPc && (
-                    <select
-                      value=""
-                      onChange={(e) => {
-                        if (!e.target.value) return;
-                        const c = STANDARD_CLASSES.find((cl) => cl.id === e.target.value);
-                        if (c) {
-                          const lv = parsePgLevel(editingChar.levelOrCr);
-                          const updated = applyStandardTemplate(editingChar, {
-                            classDef: c,
-                            level: lv,
-                            lang,
-                          });
-                          setEditingChar(syncSkillAndSaveStrings(updated));
-                        }
-                      }}
-                      className="px-2.5 py-2 rounded-xl bg-stone-900 border border-amber-500/40 text-amber-300 text-xs shrink-0 cursor-pointer hover:border-amber-400"
-                      title={tr('Apply 5e standard class features & hit dice', 'Applica capacità di classe e dadi vita standard 5e')}
-                    >
-                      <option value="">{tr('5e Preset...', 'Preimpostati 5e...')}</option>
-                      {STANDARD_CLASSES.map((c) => (
-                        <option key={c.id} value={c.id}>
-                          {lang === 'it' ? c.nameIt : c.nameEn}
-                        </option>
-                      ))}
-                    </select>
-                  )}
-                </div>
-              </div>
-
-              {/* Alignment */}
-              <div>
-                <label className="block text-stone-400 mb-1 font-semibold">
-                  {tr('Alignment', 'Allineamento')}
-                </label>
-                <input
-                  type="text"
-                  value={editingChar.alignment}
-                  onChange={(e) =>
-                    setEditingChar({ ...editingChar, alignment: e.target.value })
-                  }
-                  placeholder={tr('e.g. Lawful Good, Chaotic Neutral', 'es. Legale Buono, Caotico Neutrale')}
-                  className="w-full px-3 py-2 rounded-xl bg-stone-950 border border-stone-700 text-stone-200"
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* Section: Combat Vitals */}
-          <div className="bg-stone-900/80 border border-stone-800 p-5 rounded-2xl space-y-3">
-            <h3 className="font-header text-sm font-bold text-amber-400">
-              {tr('Combat Vitals', 'Parametri di Combattimento')}
-            </h3>
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3 bg-stone-950 p-4 rounded-xl border border-stone-800">
-              <div>
-                <label className="block text-stone-400 mb-1 font-semibold">
-                  {tr('Armor Class', 'Classe Armat. (CA)')}
-                </label>
-                <input
-                  type="number"
-                  value={editingChar.ac}
-                  onChange={(e) =>
-                    setEditingChar({ ...editingChar, ac: Number(e.target.value) })
-                  }
-                  className="w-full px-2.5 py-1.5 rounded-lg bg-stone-900 border border-stone-700 text-amber-300 font-bold text-center"
-                />
-              </div>
-
-              <div>
-                <label className="block text-stone-400 mb-1 font-semibold">
-                  {tr('Max HP', 'PF Massimi')}
-                </label>
-                <input
-                  type="number"
-                  value={editingChar.hpMax}
-                  onChange={(e) =>
-                    setEditingChar({ ...editingChar, hpMax: Number(e.target.value) })
-                  }
-                  className="w-full px-2.5 py-1.5 rounded-lg bg-stone-900 border border-stone-700 text-emerald-400 font-bold text-center"
-                />
-              </div>
-
-              <div>
-                <label className="block text-stone-400 mb-1 font-semibold">
-                  {tr('Hit Dice Formula', 'Formula Dadi Vita')}
-                </label>
-                <input
-                  type="text"
-                  value={editingChar.hitDiceFormula}
-                  onChange={(e) =>
-                    setEditingChar({ ...editingChar, hitDiceFormula: e.target.value })
-                  }
-                  className="w-full px-2.5 py-1.5 rounded-lg bg-stone-900 border border-stone-700 text-stone-200 text-center font-mono"
-                />
-              </div>
-
-              <div>
-                <label className="block text-stone-400 mb-1 font-semibold">
-                  {tr('Initiative Bonus', 'Bonus Iniziativa')}
-                </label>
-                <input
-                  type="number"
-                  value={editingChar.initiativeBonus}
-                  onChange={(e) =>
-                    setEditingChar({
-                      ...editingChar,
-                      initiativeBonus: Number(e.target.value),
-                    })
-                  }
-                  className="w-full px-2.5 py-1.5 rounded-lg bg-stone-900 border border-stone-700 text-stone-200 text-center"
-                />
-              </div>
-
-              <div>
-                <label className="block text-stone-400 mb-1 font-semibold">
-                  {tr('Passive Perception', 'Percezione Passiva')}
-                </label>
-                <input
-                  type="number"
-                  value={editingChar.passivePerception}
-                  onChange={(e) =>
-                    setEditingChar({
-                      ...editingChar,
-                      passivePerception: Number(e.target.value),
-                    })
-                  }
-                  className="w-full px-2.5 py-1.5 rounded-lg bg-stone-900 border border-stone-700 text-stone-200 text-center"
-                />
-              </div>
-
-              <div>
-                <label className="block text-stone-400 mb-1 font-semibold">
-                  {tr('Speed', 'Velocità')}
-                </label>
-                <input
-                  type="text"
-                  value={editingChar.speed}
-                  onChange={(e) =>
-                    setEditingChar({ ...editingChar, speed: e.target.value })
-                  }
-                  placeholder={tr('30 ft.', '9m')}
-                  className="w-full px-2.5 py-1.5 rounded-lg bg-stone-900 border border-stone-700 text-stone-200 text-center"
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* Section: 6 Ability Scores */}
-          <div className="bg-stone-900/80 border border-stone-800 p-5 rounded-2xl space-y-3">
-            <div className="flex items-center justify-between">
-              <h3 className="font-header text-sm font-bold text-amber-400">
-                {tr(
-                  'D&D 5e Ability Scores',
-                  'Caratteristiche D&D 5e'
-                )}
-              </h3>
-              <span className="text-[11px] text-stone-400">
-                {tr('Auto-calculates saving throws and all 18 skill bonuses', 'Aggiorna in automatico tutti i tiri salvezza e le 18 abilità')}
-              </span>
-            </div>
-
-            <div className="grid grid-cols-3 sm:grid-cols-6 gap-3">
-              {DND_ABILITY_META.map((ab) => (
-                <div
-                  key={ab.key}
-                  className="bg-stone-950 p-3 rounded-xl border border-stone-800 text-center shadow-inner"
-                >
-                  <div className="text-xs font-extrabold text-amber-400 uppercase">
-                    {lang === 'it' ? ab.shortIt : ab.shortEn}
-                  </div>
-                  <input
-                    type="number"
-                    value={editingChar.abilities[ab.key]}
-                    onChange={(e) => updateAbility(ab.key, Number(e.target.value))}
-                    className="w-full mt-1.5 text-center py-1.5 rounded-lg bg-stone-900 border border-stone-700 text-stone-100 font-bold text-base"
-                  />
-                  <div className="text-xs font-mono text-amber-300 font-semibold mt-1">
-                    {formatMod(editingChar.abilities[ab.key])}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Section: Interactive Saving Throws & All 18 Skills Editor */}
-          <div className="bg-stone-900/80 border border-stone-800 p-5 rounded-2xl space-y-4">
-            <div className="flex items-center justify-between border-b border-stone-800 pb-3">
-              <span className="font-header font-bold text-amber-400 text-sm">
-                {tr(
-                  `All 18 Skills & Saving Throws (Proficiency Bonus: +${getProficiencyBonus(
-                    editingChar
-                  )})`,
-                  `Tutte le 18 Abilità & Tiri Salvezza (Bonus Competenza: +${getProficiencyBonus(
-                    editingChar
-                  )})`
-                )}
-              </span>
-              <span className="text-[11px] text-stone-400">
-                {tr(
-                  'Click a skill to cycle: None (○) → Proficient (●) → Expertise (◆)',
-                  'Clicca un’abilità per ciclare: Base (○) → Competenza (●) → Maestria (◆)'
-                )}
-              </span>
-            </div>
-
-            {/* 6 Saving Throws toggles */}
-            <div>
-              <div className="text-xs font-bold uppercase text-stone-400 mb-2">
-                {tr('Saving Throws', 'Tiri Salvezza')}
-              </div>
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2">
-                {DND_ABILITY_META.map((ab) => {
-                  const { total, proficient } = getSavingThrowTotalBonus(
-                    editingChar,
-                    ab.key
-                  );
-                  return (
-                    <button
-                      key={ab.key}
-                      type="button"
-                      onClick={() => toggleSaveProficiency(ab.key)}
-                      className={`px-3 py-2 rounded-xl border text-xs flex items-center justify-between transition cursor-pointer ${
-                        proficient
-                          ? 'bg-amber-600/20 border-amber-500 text-amber-200 font-bold shadow'
-                          : 'bg-stone-950 border-stone-800 text-stone-400 hover:border-stone-700'
-                      }`}
-                    >
-                      <span>
-                        {proficient ? '● ' : '○ '}
-                        {lang === 'it' ? ab.shortIt : ab.shortEn}
-                      </span>
-                      <span className="font-mono font-bold">{formatSignedBonus(total)}</span>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* 18 Skills interactive buttons */}
-            <div>
-              <div className="text-xs font-bold uppercase text-stone-400 mb-2">
-                {tr('All 18 D&D 5e Skills', 'Tutte le 18 Abilità D&D 5e')}
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
-                {DND_SKILLS.map((sk) => {
-                  const { total, rank } = getSkillTotalBonus(editingChar, sk.id);
-                  const abMeta = DND_ABILITY_META.find((a) => a.key === sk.ability)!;
-                  const abShort = lang === 'it' ? abMeta.shortIt : abMeta.shortEn;
-                  const icon = rank === 2 ? '◆' : rank === 1 ? '●' : '○';
-                  return (
-                    <button
-                      key={sk.id}
-                      type="button"
-                      onClick={() => cycleSkillProficiency(sk.id)}
-                      className={`px-3 py-2 rounded-xl border text-left text-xs flex items-center justify-between transition cursor-pointer ${
-                        rank === 2
-                          ? 'bg-purple-600/25 border-purple-400 text-purple-200 font-bold shadow'
-                          : rank === 1
-                          ? 'bg-amber-600/20 border-amber-500 text-amber-200 font-bold shadow'
-                          : 'bg-stone-950 border-stone-800 text-stone-300 hover:border-stone-700'
-                      }`}
-                    >
-                      <span className="truncate">
-                        <span className="mr-1.5">{icon}</span>
-                        {lang === 'it' ? sk.labelIt : sk.labelEn}{' '}
-                        <span className="text-[10px] opacity-60">({abShort})</span>
-                      </span>
-                      <span className="font-mono font-bold ml-1">{formatSignedBonus(total)}</span>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          </div>
-
-          {/* Section: Traits & Special Abilities */}
-          <div className="bg-stone-900/80 border border-stone-800 p-5 rounded-2xl space-y-3">
-            <div className="flex items-center justify-between">
-              <span className="font-header font-bold text-amber-400 text-sm">
-                {tr('Traits & Special Features', 'Tratti & Capacità Speciali')}
-              </span>
-              <button
-                type="button"
-                onClick={() => addListEntry('traits')}
-                className="px-3 py-1 rounded-xl bg-stone-800 hover:bg-stone-700 text-amber-300 border border-stone-700 text-xs font-semibold flex items-center gap-1 cursor-pointer transition"
-              >
-                <Plus className="w-3.5 h-3.5" />
-                {tr('Add Trait', 'Aggiungi Tratto')}
-              </button>
-            </div>
-            <div className="space-y-2.5">
-              {editingChar.traits.map((t, idx) => (
-                <div
-                  key={idx}
-                  className="flex flex-col sm:flex-row gap-2 items-start bg-stone-950 p-3 rounded-xl border border-stone-800"
-                >
-                  <input
-                    type="text"
-                    value={t.name}
-                    onChange={(e) => updateListEntry('traits', idx, { name: e.target.value })}
-                    placeholder={tr('Trait name (e.g. (Elf) Darkvision)', 'Nome tratto (es. (Elfo) Scurovisione)')}
-                    className="w-full sm:w-1/3 px-3 py-1.5 rounded-lg bg-stone-900 border border-stone-700 text-amber-200 font-semibold text-xs"
-                  />
-                  <input
-                    type="text"
-                    value={t.description}
-                    onChange={(e) =>
-                      updateListEntry('traits', idx, { description: e.target.value })
-                    }
-                    placeholder={tr('Description of trait effect', 'Descrizione dell’effetto del tratto')}
-                    className="w-full sm:flex-1 px-3 py-1.5 rounded-lg bg-stone-900 border border-stone-700 text-stone-200 text-xs"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => removeListEntry('traits', idx)}
-                    className="p-1.5 text-stone-500 hover:text-red-400 transition cursor-pointer self-center"
-                    title={tr('Delete trait', 'Elimina tratto')}
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Section: Actions & Attacks */}
-          <div className="bg-stone-900/80 border border-stone-800 p-5 rounded-2xl space-y-3">
-            <div className="flex items-center justify-between">
-              <span className="font-header font-bold text-amber-400 text-sm">
-                {tr('Actions & Attacks', 'Azioni & Attacchi')}
-              </span>
-              <button
-                type="button"
-                onClick={() => addListEntry('actions')}
-                className="px-3 py-1 rounded-xl bg-stone-800 hover:bg-stone-700 text-amber-300 border border-stone-700 text-xs font-semibold flex items-center gap-1 cursor-pointer transition"
-              >
-                <Plus className="w-3.5 h-3.5" />
-                {tr('Add Action', 'Aggiungi Azione')}
-              </button>
-            </div>
-            <div className="space-y-2.5">
-              {editingChar.actions.map((a, idx) => (
-                <div
-                  key={idx}
-                  className="flex flex-col sm:flex-row gap-2 items-start bg-stone-950 p-3 rounded-xl border border-stone-800"
-                >
-                  <input
-                    type="text"
-                    value={a.name}
-                    onChange={(e) => updateListEntry('actions', idx, { name: e.target.value })}
-                    placeholder={tr('Action name (e.g. Longsword)', 'Nome azione (es. Spada Lunga)')}
-                    className="w-full sm:w-1/3 px-3 py-1.5 rounded-lg bg-stone-900 border border-stone-700 text-amber-200 font-semibold text-xs"
-                  />
-                  <input
-                    type="text"
-                    value={a.description}
-                    onChange={(e) =>
-                      updateListEntry('actions', idx, { description: e.target.value })
-                    }
-                    placeholder={tr(
-                      'Attack / damage description (e.g. +5 to hit, 1d8+3 slashing)',
-                      'Descrizione attacco / danno (es. +5 per colpire, 1d8+3 taglienti)'
+              <div className="grid grid-cols-[repeat(auto-fit,minmax(14rem,1fr))] gap-4">
+                {/* Race / Species */}
+                <Field label={tr('Race / Species', 'Razza / Specie')}>
+                  <div className="flex flex-wrap gap-1.5">
+                    <input
+                      type="text"
+                      value={editingChar.creatureType}
+                      onChange={(e) => patch({ creatureType: e.target.value })}
+                      placeholder={
+                        isPc
+                          ? tr('e.g. Elf, Human...', 'es. Elfo, Umano...')
+                          : tr('e.g. Humanoid, Fiend', 'es. Umanoide, Immondo')
+                      }
+                      className={`${inputCls} flex-1 min-w-[9rem]`}
+                    />
+                    {isPc && (
+                      <select
+                        value=""
+                        onChange={(e) => {
+                          const r = STANDARD_RACES.find((rc) => rc.id === e.target.value);
+                          if (r) apply(applyStandardTemplate(editingChar, { raceDef: r, lang }));
+                        }}
+                        className={presetCls}
+                        title={tr(
+                          'Apply 5e standard race traits & stats',
+                          'Applica tratti e statistiche della razza standard 5e'
+                        )}
+                      >
+                        <option value="">{tr('5e Preset...', 'Preimpostati 5e...')}</option>
+                        {STANDARD_RACES.map((r) => (
+                          <option key={r.id} value={r.id}>
+                            {lang === 'it' ? r.nameIt : r.nameEn}
+                          </option>
+                        ))}
+                      </select>
                     )}
-                    className="w-full sm:flex-1 px-3 py-1.5 rounded-lg bg-stone-900 border border-stone-700 text-stone-200 text-xs"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => removeListEntry('actions', idx)}
-                    className="p-1.5 text-stone-500 hover:text-red-400 transition cursor-pointer self-center"
-                    title={tr('Delete action', 'Elimina azione')}
+                  </div>
+                </Field>
+
+                {/* Size */}
+                <Field label={tr('Size', 'Taglia')}>
+                  <select
+                    value={localizeSize(editingChar.size, lang)}
+                    onChange={(e) => patch({ size: e.target.value })}
+                    className={inputCls}
                   >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
+                    {!SIZE_OPTIONS.some((s) => s[lang] === localizeSize(editingChar.size, lang)) && (
+                      <option value={editingChar.size}>{editingChar.size}</option>
+                    )}
+                    {SIZE_OPTIONS.map((s) => (
+                      <option key={s.en} value={s[lang]}>
+                        {s[lang]}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+
+                {/* Class / Archetype */}
+                <Field label={tr('Class / Archetype', 'Classe / Archetipo')}>
+                  <div className="flex flex-wrap gap-1.5">
+                    <input
+                      type="text"
+                      value={editingChar.classOrArchetype || ''}
+                      onChange={(e) => patch({ classOrArchetype: e.target.value })}
+                      placeholder={tr('e.g. Fighter, Wizard...', 'es. Guerriero, Mago...')}
+                      className={`${inputCls} flex-1 min-w-[9rem]`}
+                    />
+                    {isPc && (
+                      <select
+                        value=""
+                        onChange={(e) => {
+                          const c = STANDARD_CLASSES.find((cl) => cl.id === e.target.value);
+                          if (c) {
+                            apply(
+                              applyStandardTemplate(editingChar, {
+                                classDef: c,
+                                level: parsePgLevel(editingChar.levelOrCr),
+                                lang,
+                              })
+                            );
+                          }
+                        }}
+                        className={presetCls}
+                        title={tr(
+                          'Apply 5e standard class features & hit dice',
+                          'Applica capacità di classe e dadi vita standard 5e'
+                        )}
+                      >
+                        <option value="">{tr('5e Preset...', 'Preimpostati 5e...')}</option>
+                        {STANDARD_CLASSES.map((c) => (
+                          <option key={c.id} value={c.id}>
+                            {lang === 'it' ? c.nameIt : c.nameEn}
+                          </option>
+                        ))}
+                      </select>
+                    )}
+                  </div>
+                </Field>
+
+                {/* Level */}
+                <Field label={tr('Level (PC) or CR', 'Livello (PG) o GS')}>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="text"
+                      value={editingChar.levelOrCr}
+                      onChange={(e) => apply({ ...editingChar, levelOrCr: e.target.value })}
+                      className={`${inputCls} min-w-[7rem] font-bold`}
+                    />
+                    {isPc && (
+                      <button
+                        type="button"
+                        onClick={() => onLevelUp(editingChar)}
+                        className="px-3 py-2 rounded-xl bg-purple-700 hover:bg-purple-600 text-purple-100 text-xs font-bold flex items-center gap-1 shrink-0 transition shadow cursor-pointer"
+                        title={tr('Level Up', 'Passaggio di Livello')}
+                      >
+                        <TrendingUp className="w-3.5 h-3.5" />
+                        {tr('Level Up', 'Sali di livello')}
+                      </button>
+                    )}
+                  </div>
+                </Field>
+
+                {/* Background */}
+                <Field label={tr('Background', 'Background')}>
+                  <input
+                    type="text"
+                    list="sheet-backgrounds"
+                    value={editingChar.background || ''}
+                    onChange={(e) => patch({ background: e.target.value })}
+                    placeholder={tr('e.g. Noble, Sage, Soldier', 'es. Nobile, Sapiente, Soldato')}
+                    className={inputCls}
+                  />
+                  <datalist id="sheet-backgrounds">
+                    {BACKGROUND_OPTIONS.map((b) => (
+                      <option key={b.en} value={b[lang]} />
+                    ))}
+                  </datalist>
+                </Field>
+
+                {/* Alignment */}
+                <Field label={tr('Alignment', 'Allineamento')}>
+                  <input
+                    type="text"
+                    list="sheet-alignments"
+                    value={editingChar.alignment}
+                    onChange={(e) => patch({ alignment: e.target.value })}
+                    placeholder={tr('e.g. Lawful Good', 'es. Legale Buono')}
+                    className={inputCls}
+                  />
+                  <datalist id="sheet-alignments">
+                    {ALIGNMENT_OPTIONS.map((a) => (
+                      <option key={a.en} value={a[lang]} />
+                    ))}
+                  </datalist>
+                </Field>
+              </div>
+
+              {/* Portrait / Illustration */}
+              <div className="p-3.5 rounded-xl bg-stone-950 border border-stone-800 space-y-2">
+                <div className="flex items-center justify-between gap-2">
+                  <label className="font-semibold text-amber-400 flex items-center gap-1.5">
+                    <ImagePlus className="w-4 h-4" />
+                    {tr('Portrait / Illustration', 'Immagine / Ritratto')}
+                  </label>
+                  {editingChar.portraitUrl && (
+                    <button
+                      type="button"
+                      onClick={() => patch({ portraitUrl: undefined })}
+                      className="text-[11px] text-red-400 hover:underline cursor-pointer"
+                    >
+                      {tr('Remove Image', 'Rimuovi Immagine')}
+                    </button>
+                  )}
                 </div>
-              ))}
+                <div className="flex flex-wrap items-center gap-3">
+                  {editingChar.portraitUrl && (
+                    <img
+                      src={editingChar.portraitUrl}
+                      alt="Portrait preview"
+                      className="w-16 h-16 rounded-xl object-cover border border-amber-500/50 shrink-0"
+                    />
+                  )}
+                  <label className="px-3.5 py-2 rounded-xl bg-stone-800 hover:bg-stone-700 text-amber-300 font-semibold cursor-pointer border border-stone-700 text-xs transition shrink-0">
+                    {tr('Upload Image File...', 'Carica File Immagine...')}
+                    <input type="file" accept="image/*" onChange={handlePortraitUpload} className="hidden" />
+                  </label>
+                  <input
+                    type="text"
+                    value={editingChar.portraitUrl || ''}
+                    onChange={(e) => patch({ portraitUrl: e.target.value || undefined })}
+                    placeholder={tr('Or paste image URL / DataURL...', 'Oppure incolla URL immagine / DataURL...')}
+                    className={`${inputCls} flex-1 min-w-[12rem]`}
+                  />
+                </div>
+              </div>
+              <NextButton onClick={() => setTab('abilities')} label={tr('Next: Abilities & Skills', 'Avanti: Caratteristiche & Abilità')} />
             </div>
-          </div>
+          )}
 
-          {/* Section: Spells & Lore */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="bg-stone-900/80 border border-stone-800 p-4 rounded-2xl space-y-2">
-              <label className="block text-stone-400 font-semibold">
-                {tr('Spells & Spell Slots Notes', 'Note Incantesimi & Slot')}
-              </label>
-              <textarea
-                rows={3}
-                value={editingChar.spellsNotes || ''}
-                onChange={(e) =>
-                  setEditingChar({ ...editingChar, spellsNotes: e.target.value })
-                }
-                placeholder={tr('e.g. Cantrips: Fire Bolt, Light. 1st Level (4 slots): Shield, Magic Missile...', 'es. Trucchetti: Dardo di Fuoco, Luce. 1° Livello (4 slot): Scudo, Dardo Incantato...')}
-                className="w-full px-3 py-2 rounded-xl bg-stone-950 border border-stone-700 text-stone-200 text-xs"
-              />
-            </div>
+          {/* TAB 2: Abilities, saves, skills */}
+          {tab === 'abilities' && (
+            <div className="space-y-5">
+              <div className={cardCls}>
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <h3 className={cardTitleCls}>{tr('Ability Scores', 'Caratteristiche')}</h3>
+                  <span className="text-[11px] text-stone-400">
+                    {tr(
+                      'Auto-calculates saving throws and all 18 skill bonuses',
+                      'Aggiorna in automatico tutti i tiri salvezza e le 18 abilità'
+                    )}
+                  </span>
+                </div>
+                <div className="grid grid-cols-[repeat(auto-fit,minmax(6.5rem,1fr))] gap-3">
+                  {DND_ABILITY_META.map((ab) => (
+                    <div
+                      key={ab.key}
+                      className="bg-stone-950 p-3 rounded-xl border border-stone-800 text-center shadow-inner"
+                    >
+                      <div className="text-xs font-extrabold text-amber-400 uppercase">
+                        {lang === 'it' ? ab.shortIt : ab.shortEn}
+                      </div>
+                      <input
+                        type="number"
+                        min={1}
+                        max={30}
+                        value={editingChar.abilities[ab.key]}
+                        onChange={(e) => updateAbility(ab.key, Number(e.target.value))}
+                        className="w-full min-w-[4rem] mt-1.5 text-center py-1.5 rounded-lg bg-stone-900 border border-stone-700 text-stone-100 font-bold text-base"
+                      />
+                      <div className="text-xs font-mono text-amber-300 font-semibold mt-1">
+                        {formatMod(editingChar.abilities[ab.key])}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
 
-            <div className="bg-stone-900/80 border border-stone-800 p-4 rounded-2xl space-y-2">
-              <label className="block text-stone-400 font-semibold">
-                {tr('Backstory, Personality & Equipment', 'Biografia, Personalità & Equipaggiamento')}
-              </label>
-              <textarea
-                rows={3}
-                value={editingChar.biographyOrLore}
-                onChange={(e) =>
-                  setEditingChar({ ...editingChar, biographyOrLore: e.target.value })
-                }
-                placeholder={tr('Notes on background, equipment, magical items, personality traits...', 'Note su background, equipaggiamento, oggetti magici, legami e difetti...')}
-                className="w-full px-3 py-2 rounded-xl bg-stone-950 border border-stone-700 text-stone-200 text-xs"
-              />
+              <div className={cardCls}>
+                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-stone-800 pb-3">
+                  <span className={cardTitleCls}>
+                    {tr('Saving Throws & Skills', 'Tiri Salvezza & Abilità')} — {tr('Proficiency Bonus', 'Bonus Competenza')}{' '}
+                    +{getProficiencyBonus(editingChar)}
+                  </span>
+                  <span className="text-[11px] text-stone-400">
+                    {tr(
+                      'Click to cycle: None (○) → Proficient (●) → Expertise (◆)',
+                      'Clicca per ciclare: Base (○) → Competenza (●) → Maestria (◆)'
+                    )}
+                  </span>
+                </div>
+
+                <div>
+                  <div className="text-xs font-bold uppercase text-stone-400 mb-2">
+                    {tr('Saving Throws', 'Tiri Salvezza')}
+                  </div>
+                  <div className="grid grid-cols-[repeat(auto-fill,minmax(8rem,1fr))] gap-2">
+                    {DND_ABILITY_META.map((ab) => {
+                      const { total, proficient } = getSavingThrowTotalBonus(editingChar, ab.key);
+                      return (
+                        <button
+                          key={ab.key}
+                          type="button"
+                          onClick={() => toggleSaveProficiency(ab.key)}
+                          className={`px-3 py-2 rounded-xl border text-xs flex items-center justify-between gap-2 transition cursor-pointer ${
+                            proficient
+                              ? 'bg-amber-600/20 border-amber-500 text-amber-200 font-bold shadow'
+                              : 'bg-stone-950 border-stone-800 text-stone-400 hover:border-stone-700'
+                          }`}
+                        >
+                          <span>
+                            {proficient ? '● ' : '○ '}
+                            {lang === 'it' ? ab.shortIt : ab.shortEn}
+                          </span>
+                          <span className="font-mono font-bold">{formatSignedBonus(total)}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div>
+                  <div className="text-xs font-bold uppercase text-stone-400 mb-2">
+                    {tr('All 18 D&D 5e Skills', 'Tutte le 18 Abilità D&D 5e')}
+                  </div>
+                  <div className="grid grid-cols-[repeat(auto-fill,minmax(14rem,1fr))] gap-2">
+                    {DND_SKILLS.map((sk) => {
+                      const { total, rank } = getSkillTotalBonus(editingChar, sk.id);
+                      const abMeta = DND_ABILITY_META.find((a) => a.key === sk.ability)!;
+                      const abShort = lang === 'it' ? abMeta.shortIt : abMeta.shortEn;
+                      const icon = rank === 2 ? '◆' : rank === 1 ? '●' : '○';
+                      return (
+                        <button
+                          key={sk.id}
+                          type="button"
+                          onClick={() => cycleSkillProficiency(sk.id)}
+                          className={`px-3 py-2 rounded-xl border text-left text-xs flex items-center justify-between gap-2 transition cursor-pointer ${
+                            rank === 2
+                              ? 'bg-purple-600/25 border-purple-400 text-purple-200 font-bold shadow'
+                              : rank === 1
+                              ? 'bg-amber-600/20 border-amber-500 text-amber-200 font-bold shadow'
+                              : 'bg-stone-950 border-stone-800 text-stone-300 hover:border-stone-700'
+                          }`}
+                        >
+                          <span className="truncate">
+                            <span className="mr-1.5">{icon}</span>
+                            {lang === 'it' ? sk.labelIt : sk.labelEn}{' '}
+                            <span className="text-[10px] opacity-60">({abShort})</span>
+                          </span>
+                          <span className="font-mono font-bold shrink-0">{formatSignedBonus(total)}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+                <NextButton onClick={() => setTab('combat')} label={tr('Next: Combat', 'Avanti: Combattimento')} />
+              </div>
             </div>
-          </div>
+          )}
+
+          {/* TAB 3: Combat */}
+          {tab === 'combat' && (
+            <div className="space-y-5">
+              <div className={cardCls}>
+                <h3 className={cardTitleCls}>{tr('Combat Vitals', 'Parametri di Combattimento')}</h3>
+                <div className="grid grid-cols-[repeat(auto-fill,minmax(8.5rem,1fr))] gap-3 bg-stone-950 p-4 rounded-xl border border-stone-800">
+                  <Field label={tr('Armor Class', 'Classe Armatura')}>
+                    <input
+                      type="number"
+                      value={editingChar.ac}
+                      onChange={(e) => patch({ ac: Number(e.target.value) })}
+                      className={`${numCls} text-amber-300 font-bold`}
+                    />
+                  </Field>
+                  <Field label={tr('Max HP', 'PF Massimi')}>
+                    <input
+                      type="number"
+                      value={editingChar.hpMax}
+                      onChange={(e) => patch({ hpMax: Number(e.target.value) })}
+                      className={`${numCls} text-emerald-400 font-bold`}
+                    />
+                  </Field>
+                  <Field label={tr('Hit Dice', 'Dadi Vita')}>
+                    <input
+                      type="text"
+                      value={editingChar.hitDiceFormula}
+                      onChange={(e) => patch({ hitDiceFormula: e.target.value })}
+                      className={`${numCls} font-mono`}
+                    />
+                  </Field>
+                  <Field label={tr('Initiative Bonus', 'Bonus Iniziativa')}>
+                    <input
+                      type="number"
+                      value={editingChar.initiativeBonus}
+                      onChange={(e) => patch({ initiativeBonus: Number(e.target.value) })}
+                      className={numCls}
+                    />
+                  </Field>
+                  <Field label={tr('Passive Perception', 'Percezione Passiva')}>
+                    <div className="flex gap-1">
+                      <input
+                        type="number"
+                        value={editingChar.passivePerception}
+                        onChange={(e) => patch({ passivePerception: Number(e.target.value) })}
+                        className={numCls}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => apply(editingChar)}
+                        title={tr('Recalculate from Wisdom and Perception', 'Ricalcola da Saggezza e Percezione')}
+                        className="px-2 rounded-lg bg-stone-800 hover:bg-stone-700 text-amber-300 text-sm cursor-pointer shrink-0"
+                      >
+                        ↻
+                      </button>
+                    </div>
+                  </Field>
+                  <Field label={tr('Speed', 'Velocità')}>
+                    <input
+                      type="text"
+                      value={editingChar.speed}
+                      onChange={(e) => patch({ speed: e.target.value })}
+                      placeholder={tr('30 ft.', '9 m')}
+                      className={numCls}
+                    />
+                  </Field>
+                </div>
+                <Field label={tr('Armor & shield note', 'Armatura e scudo')}>
+                  <input
+                    type="text"
+                    value={editingChar.acNote || ''}
+                    onChange={(e) => patch({ acNote: e.target.value })}
+                    placeholder={tr('e.g. Chain mail, shield', 'es. Cotta di maglia, scudo')}
+                    className={inputCls}
+                  />
+                </Field>
+              </div>
+
+              <div className={cardCls}>
+                <ListEditor
+                  title={tr('Actions & Attacks', 'Azioni & Attacchi')}
+                  addLabel={tr('Add Action', 'Aggiungi Azione')}
+                  nameHint={tr('Action name (e.g. Longsword)', 'Nome azione (es. Spada Lunga)')}
+                  descHint={tr(
+                    'Attack / damage description (e.g. +5 to hit, 1d8+3 slashing)',
+                    'Descrizione attacco / danno (es. +5 per colpire, 1d8+3 taglienti)'
+                  )}
+                  items={editingChar.actions}
+                  onChange={(idx, p) => updateListEntry('actions', idx, p)}
+                  onAdd={() => addListEntry('actions')}
+                  onRemove={(idx) => removeListEntry('actions', idx)}
+                />
+                {!isPc && (
+                  <ListEditor
+                    title={tr('Reactions & Legendary Actions', 'Reazioni & Azioni Leggendarie')}
+                    addLabel={tr('Add Entry', 'Aggiungi Voce')}
+                    nameHint={tr('Name', 'Nome')}
+                    descHint={tr('Description', 'Descrizione')}
+                    items={editingChar.reactionsOrLegendary || []}
+                    onChange={(idx, p) => updateListEntry('reactionsOrLegendary', idx, p)}
+                    onAdd={() => addListEntry('reactionsOrLegendary')}
+                    onRemove={(idx) => removeListEntry('reactionsOrLegendary', idx)}
+                  />
+                )}
+                <NextButton onClick={() => setTab('senses')} label={tr('Next: Senses & Proficiencies', 'Avanti: Sensi & Competenze')} />
+              </div>
+            </div>
+          )}
+
+          {/* TAB 4: Senses, languages, proficiencies, resistances */}
+          {tab === 'senses' && (
+            <div className={cardCls}>
+              <h3 className={cardTitleCls}>{tr('Senses, Languages & Proficiencies', 'Sensi, Linguaggi & Competenze')}</h3>
+
+              <ChipField
+                label={tr('Senses', 'Sensi')}
+                value={editingChar.senses || ''}
+                placeholder={tr('e.g. Darkvision 60 ft.', 'es. Scurovisione 18 m')}
+                presets={SENSE_PRESETS.map((s) => s[lang])}
+                onChange={(v) => patch({ senses: v })}
+              />
+              <ChipField
+                label={tr('Languages', 'Linguaggi')}
+                value={editingChar.languages || ''}
+                placeholder={tr('e.g. Common, Elvish', 'es. Comune, Elfico')}
+                presets={LANGUAGE_PRESETS.map((l) => l[lang])}
+                onChange={(v) => patch({ languages: v })}
+              />
+              <Field label={tr('Other proficiencies (armor, weapons, tools)', 'Altre competenze (armature, armi, strumenti)')}>
+                <textarea
+                  rows={2}
+                  value={editingChar.otherProficiencies || ''}
+                  onChange={(e) => patch({ otherProficiencies: e.target.value })}
+                  placeholder={tr(
+                    'e.g. Light armor, simple weapons, thieves’ tools',
+                    'es. Armature leggere, armi semplici, arnesi da scasso'
+                  )}
+                  className={`${inputCls} resize-y min-h-[3.5rem]`}
+                />
+              </Field>
+              <ChipField
+                label={tr('Damage resistances', 'Resistenze ai danni')}
+                value={editingChar.damageResistances || ''}
+                placeholder={tr('e.g. Fire, Poison', 'es. Fuoco, Veleno')}
+                presets={DAMAGE_PRESETS.map((d) => d[lang])}
+                onChange={(v) => patch({ damageResistances: v })}
+              />
+              <ChipField
+                label={tr('Damage immunities', 'Immunità ai danni')}
+                value={editingChar.damageImmunities || ''}
+                placeholder={tr('e.g. Poison', 'es. Veleno')}
+                presets={DAMAGE_PRESETS.map((d) => d[lang])}
+                onChange={(v) => patch({ damageImmunities: v })}
+              />
+              <Field label={tr('Condition immunities', 'Immunità alle condizioni')}>
+                <input
+                  type="text"
+                  value={editingChar.conditionImmunities || ''}
+                  onChange={(e) => patch({ conditionImmunities: e.target.value })}
+                  placeholder={tr('e.g. Charmed, Frightened', 'es. Affascinato, Spaventato')}
+                  className={inputCls}
+                />
+              </Field>
+              <NextButton onClick={() => setTab('features')} label={tr('Next: Features & Spells', 'Avanti: Capacità & Incantesimi')} />
+            </div>
+          )}
+
+          {/* TAB 5: Features and spells */}
+          {tab === 'features' && (
+            <div className="space-y-5">
+              <div className={cardCls}>
+                <ListEditor
+                  title={tr('Traits & Special Features', 'Tratti & Capacità Speciali')}
+                  addLabel={tr('Add Trait', 'Aggiungi Tratto')}
+                  nameHint={tr('Trait name (e.g. (Elf) Darkvision)', 'Nome tratto (es. (Elfo) Scurovisione)')}
+                  descHint={tr('Description of trait effect', 'Descrizione dell’effetto del tratto')}
+                  items={editingChar.traits}
+                  onChange={(idx, p) => updateListEntry('traits', idx, p)}
+                  onAdd={() => addListEntry('traits')}
+                  onRemove={(idx) => removeListEntry('traits', idx)}
+                />
+              </div>
+              <div className={cardCls}>
+                <h3 className={cardTitleCls}>{tr('Spellcasting', 'Incantesimi')}</h3>
+                <div className="grid grid-cols-[repeat(auto-fit,minmax(9rem,1fr))] gap-3">
+                  <Field label={tr('Spellcasting ability', 'Caratteristica da incantatore')}>
+                    <select
+                      value={editingChar.spellcastingAbility || ''}
+                      onChange={(e) =>
+                        patch({ spellcastingAbility: (e.target.value || undefined) as AbilityKey | undefined })
+                      }
+                      className={inputCls}
+                    >
+                      <option value="">{tr('None', 'Nessuna')}</option>
+                      {SPELLCASTING_ABILITIES.map((k) => {
+                        const meta = DND_ABILITY_META.find((a) => a.key === k)!;
+                        return (
+                          <option key={k} value={k}>
+                            {lang === 'it' ? meta.shortIt : meta.shortEn}
+                          </option>
+                        );
+                      })}
+                    </select>
+                  </Field>
+                  {spellStats && (
+                    <>
+                      <ReadOnlyStat label={tr('Spell save DC', 'CD incantesimi')} value={String(spellStats.dc)} />
+                      <ReadOnlyStat label={tr('Spell attack bonus', 'Bonus attacco inc.')} value={formatSignedBonus(spellStats.attack)} />
+                    </>
+                  )}
+                </div>
+                <Field label={tr('Spells & Spell Slots Notes', 'Note Incantesimi & Slot')}>
+                  <textarea
+                    rows={5}
+                    value={editingChar.spellsNotes || ''}
+                    onChange={(e) => patch({ spellsNotes: e.target.value })}
+                    placeholder={tr(
+                      'e.g. Cantrips: Fire Bolt, Light. 1st Level (4 slots): Shield, Magic Missile...',
+                      'es. Trucchetti: Dardo di Fuoco, Luce. 1° Livello (4 slot): Scudo, Dardo Incantato...'
+                    )}
+                    className={`${inputCls} resize-y min-h-[6rem]`}
+                  />
+                </Field>
+                <NextButton onClick={() => setTab('story')} label={tr('Next: Gear & Story', 'Avanti: Equipaggiamento & Storia')} />
+              </div>
+            </div>
+          )}
+
+          {/* TAB 6: Gear and story */}
+          {tab === 'story' && (
+            <div className={cardCls}>
+              <h3 className={cardTitleCls}>{tr('Equipment & Story', 'Equipaggiamento & Storia')}</h3>
+              <Field label={tr('Equipment, treasure & coins', 'Equipaggiamento, tesoro e monete')}>
+                <textarea
+                  rows={4}
+                  value={editingChar.equipment || ''}
+                  onChange={(e) => patch({ equipment: e.target.value })}
+                  placeholder={tr(
+                    'e.g. Longsword, backpack, 50 ft. rope, 12 gp',
+                    'es. Spada lunga, zaino, 15 m di corda, 12 mo'
+                  )}
+                  className={`${inputCls} resize-y min-h-[5rem]`}
+                />
+              </Field>
+              <div className="grid grid-cols-[repeat(auto-fit,minmax(16rem,1fr))] gap-4">
+                <Field label={tr('Personality traits', 'Tratti caratteriali')}>
+                  <textarea rows={3} value={editingChar.personalityTraits || ''} onChange={(e) => patch({ personalityTraits: e.target.value })} className={`${inputCls} resize-y min-h-[4.5rem]`} />
+                </Field>
+                <Field label={tr('Ideals', 'Ideali')}>
+                  <textarea rows={3} value={editingChar.ideals || ''} onChange={(e) => patch({ ideals: e.target.value })} className={`${inputCls} resize-y min-h-[4.5rem]`} />
+                </Field>
+                <Field label={tr('Bonds', 'Legami')}>
+                  <textarea rows={3} value={editingChar.bonds || ''} onChange={(e) => patch({ bonds: e.target.value })} className={`${inputCls} resize-y min-h-[4.5rem]`} />
+                </Field>
+                <Field label={tr('Flaws', 'Difetti')}>
+                  <textarea rows={3} value={editingChar.flaws || ''} onChange={(e) => patch({ flaws: e.target.value })} className={`${inputCls} resize-y min-h-[4.5rem]`} />
+                </Field>
+              </div>
+              <Field label={tr('Backstory & notes', 'Biografia & note')}>
+                <textarea
+                  rows={6}
+                  value={editingChar.biographyOrLore}
+                  onChange={(e) => patch({ biographyOrLore: e.target.value })}
+                  placeholder={tr('Backstory, allies, organizations, notes...', 'Biografia, alleati, organizzazioni, note...')}
+                  className={`${inputCls} resize-y min-h-[8rem]`}
+                />
+              </Field>
+            </div>
+          )}
 
           {/* Bottom Action Bar */}
           <div className="bg-stone-900/90 border border-stone-800 p-4 rounded-2xl flex items-center justify-between gap-4">
             <button
               type="button"
-              onClick={onCancel}
+              onClick={handleCancel}
               className="px-4 py-2 rounded-xl bg-stone-800 hover:bg-stone-700 text-stone-300 font-semibold text-xs cursor-pointer transition"
             >
               {tr('Cancel', 'Annulla')}

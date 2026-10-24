@@ -8,6 +8,7 @@ import {
   SfxItem,
 } from '../types/dnd';
 import { useLanguage } from '../i18n/LanguageContext';
+import { useConfirmDelete } from './ConfirmDialog';
 import { HomebreweryRenderer } from './HomebreweryRenderer';
 import { StatblockCard } from './StatblockCard';
 import {
@@ -65,6 +66,7 @@ export const AdventureStudioView: React.FC<AdventureStudioViewProps> = ({
   lastSaveInfo,
 }) => {
   const { tr } = useLanguage();
+  const confirmDelete = useConfirmDelete();
   const currentAdventure =
     adventures.find((a) => a.id === selectedAdventureId) || adventures[0];
 
@@ -416,7 +418,9 @@ export const AdventureStudioView: React.FC<AdventureStudioViewProps> = ({
 
             {saveBadge}
             <button
-              onClick={() => onDeleteAdventure(currentAdventure.id)}
+              onClick={async () => {
+                if (await confirmDelete(tr(`the adventure “${currentAdventure.title}”`, `l’avventura “${currentAdventure.title}”`), tr('All its scenes, blocks and encounters will be lost. This cannot be undone.', 'Tutte le sue scene, blocchi e incontri andranno persi. Non si può annullare.'))) onDeleteAdventure(currentAdventure.id);
+              }}
               title={tr('Delete this adventure', 'Elimina questa avventura')}
               className="p-2 rounded-lg hover:bg-stone-900 text-stone-500 hover:text-red-300 cursor-pointer"
             >
@@ -552,7 +556,9 @@ export const AdventureStudioView: React.FC<AdventureStudioViewProps> = ({
                       </button>
                       {currentAdventure.scenes.length > 1 && (
                         <button
-                          onClick={() => handleDeleteScene(scene.id)}
+                          onClick={async () => {
+                            if (await confirmDelete(tr(`the scene “${scene.title}”`, `la scena “${scene.title}”`), tr('Its text, encounters and sounds will be lost.', 'Testo, incontri e suoni andranno persi.'))) handleDeleteScene(scene.id);
+                          }}
                           className="p-0.5 text-stone-500 hover:text-red-400"
                         >
                           <Trash2 className="w-3 h-3" />
@@ -713,11 +719,12 @@ export const AdventureStudioView: React.FC<AdventureStudioViewProps> = ({
                           {tr('Edit', 'Modifica')}
                         </button>
                         <button
-                          onClick={() =>
-                            updateScene({
-                              encounters: currentScene.encounters.filter((e) => e.id !== enc.id),
-                            })
-                          }
+                          onClick={async () => {
+                            if (await confirmDelete(tr(`the encounter “${enc.name}”`, `l’incontro “${enc.name}”`)))
+                              updateScene({
+                                encounters: currentScene.encounters.filter((e) => e.id !== enc.id),
+                              });
+                          }}
                           className="p-1 text-stone-500 hover:text-red-400 ml-auto"
                         >
                           <Trash2 className="w-3 h-3" />

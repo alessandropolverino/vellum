@@ -14,6 +14,7 @@ import {
   isPcBlueprint,
 } from '../types/dnd';
 import { useLanguage } from '../i18n/LanguageContext';
+import { useConfirmDelete } from './ConfirmDialog';
 import { HomebreweryRenderer } from './HomebreweryRenderer';
 import { StatblockCard } from './StatblockCard';
 import { LevelUpModal } from './LevelUpModal';
@@ -71,6 +72,7 @@ export const LiveSessionConsole: React.FC<LiveSessionConsoleProps> = ({
   onOpenNewInstanceModal,
 }) => {
   const { lang, tr } = useLanguage();
+  const confirmDelete = useConfirmDelete();
   const [, setAudioTick] = useState(0);
   const [centerTab, setCenterTab] = useState<'story' | 'combat'>('story');
   const [sideTab, setSideTab] = useState<'scenes' | 'party' | 'sounds' | 'log'>('scenes');
@@ -732,7 +734,9 @@ export const LiveSessionConsole: React.FC<LiveSessionConsoleProps> = ({
 
           {instances.length > 0 && (
             <button
-              onClick={() => onDeleteInstance(currentInstance.id)}
+              onClick={async () => {
+                if (await confirmDelete(tr(`the instance “${currentInstance.instanceName}”`, `l’istanza “${currentInstance.instanceName}”`), tr('Session progress, notes and state will be lost.', 'Progressi, note e stato della sessione andranno persi.'))) onDeleteInstance(currentInstance.id);
+              }}
               title={tr('Delete this instance', 'Elimina questa istanza')}
               className="p-1.5 rounded-lg bg-stone-800 hover:bg-red-900/70 text-stone-400 hover:text-red-200"
             >
