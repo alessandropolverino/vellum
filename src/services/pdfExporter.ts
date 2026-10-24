@@ -857,6 +857,7 @@ export async function generateOfficialPcSheetPdf(
 
   const equipText = [
     character.acNote ? `${tr('Armor', 'Armatura')}: ${character.acNote}` : '',
+    character.equipment ? `${tr('Equipment', 'Equipaggiamento')}: ${character.equipment}` : '',
     character.damageResistances
       ? `${tr('Resistances', 'Resistenze')}: ${character.damageResistances}`
       : '',
@@ -978,6 +979,7 @@ export async function generateOfficialPcSheetPdf(
   const sensesLangText = [
     character.senses ? `${tr('Senses', 'Sensi')}: ${character.senses}` : '',
     character.languages ? `${tr('Languages', 'Linguaggi')}: ${character.languages}` : '',
+    character.otherProficiencies ? `${tr('Proficiencies', 'Competenze')}: ${character.otherProficiencies}` : '',
     character.tags.length ? `${tr('Tags / Roles', 'Ruoli')}: ${character.tags.join(', ')}` : '',
   ]
     .filter(Boolean)
@@ -1014,6 +1016,10 @@ export async function generateOfficialPcSheetPdf(
   );
 
   const combinedLore = [
+    character.personalityTraits ? `${tr('Personality', 'Personalità')}: ${character.personalityTraits}` : '',
+    character.ideals ? `${tr('Ideals', 'Ideali')}: ${character.ideals}` : '',
+    character.bonds ? `${tr('Bonds', 'Legami')}: ${character.bonds}` : '',
+    character.flaws ? `${tr('Flaws', 'Difetti')}: ${character.flaws}` : '',
     character.biographyOrLore,
     runtimeOverrides?.sessionNotes
       ? `[${tr('Session Notes', 'Note Sessione')}]: ${runtimeOverrides.sessionNotes}`
