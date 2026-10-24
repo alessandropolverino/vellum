@@ -6,6 +6,7 @@ import {
   isPcBlueprint,
 } from '../types/dnd';
 import { useLanguage } from '../i18n/LanguageContext';
+import { useConfirmDelete } from './ConfirmDialog';
 import { StatblockCard } from './StatblockCard';
 import { SupervisedPgCreateView } from './SupervisedPgCreateView';
 import { FullPageCharacterEditor } from './FullPageCharacterEditor';
@@ -46,6 +47,7 @@ export const CharactersView: React.FC<CharactersViewProps> = ({
   onDeleteParty,
 }) => {
   const { lang, tr } = useLanguage();
+  const confirmDelete = useConfirmDelete();
   const [filterKind, setFilterKind] = useState<
     'all' | 'pc' | 'pc_blueprints' | 'npc' | 'monster' | 'parties'
   >('all');
@@ -398,7 +400,9 @@ export const CharactersView: React.FC<CharactersViewProps> = ({
                         {tr('Edit', 'Modifica')}
                       </button>
                       <button
-                        onClick={() => onDeleteParty(party.id)}
+                        onClick={async () => {
+                          if (await confirmDelete(tr(`the party “${party.name}”`, `il gruppo “${party.name}”`), tr('The characters themselves are kept.', 'I personaggi non vengono eliminati.'))) onDeleteParty(party.id);
+                        }}
                         className="p-1 rounded bg-stone-800 hover:bg-red-900/60 text-stone-400 hover:text-red-300"
                       >
                         <Trash2 className="w-3.5 h-3.5" />
@@ -600,9 +604,9 @@ export const CharactersView: React.FC<CharactersViewProps> = ({
                         <Copy className="w-4 h-4" />
                       </button>
                       <button
-                        onClick={(e) => {
+                        onClick={async (e) => {
                           e.stopPropagation();
-                          onDeleteCharacter(c.id);
+                          if (await confirmDelete(tr(`the sheet of ${c.name}`, `la scheda di ${c.name}`))) onDeleteCharacter(c.id);
                         }}
                         title={tr('Delete sheet', 'Elimina scheda')}
                         className="p-1.5 rounded-md hover:bg-stone-800 text-stone-500 hover:text-red-300 cursor-pointer"

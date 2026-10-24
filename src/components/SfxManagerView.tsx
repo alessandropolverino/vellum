@@ -3,6 +3,7 @@ import { SfxCategory, SfxItem, SynthPresetId } from '../types/dnd';
 import { soundboardEngine } from '../services/audioEngine';
 import { storageRepository } from '../services/storageRepository';
 import { useLanguage } from '../i18n/LanguageContext';
+import { useConfirmDelete } from './ConfirmDialog';
 import {
   VolumeX,
   Plus,
@@ -28,6 +29,7 @@ export const SfxManagerView: React.FC<SfxManagerViewProps> = ({
   onDeleteSfx,
 }) => {
   const { tr } = useLanguage();
+  const confirmDelete = useConfirmDelete();
   const [, setTick] = useState(0);
   const [selectedCategory, setSelectedCategory] = useState<'all' | SfxCategory>('all');
   const [editingSfx, setEditingSfx] = useState<SfxItem | null>(null);
@@ -212,7 +214,9 @@ export const SfxManagerView: React.FC<SfxManagerViewProps> = ({
                     {tr('Edit', 'Modifica')}
                   </button>
                   <button
-                    onClick={() => onDeleteSfx(item.id)}
+                    onClick={async () => {
+                      if (await confirmDelete(tr(`the sound “${item.name}”`, `il suono “${item.name}”`))) onDeleteSfx(item.id);
+                    }}
                     title={tr('Delete', 'Elimina')}
                     className="p-1.5 rounded-md hover:bg-stone-800 text-stone-500 hover:text-red-300"
                   >
