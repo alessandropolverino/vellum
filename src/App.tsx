@@ -19,6 +19,7 @@ import { LiveSessionConsole } from './components/LiveSessionConsole';
 import { CharactersView } from './components/CharactersView';
 import { SfxManagerView } from './components/SfxManagerView';
 import { DataBackupModal } from './components/DataBackupModal';
+import { UpdateControl } from './components/UpdateModal';
 import {
   BookOpen,
   Compass,
@@ -378,6 +379,8 @@ export const App: React.FC = () => {
             >
               <ShieldCheck className="w-4 h-4" />
             </button>
+
+            <UpdateControl />
           </div>
         </div>
       </header>
