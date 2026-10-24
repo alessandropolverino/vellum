@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   AdventureBlueprint,
   Campaign,
@@ -9,13 +9,17 @@ import {
   SfxItem,
 } from './types/dnd';
 import { SEED_DATABASE } from './data/seedData';
+import { getBuiltInSfxCatalog } from './data/sfxCatalog';
 import { storageRepository } from './services/storageRepository';
 import { soundboardEngine } from './services/audioEngine';
+import { useLanguage } from './i18n/LanguageContext';
 import { DashboardView } from './components/DashboardView';
 import { AdventureStudioView } from './components/AdventureStudioView';
 import { LiveSessionConsole } from './components/LiveSessionConsole';
 import { CharactersView } from './components/CharactersView';
 import { SfxManagerView } from './components/SfxManagerView';
+import { DataBackupModal } from './components/DataBackupModal';
+import { UpdateControl } from './components/UpdateModal';
 import {
   BookOpen,
   Compass,
@@ -23,21 +27,23 @@ import {
   Volume2,
   VolumeX,
   Flame,
-  Download,
-  Upload,
-  HardDrive,
+  ShieldCheck,
   Dice5,
   Plus,
   X,
-  RotateCcw,
 } from 'lucide-react';
 
 type ActiveTab = 'dashboard' | 'studio' | 'console' | 'characters' | 'sfx';
 
 export const App: React.FC = () => {
+  const { lang, setLang, tr } = useLanguage();
   const [db, setDb] = useState<DndDatabase>(SEED_DATABASE);
-  const [storageSource, setStorageSource] = useState<string>('Caricamento...');
+  const [storageSource, setStorageSource] = useState<string>('Loading...');
   const [lastSaveInfo, setLastSaveInfo] = useState<string>('');
+  const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'error'>('saved');
+  const [lastSavedTime, setLastSavedTime] = useState<string>('');
+  const pendingSavesRef = useRef<number>(0);
+  const [isBackupModalOpen, setIsBackupModalOpen] = useState<boolean>(false);
   const [activeTab, setActiveTab] = useState<ActiveTab>('dashboard');
 
   const [selectedAdventureId, setSelectedAdventureId] = useState<string>(
@@ -61,6 +67,9 @@ export const App: React.FC = () => {
     storageRepository.loadDatabase().then(({ db: loaded, source }) => {
       setDb(loaded);
       setStorageSource(source);
+      if (loaded.lastSavedAt) {
+        setLastSavedTime(new Date(loaded.lastSavedAt).toLocaleTimeString(lang === 'it' ? 'it-IT' : 'en-US'));
+      }
       if (loaded.adventures[0]) setSelectedAdventureId(loaded.adventures[0].id);
       if (loaded.playInstances[0]) setActiveInstanceId(loaded.playInstances[0].id);
     });
@@ -72,12 +81,30 @@ export const App: React.FC = () => {
 
   const persistDb = (nextDb: DndDatabase) => {
     setDb(nextDb);
+    setSaveStatus('saving');
+    pendingSavesRef.current += 1;
     storageRepository.saveDatabase(nextDb).then((res) => {
-      setLastSaveInfo(
-        `Salvato su ${res.adapter === 'tauri-fs' ? 'Tauri FS' : res.adapter === 'local-disk-api' ? './data/dnd5e-db.json' : 'Storage Locale'} (${new Date(
-          res.savedAt
-        ).toLocaleTimeString('it-IT')})`
+      const adapterLabel =
+        res.adapter === 'tauri-fs'
+          ? 'Tauri FS'
+          : res.adapter === 'local-disk-api'
+          ? './data/dnd5e-db.json'
+          : tr('Local Storage', 'Storage Locale');
+      const timeLabel = new Date(res.savedAt).toLocaleTimeString(
+        lang === 'it' ? 'it-IT' : 'en-US'
       );
+      pendingSavesRef.current = Math.max(0, pendingSavesRef.current - 1);
+      if (pendingSavesRef.current === 0) {
+        setSaveStatus('saved');
+      }
+      setLastSavedTime(timeLabel);
+      setLastSaveInfo(
+        `${tr('Saved to', 'Salvato su')} ${adapterLabel} (${timeLabel})`
+      );
+    }).catch((err) => {
+      console.error('Failed to save database:', err);
+      pendingSavesRef.current = Math.max(0, pendingSavesRef.current - 1);
+      setSaveStatus('error');
     });
   };
 
@@ -166,21 +193,32 @@ export const App: React.FC = () => {
 
   const openLaunchInstanceModal = (adv?: AdventureBlueprint) => {
     const targetAdv = adv || db.adventures[0];
-    if (!targetAdv) return;
+    if (!targetAdv) {
+      // Nothing to play yet: send the user to write a story first
+      setActiveTab('studio');
+      return;
+    }
     const defaultParty = db.parties[0];
     setNewInstanceAdventure(targetAdv);
-    setNewInstPartyId(defaultParty?.id || '');
+    setNewInstPartyId(defaultParty?.id || '__custom_empty__');
     const countForAdv =
       db.playInstances.filter((i) => i.adventureId === targetAdv.id).length + 1;
-    setNewInstName(`Run #${countForAdv} — ${defaultParty?.name || 'Nuovo Gruppo'}`);
+    setNewInstName(
+      `Run #${countForAdv} — ${defaultParty?.name || tr('Custom Group', 'Gruppo Personalizzato')}`
+    );
   };
 
   const handleCreateNewInstance = () => {
     if (!newInstanceAdventure) return;
-    const chosenParty = db.parties.find((p) => p.id === newInstPartyId);
+    const chosenParty =
+      newInstPartyId === '__custom_empty__'
+        ? undefined
+        : db.parties.find((p) => p.id === newInstPartyId);
     const partyCharIds =
-      chosenParty?.memberCharacterIds ||
-      db.characters.filter((c) => c.kind === 'pc').map((c) => c.id);
+      newInstPartyId === '__custom_empty__'
+        ? []
+        : chosenParty?.memberCharacterIds ||
+          db.characters.filter((c) => c.kind === 'pc' && !c.isPreGenBlueprint).map((c) => c.id);
 
     const pcStatus: PlayInstance['pcStatus'] = {};
     partyCharIds.forEach((pcId) => {
@@ -201,8 +239,10 @@ export const App: React.FC = () => {
     const newInst: PlayInstance = {
       id: `inst-${Date.now()}`,
       adventureId: newInstanceAdventure.id,
-      instanceName: newInstName.trim() || `Nuova Sessione (${newInstanceAdventure.title})`,
-      groupName: chosenParty?.name || 'Gruppo Personalizzato',
+      instanceName:
+        newInstName.trim() ||
+        `${tr('New Session', 'Nuova Sessione')} (${newInstanceAdventure.title})`,
+      groupName: chosenParty?.name || tr('Custom Table Group', 'Tavolo Personalizzato'),
       partyCharacterIds: partyCharIds,
       status: 'active',
       sessionCount: 1,
@@ -215,12 +255,19 @@ export const App: React.FC = () => {
           id: `log-init-${Date.now()}`,
           timestamp: new Date().toISOString(),
           sceneId: firstScene?.id || '',
-          sceneTitle: firstScene ? `${firstScene.code}: ${firstScene.title}` : 'Inizio',
+          sceneTitle: firstScene
+            ? `${firstScene.code}: ${firstScene.title}`
+            : tr('Start', 'Inizio'),
           category: 'narrative',
-          title: 'Avvio Nuova Istanza della Storia',
-          details: `Iniziata l’avventura "${newInstanceAdventure.title}" con il gruppo "${
-            chosenParty?.name || 'Avventurieri'
-          }".`,
+          title: tr('New Story Instance Started', 'Avvio Nuova Istanza della Storia'),
+          details: tr(
+            `Started adventure "${newInstanceAdventure.title}" with group "${
+              chosenParty?.name || 'Custom Table Group'
+            }".`,
+            `Iniziata l’avventura "${newInstanceAdventure.title}" con il gruppo "${
+              chosenParty?.name || 'Tavolo Personalizzato'
+            }".`
+          ),
           pinnedForRecap: true,
         },
       ],
@@ -235,19 +282,23 @@ export const App: React.FC = () => {
     setActiveTab('console');
   };
 
-  const handleImportJson = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => {
-      try {
-        const imported = storageRepository.importFromJsonString(String(reader.result));
-        persistDb(imported);
-      } catch (err: any) {
-        alert(err?.message || 'Errore importazione JSON');
+  const handleSwitchLanguage = (nextLang: 'en' | 'it') => {
+    setLang(nextLang);
+    // Re-translate built-in sounds the user has not renamed
+    const otherLang = nextLang === 'en' ? 'it' : 'en';
+    const previous = new Map(getBuiltInSfxCatalog(otherLang).map((s) => [s.id, s]));
+    const next = new Map(getBuiltInSfxCatalog(nextLang).map((s) => [s.id, s]));
+    let changed = false;
+    const sfxCatalog = db.sfxCatalog.map((item) => {
+      const was = previous.get(item.id);
+      const now = next.get(item.id);
+      if (was && now && item.name === was.name && item.description === was.description) {
+        changed = true;
+        return { ...item, name: now.name, description: now.description };
       }
-    };
-    reader.readAsText(file);
+      return item;
+    });
+    if (changed) persistDb({ ...db, sfxCatalog });
   };
 
   const rollQuickDie = (sides: number) => {
@@ -260,127 +311,76 @@ export const App: React.FC = () => {
   return (
     <div className="min-h-screen flex flex-col bg-stone-950 text-stone-100">
       {/* Top Navigation Header */}
-      <header className="sticky top-0 z-40 bg-stone-950/95 backdrop-blur border-b border-stone-800 px-4 lg:px-6 py-3">
+      <header className="sticky top-0 z-40 bg-stone-950/95 backdrop-blur border-b border-stone-800/70 px-4 lg:px-6 py-2">
         <div className="max-w-[1600px] mx-auto flex flex-wrap items-center justify-between gap-3">
           {/* Brand */}
           <div
             onClick={() => setActiveTab('dashboard')}
-            className="cursor-pointer flex items-center gap-3"
+            className="cursor-pointer flex items-center gap-2.5"
           >
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-amber-500 to-[#58180D] flex items-center justify-center shadow-md border border-amber-400/40">
-              <BookOpen className="w-5 h-5 text-stone-950" />
+            <div className="w-8 h-8 rounded-lg bg-stone-800 flex items-center justify-center border border-stone-700">
+              <BookOpen className="w-4 h-4 text-amber-400" />
             </div>
-            <div>
-              <div className="font-header text-lg font-extrabold tracking-wider text-amber-400 leading-none">
-                VELLUM
-              </div>
-              <div className="text-[10px] text-stone-400 font-medium">
-                D&D 5e Campaign, One-Shot & Multi-Instance Studio
-              </div>
+            <div className="font-header text-base font-bold tracking-wider text-stone-200 leading-none">
+              VELLUM
             </div>
           </div>
 
           {/* Primary Module Tabs */}
-          <nav className="flex flex-wrap items-center gap-1 bg-stone-900 p-1 rounded-xl border border-stone-800">
-            <button
-              onClick={() => setActiveTab('dashboard')}
-              className={`px-3.5 py-2 rounded-lg text-xs font-bold flex items-center gap-1.5 transition cursor-pointer ${
-                activeTab === 'dashboard'
-                  ? 'bg-amber-600 text-stone-950 shadow'
-                  : 'text-stone-300 hover:text-amber-300'
-              }`}
-            >
-              <Compass className="w-4 h-4" /> Dashboard & Istanze
-            </button>
-
-            <button
-              onClick={() => setActiveTab('studio')}
-              className={`px-3.5 py-2 rounded-lg text-xs font-bold flex items-center gap-1.5 transition cursor-pointer ${
-                activeTab === 'studio'
-                  ? 'bg-amber-600 text-stone-950 shadow'
-                  : 'text-stone-300 hover:text-amber-300'
-              }`}
-            >
-              <BookOpen className="w-4 h-4" /> Editor Storia (Homebrewery)
-            </button>
-
-            <button
-              onClick={() => setActiveTab('console')}
-              className={`px-3.5 py-2 rounded-lg text-xs font-bold flex items-center gap-1.5 transition cursor-pointer ${
-                activeTab === 'console'
-                  ? 'bg-amber-600 text-stone-950 shadow'
-                  : 'text-stone-300 hover:text-amber-300'
-              }`}
-            >
-              <Flame className="w-4 h-4" /> Console Partita Live
-              <span className="px-1.5 py-0.2 rounded-full bg-stone-800 text-amber-300 text-[10px]">
-                {db.playInstances.length}
-              </span>
-            </button>
-
-            <button
-              onClick={() => setActiveTab('characters')}
-              className={`px-3.5 py-2 rounded-lg text-xs font-bold flex items-center gap-1.5 transition cursor-pointer ${
-                activeTab === 'characters'
-                  ? 'bg-amber-600 text-stone-950 shadow'
-                  : 'text-stone-300 hover:text-amber-300'
-              }`}
-            >
-              <Users className="w-4 h-4" /> PG, NPC & Bestiario
-            </button>
-
-            <button
-              onClick={() => setActiveTab('sfx')}
-              className={`px-3.5 py-2 rounded-lg text-xs font-bold flex items-center gap-1.5 transition cursor-pointer ${
-                activeTab === 'sfx'
-                  ? 'bg-amber-600 text-stone-950 shadow'
-                  : 'text-stone-300 hover:text-amber-300'
-              }`}
-            >
-              <Volume2 className="w-4 h-4" /> Libreria SFX
-              {activeTrackIds.length > 0 && (
-                <span className="w-2 h-2 rounded-full bg-amber-400 animate-ping" />
-              )}
-            </button>
+          <nav className="flex flex-wrap items-center gap-1">
+            {(
+              [
+                ['dashboard', Compass, tr('Dashboard', 'Dashboard')],
+                ['studio', BookOpen, tr('Story Editor', 'Editor Storia')],
+                ['console', Flame, tr('Live Session', 'Partita Live')],
+                ['characters', Users, tr('Characters', 'Personaggi')],
+                ['sfx', Volume2, tr('SFX', 'SFX')],
+              ] as const
+            ).map(([id, Icon, label]) => (
+              <button
+                key={id}
+                onClick={() => setActiveTab(id)}
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer ${
+                  activeTab === id
+                    ? 'bg-stone-800 text-amber-300'
+                    : 'text-stone-400 hover:text-stone-200 hover:bg-stone-900'
+                }`}
+              >
+                <Icon className="w-4 h-4" /> {label}
+              </button>
+            ))}
           </nav>
 
-          {/* Persistence & Import/Export */}
+          {/* Language switcher + data manager (export, import, backups and demo reset live in the modal) */}
           <div className="flex items-center gap-2 text-xs">
             <div
-              title={lastSaveInfo || storageSource}
-              className="hidden xl:flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-stone-900 border border-stone-800 text-stone-400 text-[11px]"
+              className="flex items-center gap-0.5"
+              title={tr('UI Language (English / Italiano)', 'Lingua Interfaccia (English / Italiano)')}
             >
-              <HardDrive className="w-3.5 h-3.5 text-emerald-400" />
-              <span>{lastSaveInfo || storageSource}</span>
+              {(['en', 'it'] as const).map((code) => (
+                <button
+                  key={code}
+                  onClick={() => handleSwitchLanguage(code)}
+                  className={`px-2 py-1 rounded text-[11px] font-semibold transition cursor-pointer ${
+                    lang === code
+                      ? 'bg-stone-800 text-amber-300'
+                      : 'text-stone-500 hover:text-stone-300'
+                  }`}
+                >
+                  {code.toUpperCase()}
+                </button>
+              ))}
             </div>
 
             <button
-              onClick={() => storageRepository.exportToJsonFile(db)}
-              title="Esporta intero Database in JSON"
-              className="p-2 rounded-lg bg-stone-900 hover:bg-stone-800 border border-stone-800 text-stone-300"
+              onClick={() => setIsBackupModalOpen(true)}
+              title={`${lastSaveInfo || storageSource} — ${tr('Data & Backups', 'Dati & Backup')}`}
+              className="p-2 rounded-lg text-stone-400 hover:text-stone-200 hover:bg-stone-900 transition cursor-pointer"
             >
-              <Download className="w-4 h-4" />
+              <ShieldCheck className="w-4 h-4" />
             </button>
 
-            <label
-              title="Importa Database da file JSON"
-              className="p-2 rounded-lg bg-stone-900 hover:bg-stone-800 border border-stone-800 text-stone-300 cursor-pointer"
-            >
-              <Upload className="w-4 h-4" />
-              <input type="file" accept=".json" onChange={handleImportJson} className="hidden" />
-            </label>
-
-            <button
-              onClick={() => {
-                if (confirm('Vuoi ripristinare i dati demo iniziali?')) {
-                  persistDb(structuredClone(SEED_DATABASE));
-                }
-              }}
-              title="Ripristina dati demo iniziali"
-              className="p-2 rounded-lg bg-stone-900 hover:bg-stone-800 border border-stone-800 text-stone-400 hover:text-amber-300"
-            >
-              <RotateCcw className="w-4 h-4" />
-            </button>
+            <UpdateControl />
           </div>
         </div>
       </header>
@@ -392,9 +392,6 @@ export const App: React.FC = () => {
             campaigns={db.campaigns}
             adventures={db.adventures}
             instances={db.playInstances}
-            characters={db.characters}
-            parties={db.parties}
-            sfxCatalog={db.sfxCatalog}
             onOpenAdventureInStudio={(advId) => {
               setSelectedAdventureId(advId);
               setActiveTab('studio');
@@ -420,6 +417,9 @@ export const App: React.FC = () => {
             onDeleteAdventure={handleDeleteAdventure}
             onSaveCampaign={handleSaveCampaign}
             onLaunchInstanceModal={(adv) => openLaunchInstanceModal(adv)}
+            saveStatus={saveStatus}
+            lastSavedTime={lastSavedTime}
+            lastSaveInfo={lastSaveInfo}
           />
         )}
 
@@ -433,6 +433,7 @@ export const App: React.FC = () => {
             activeInstanceId={activeInstanceId}
             onSelectInstance={setActiveInstanceId}
             onSaveInstance={handleSaveInstance}
+            onSaveCharacter={handleSaveCharacter}
             onDeleteInstance={handleDeleteInstance}
             onOpenNewInstanceModal={(adv) => openLaunchInstanceModal(adv)}
           />
@@ -459,58 +460,51 @@ export const App: React.FC = () => {
       </main>
 
       {/* Bottom Quick Dice & Active Audio Bar */}
-      <footer className="sticky bottom-0 z-30 bg-stone-950/95 backdrop-blur border-t border-stone-800 px-4 lg:px-6 py-2">
+      <footer className="sticky bottom-0 z-30 bg-stone-950/95 backdrop-blur border-t border-stone-800/70 px-4 lg:px-6 py-1.5">
         <div className="max-w-[1600px] mx-auto flex flex-wrap items-center justify-between gap-3 text-xs">
           {/* Quick Dice Roller */}
           <div className="flex items-center gap-1.5">
-            <span className="text-stone-400 font-semibold flex items-center gap-1 mr-1">
-              <Dice5 className="w-4 h-4 text-amber-500" /> Dadi Rapidi:
-            </span>
+            <Dice5 className="w-4 h-4 text-stone-500 mr-1" />
             {[4, 6, 8, 10, 12, 20, 100].map((sides) => (
               <button
                 key={sides}
                 onClick={() => rollQuickDie(sides)}
-                className="px-2 py-1 rounded bg-stone-900 hover:bg-amber-600 hover:text-stone-950 border border-stone-800 font-mono font-bold text-stone-200 transition cursor-pointer"
+                className="px-2 py-0.5 rounded text-stone-400 hover:bg-stone-800 hover:text-amber-300 font-mono text-[11px] transition cursor-pointer"
               >
                 d{sides}
               </button>
             ))}
             {diceResult && (
-              <span className="ml-2 px-3 py-1 rounded-full bg-amber-500/20 border border-amber-500/50 text-amber-300 font-extrabold">
+              <span className="ml-2 px-3 py-0.5 rounded-full bg-stone-800 text-amber-300 font-semibold">
                 🎲 {diceResult}
               </span>
             )}
           </div>
 
-          {/* Active Audio Tracks Pill Bar */}
-          <div className="flex items-center gap-2">
-            {activeTrackIds.length === 0 ? (
-              <span className="text-stone-500 text-[11px]">Nessun audio in riproduzione</span>
-            ) : (
-              <>
-                <span className="text-amber-400 font-bold text-[11px]">Audio Attivi:</span>
-                {activeTrackIds.map((id) => {
-                  const item = db.sfxCatalog.find((s) => s.id === id);
-                  if (!item) return null;
-                  return (
-                    <button
-                      key={id}
-                      onClick={() => soundboardEngine.stop(id)}
-                      className="px-2.5 py-1 rounded-full bg-amber-600/20 border border-amber-500 text-amber-300 text-[11px] font-semibold flex items-center gap-1"
-                    >
-                      <Volume2 className="w-3 h-3" /> {item.name} ×
-                    </button>
-                  );
-                })}
-                <button
-                  onClick={() => soundboardEngine.stopAll()}
-                  className="px-2.5 py-1 rounded bg-red-900/80 hover:bg-red-800 text-red-100 text-[11px] font-bold flex items-center gap-1"
-                >
-                  <VolumeX className="w-3 h-3" /> Stop Tutti
-                </button>
-              </>
-            )}
-          </div>
+          {/* Active audio (shown only while something plays) */}
+          {activeTrackIds.length > 0 && (
+            <div className="flex items-center gap-2">
+              {activeTrackIds.map((id) => {
+                const item = db.sfxCatalog.find((s) => s.id === id);
+                if (!item) return null;
+                return (
+                  <button
+                    key={id}
+                    onClick={() => soundboardEngine.stop(id)}
+                    className="px-2.5 py-1 rounded-full bg-stone-800 text-amber-300 text-[11px] font-medium flex items-center gap-1"
+                  >
+                    <Volume2 className="w-3 h-3" /> {item.name} ×
+                  </button>
+                );
+              })}
+              <button
+                onClick={() => soundboardEngine.stopAll()}
+                className="px-2.5 py-1 rounded bg-stone-800 hover:bg-red-900/60 text-stone-300 text-[11px] font-medium flex items-center gap-1"
+              >
+                <VolumeX className="w-3 h-3" /> {tr('Stop All', 'Stop Tutti')}
+              </button>
+            </div>
+          )}
         </div>
       </footer>
 
@@ -520,7 +514,7 @@ export const App: React.FC = () => {
           <div className="bg-stone-900 border border-stone-700 rounded-2xl max-w-lg w-full p-6 space-y-4 shadow-2xl text-xs">
             <div className="flex items-center justify-between">
               <h3 className="font-header text-xl font-bold text-amber-400">
-                Avvia Nuova Istanza di Gioco
+                {tr('Launch New Play Instance', 'Avvia Nuova Istanza di Gioco')}
               </h3>
               <button
                 onClick={() => setNewInstanceAdventure(null)}
@@ -531,14 +525,21 @@ export const App: React.FC = () => {
             </div>
 
             <p className="text-stone-400 leading-relaxed">
-              Stai creando una nuova istanza indipendente per la storia{' '}
-              <strong className="text-amber-300">{newInstanceAdventure.title}</strong>. Tutte le note, le scelte, i combattimenti e i PF dei PG saranno isolati per questo gruppo.
+              {tr(
+                'You are creating a new independent instance for ',
+                'Stai creando una nuova istanza indipendente per la storia '
+              )}
+              <strong className="text-amber-300">{newInstanceAdventure.title}</strong>.{' '}
+              {tr(
+                'All notes, choices, combat states, and PC hit points will be isolated for this group.',
+                'Tutte le note, le scelte, i combattimenti e i PF dei PG saranno isolati per questo gruppo.'
+              )}
             </p>
 
             <div className="space-y-3">
               <div>
                 <label className="block text-stone-400 mb-1 font-semibold">
-                  Scegli Avventura / Modulo
+                  {tr('Choose Adventure / Module', 'Scegli Avventura / Modulo')}
                 </label>
                 <select
                   value={newInstanceAdventure.id}
@@ -550,7 +551,11 @@ export const App: React.FC = () => {
                 >
                   {db.adventures.map((a) => (
                     <option key={a.id} value={a.id}>
-                      {a.title} ({a.type === 'oneshot' ? 'One-Shot' : 'Modulo Campagna'})
+                      {a.title} (
+                      {a.type === 'oneshot'
+                        ? 'One-Shot'
+                        : tr('Campaign Module', 'Modulo Campagna')}
+                      )
                     </option>
                   ))}
                 </select>
@@ -558,41 +563,62 @@ export const App: React.FC = () => {
 
               <div>
                 <label className="block text-stone-400 mb-1 font-semibold">
-                  Seleziona il Gruppo (Party) dal Repository
+                  {tr(
+                    'Select Party Group (or Custom Table)',
+                    'Seleziona il Gruppo (o Tavolo Personalizzato)'
+                  )}
                 </label>
                 <select
                   value={newInstPartyId}
                   onChange={(e) => {
                     const pid = e.target.value;
                     setNewInstPartyId(pid);
-                    const p = db.parties.find((x) => x.id === pid);
-                    if (p) {
-                      const count =
-                        db.playInstances.filter(
-                          (i) => i.adventureId === newInstanceAdventure.id
-                        ).length + 1;
-                      setNewInstName(`Run #${count} — ${p.name}`);
+                    const count =
+                      db.playInstances.filter(
+                        (i) => i.adventureId === newInstanceAdventure.id
+                      ).length + 1;
+                    if (pid === '__custom_empty__') {
+                      setNewInstName(
+                        `Run #${count} — ${tr('Custom Table', 'Tavolo Personalizzato')}`
+                      );
+                    } else {
+                      const p = db.parties.find((x) => x.id === pid);
+                      if (p) {
+                        setNewInstName(`Run #${count} — ${p.name}`);
+                      }
                     }
                   }}
                   className="w-full px-3 py-2 rounded bg-stone-950 border border-stone-700 text-amber-300 font-bold"
                 >
                   {db.parties.map((p) => (
                     <option key={p.id} value={p.id}>
-                      {p.name} ({p.memberCharacterIds.length} PG)
+                      {p.name} ({p.memberCharacterIds.length} {tr('PCs', 'PG')})
                     </option>
                   ))}
+                  <option value="__custom_empty__">
+                    {tr(
+                      '✨ Custom / Empty Party (Add Pre-Gen Blueprints or Custom PCs in Console)',
+                      '✨ Gruppo Vuoto / Personalizzato (Aggiungi Blueprint Pre-Gen o PG Custom in Console)'
+                    )}
+                  </option>
                 </select>
               </div>
 
               <div>
                 <label className="block text-stone-400 mb-1 font-semibold">
-                  Nome Identificativo dell’Istanza / Sessione
+                  {tr(
+                    'Instance / Session Identifier Name',
+                    'Nome Identificativo dell’Istanza / Sessione'
+                  )}
                 </label>
                 <input
                   type="text"
                   value={newInstName}
                   onChange={(e) => setNewInstName(e.target.value)}
-                  placeholder="es. Gruppo del Venerdì - Sessione 1"
+                  placeholder={tr(
+                    'e.g. Friday Group - Session 1',
+                    'es. Gruppo del Venerdì - Sessione 1'
+                  )}
                   className="w-full px-3 py-2 rounded bg-stone-950 border border-stone-700 text-stone-100 font-bold"
                 />
               </div>
@@ -603,18 +629,32 @@ export const App: React.FC = () => {
                 onClick={() => setNewInstanceAdventure(null)}
                 className="px-3 py-2 rounded-lg bg-stone-800 text-stone-300 font-semibold"
               >
-                Annulla
+                {tr('Cancel', 'Annulla')}
               </button>
               <button
                 onClick={handleCreateNewInstance}
                 className="px-4 py-2 rounded-lg bg-amber-600 hover:bg-amber-500 text-stone-950 font-extrabold flex items-center gap-1.5 shadow"
               >
-                <Plus className="w-4 h-4" /> Crea Istanza & Apri Console DM
+                <Plus className="w-4 h-4" />{' '}
+                {tr(
+                  'Create Instance & Open DM Console',
+                  'Crea Istanza & Apri Console DM'
+                )}
               </button>
             </div>
           </div>
         </div>
       )}
+
+      {/* Data Preservation & Backups Modal */}
+      <DataBackupModal
+        isOpen={isBackupModalOpen}
+        onClose={() => setIsBackupModalOpen(false)}
+        db={db}
+        storageSource={storageSource}
+        lastSaveInfo={lastSaveInfo}
+        onDatabaseReplaced={(nextDb) => persistDb(nextDb)}
+      />
     </div>
   );
 };

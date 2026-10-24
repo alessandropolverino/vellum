@@ -1,4 +1,5 @@
 import { SfxItem, SynthPresetId } from '../types/dnd';
+import { storageRepository } from './storageRepository';
 
 interface ActiveTrack {
   sfxId: string;
@@ -85,35 +86,44 @@ class SoundboardEngine {
 
     const effectiveVolume = item.defaultVolume * this.masterVolume;
 
-    // 1. If user provided a custom audio file URL / DataURL, play via HTMLAudioElement
+    // 1. If user provided a custom audio file URL / DataURL / media protocol, play via HTMLAudioElement
     if (item.customAudioUrl && item.customAudioUrl.trim().length > 0) {
-      const audio = new Audio(item.customAudioUrl);
-      audio.loop = item.loop;
-      audio.volume = Math.max(0, Math.min(1, effectiveVolume));
-      audio.onended = () => {
-        if (!item.loop) {
-          this.activeTracks.delete(item.id);
-          this.notify();
-        }
-      };
-      audio.play().catch((err) => {
-        console.warn('Errore riproduzione file audio custom, fallback su synth:', err);
-        this.playProceduralSynth(item, effectiveVolume);
-      });
-
       this.activeTracks.set(item.id, {
         sfxId: item.id,
         name: item.name,
         loop: item.loop,
-        stopFn: () => {
-          audio.pause();
-          audio.currentTime = 0;
-        },
-        setVolumeFn: (v) => {
-          audio.volume = Math.max(0, Math.min(1, v * this.masterVolume));
-        },
+        stopFn: () => {},
+        setVolumeFn: () => {},
       });
       this.notify();
+
+      storageRepository.resolveAudioUrl(item.customAudioUrl).then((resolvedUrl) => {
+        if (!this.activeTracks.has(item.id)) return;
+        const audio = new Audio(resolvedUrl);
+        audio.loop = item.loop;
+        audio.volume = Math.max(0, Math.min(1, effectiveVolume));
+        audio.onended = () => {
+          if (!item.loop) {
+            this.activeTracks.delete(item.id);
+            this.notify();
+          }
+        };
+        audio.play().catch((err) => {
+          console.warn('Errore riproduzione file audio custom, fallback su synth:', err);
+          this.playProceduralSynth(item, effectiveVolume);
+        });
+
+        const track = this.activeTracks.get(item.id);
+        if (track) {
+          track.stopFn = () => {
+            audio.pause();
+            audio.currentTime = 0;
+          };
+          track.setVolumeFn = (v) => {
+            audio.volume = Math.max(0, Math.min(1, v * this.masterVolume));
+          };
+        }
+      });
       return;
     }
 

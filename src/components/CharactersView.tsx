@@ -3,23 +3,29 @@ import {
   CharacterEntity,
   EntityKind,
   PartyGroup,
-  StatblockEntry,
-  formatMod,
+  isPcBlueprint,
 } from '../types/dnd';
+import { useLanguage } from '../i18n/LanguageContext';
 import { StatblockCard } from './StatblockCard';
+import { SupervisedPgCreateView } from './SupervisedPgCreateView';
+import { FullPageCharacterEditor } from './FullPageCharacterEditor';
+import { LevelUpModal } from './LevelUpModal';
+import { downloadOfficialCharacterPdf } from '../services/pdfExporter';
 import {
   Users,
   UserPlus,
   Search,
-  Shield,
   Skull,
   UserCheck,
-  Plus,
   Trash2,
   Copy,
   Check,
-  Sparkles,
   FolderPlus,
+  FileDown,
+  Sparkles,
+  TrendingUp,
+  Plus,
+  ChevronDown,
 } from 'lucide-react';
 
 interface CharactersViewProps {
@@ -31,48 +37,6 @@ interface CharactersViewProps {
   onDeleteParty: (id: string) => void;
 }
 
-const EMPTY_CHARACTER: CharacterEntity = {
-  id: '',
-  kind: 'pc',
-  name: 'Nuovo Personaggio',
-  playerOrRole: 'Giocatore / Ruolo',
-  size: 'Media',
-  creatureType: 'Umanoide',
-  alignment: 'Neutrale Buono',
-  classOrArchetype: 'Guerriero',
-  levelOrCr: 'Livello 3',
-  ac: 15,
-  acNote: '(Cotta di maglia)',
-  hpMax: 28,
-  hitDiceFormula: '3d10 + 6',
-  speed: '9m',
-  initiativeBonus: 2,
-  passivePerception: 13,
-  abilities: { str: 16, dex: 14, con: 14, int: 10, wis: 12, cha: 11 },
-  savingThrows: 'FOR +5, COS +4',
-  skills: 'Atletica +5, Percezione +3',
-  senses: 'Percezione passiva 13',
-  languages: 'Comune',
-  traits: [
-    {
-      name: 'Recuperare Energie',
-      description: 'Usa un’azione bonus per recuperare 1d10 + 3 punti ferita.',
-    },
-  ],
-  actions: [
-    {
-      name: 'Spada Lunga',
-      description: 'Attacco con arma da mischia: +5 a colpire, portata 1,5m. Colpito: 1d8 + 3 danni taglienti.',
-      attackBonus: 5,
-      damageFormula: '1d8+3',
-    },
-  ],
-  reactionsOrLegendary: [],
-  spellsNotes: '',
-  biographyOrLore: '',
-  tags: ['Nuovo'],
-};
-
 export const CharactersView: React.FC<CharactersViewProps> = ({
   characters,
   parties,
@@ -81,17 +45,41 @@ export const CharactersView: React.FC<CharactersViewProps> = ({
   onSaveParty,
   onDeleteParty,
 }) => {
-  const [filterKind, setFilterKind] = useState<'all' | EntityKind | 'parties'>('all');
+  const { lang, tr } = useLanguage();
+  const [filterKind, setFilterKind] = useState<
+    'all' | 'pc' | 'pc_blueprints' | 'npc' | 'monster' | 'parties'
+  >('all');
   const [searchQuery, setSearchQuery] = useState('');
+  const [newMenuOpen, setNewMenuOpen] = useState(false);
   const [selectedId, setSelectedId] = useState<string>(characters[0]?.id || '');
   const [editingChar, setEditingChar] = useState<CharacterEntity | null>(null);
-
-  // Party creation/editing state
   const [editingParty, setEditingParty] = useState<PartyGroup | null>(null);
 
-  const filteredCharacters = characters.filter((c) => {
-    if (filterKind !== 'all' && filterKind !== 'parties' && c.kind !== filterKind) {
-      return false;
+  // Supervised creation & level-up states
+  const [showSupervisedCreate, setShowSupervisedCreate] = useState<{
+    isOpen: boolean;
+    isBlueprint: boolean;
+  } | null>(null);
+  const [levelUpTargetChar, setLevelUpTargetChar] = useState<CharacterEntity | null>(null);
+
+  // Modal to instantiate an assigned Player Character from a Pre-Gen Blueprint
+  const [instantiatingBlueprint, setInstantiatingBlueprint] = useState<CharacterEntity | null>(
+    null
+  );
+  const [instPlayerName, setInstPlayerName] = useState('');
+  const [instCustomCharName, setInstCustomCharName] = useState('');
+  const [instTargetPartyId, setInstTargetPartyId] = useState('');
+
+  // Exclude session-only PCs unless viewing all or specifically searching
+  const visibleCharacters = characters.filter((c) => !c.instanceOnlyId);
+
+  const filteredCharacters = visibleCharacters.filter((c) => {
+    if (filterKind === 'pc') {
+      if (c.kind !== 'pc') return false;
+    } else if (filterKind === 'pc_blueprints') {
+      if (c.kind !== 'pc' || !isPcBlueprint(c)) return false;
+    } else if (filterKind === 'npc' || filterKind === 'monster') {
+      if (c.kind !== filterKind) return false;
     }
     if (!searchQuery.trim()) return true;
     const q = searchQuery.toLowerCase();
@@ -105,143 +93,212 @@ export const CharactersView: React.FC<CharactersViewProps> = ({
   });
 
   const selectedCharacter =
-    characters.find((c) => c.id === selectedId) || filteredCharacters[0] || characters[0];
+    visibleCharacters.find((c) => c.id === selectedId) ||
+    filteredCharacters[0] ||
+    visibleCharacters[0];
 
-  const handleCreateNew = (kind: EntityKind) => {
+  const handleCreateNew = (kind: EntityKind, asPreGenBlueprint = false) => {
+    if (kind === 'pc') {
+      setShowSupervisedCreate({ isOpen: true, isBlueprint: asPreGenBlueprint });
+      return;
+    }
+    const isNpc = kind === 'npc';
     const newChar: CharacterEntity = {
-      ...structuredClone(EMPTY_CHARACTER),
       id: `${kind}-${Date.now()}`,
       kind,
-      name:
-        kind === 'pc'
-          ? 'Nuovo Eroe PG'
-          : kind === 'npc'
-          ? 'Nuovo PNG Importante'
-          : 'Nuova Creatura / Mostro',
-      playerOrRole:
-        kind === 'pc' ? 'Giocatore: ...' : kind === 'npc' ? 'NPC — Alleato / Contatto' : 'Mostro Dungeon',
-      levelOrCr: kind === 'pc' ? 'Livello 3' : 'GS 1 (200 PE)',
-      classOrArchetype: kind === 'pc' ? 'Avventuriero' : '',
+      name: isNpc
+        ? tr('New Notable NPC', 'Nuovo PNG Importante')
+        : tr('New Creature / Monster', 'Nuova Creatura / Mostro'),
+      playerOrRole: isNpc
+        ? tr('NPC — Ally / Contact', 'NPC — Alleato / Contatto')
+        : tr('Dungeon Monster', 'Mostro Dungeon'),
+      background: undefined,
+      size: tr('Medium', 'Media'),
+      creatureType: isNpc ? tr('Humanoid', 'Umanoide') : tr('Monstrosity', 'Mostruosità'),
+      alignment: tr('Neutral', 'Neutrale'),
+      classOrArchetype: '',
+      levelOrCr: tr('CR 1 (200 XP)', 'GS 1 (200 PE)'),
+      ac: 13,
+      acNote: '',
+      hpMax: 22,
+      hitDiceFormula: '4d8 + 4',
+      speed: tr('30 ft.', '9m'),
+      initiativeBonus: 1,
+      passivePerception: 11,
+      abilities: { str: 14, dex: 12, con: 12, int: 10, wis: 12, cha: 10 },
+      savingThrowProficiencies: {},
+      skillProficiencies: {},
+      savingThrows: '',
+      skills: '',
+      senses: tr('Passive Perception 11', 'Percezione passiva 11'),
+      languages: tr('Common', 'Comune'),
+      traits: [],
+      actions: [
+        {
+          name: tr('Melee Strike', 'Attacco in Mischia'),
+          description: tr(
+            'Melee Weapon Attack: +4 to hit, reach 5 ft. Hit: 1d6 + 2 damage.',
+            'Attacco con arma da mischia: +4 a colpire, portata 1,5m. Colpito: 1d6 + 2 danni.'
+          ),
+          attackBonus: 4,
+          damageFormula: '1d6+2',
+        },
+      ],
+      reactionsOrLegendary: [],
+      spellsNotes: '',
+      biographyOrLore: '',
+      tags: [tr('New', 'Nuovo')],
     };
     setEditingChar(newChar);
+  };
+
+  const openInstantiateModal = (blueprint: CharacterEntity) => {
+    setInstantiatingBlueprint(blueprint);
+    setInstPlayerName('');
+    setInstCustomCharName(blueprint.name);
+    setInstTargetPartyId(parties[0]?.id || '');
+  };
+
+  const handleConfirmInstantiate = () => {
+    if (!instantiatingBlueprint) return;
+    const playerLabel = instPlayerName.trim()
+      ? `${tr('Player:', 'Giocatore:')} ${instPlayerName.trim()}`
+      : tr('Assigned Player', 'Giocatore Assegnato');
+    const instanceChar: CharacterEntity = {
+      ...structuredClone(instantiatingBlueprint),
+      id: `pc-inst-${Date.now()}`,
+      name: instCustomCharName.trim() || instantiatingBlueprint.name,
+      playerOrRole: playerLabel,
+      isPreGenBlueprint: false,
+      sourceBlueprintId: instantiatingBlueprint.id,
+      tags: [
+        ...instantiatingBlueprint.tags.filter(
+          (t) =>
+            t.toLowerCase() !== 'blueprint' &&
+            t.toLowerCase() !== 'pre-gen' &&
+            !t.toLowerCase().includes('blueprint')
+        ),
+        tr('Playing PC', 'PG Giocante'),
+      ],
+    };
+    onSaveCharacter(instanceChar);
+
+    if (instTargetPartyId) {
+      const party = parties.find((p) => p.id === instTargetPartyId);
+      if (party && !party.memberCharacterIds.includes(instanceChar.id)) {
+        onSaveParty({
+          ...party,
+          memberCharacterIds: [...party.memberCharacterIds, instanceChar.id],
+        });
+      }
+    }
+
+    setInstantiatingBlueprint(null);
+    setSelectedId(instanceChar.id);
   };
 
   const handleDuplicate = (char: CharacterEntity) => {
     const copy: CharacterEntity = {
       ...structuredClone(char),
       id: `${char.kind}-${Date.now()}`,
-      name: `${char.name} (Copia)`,
+      name: `${char.name} (${tr('Copy', 'Copia')})`,
     };
     onSaveCharacter(copy);
     setSelectedId(copy.id);
   };
 
-  const updateAbility = (key: keyof CharacterEntity['abilities'], val: number) => {
-    if (!editingChar) return;
-    setEditingChar({
-      ...editingChar,
-      abilities: {
-        ...editingChar.abilities,
-        [key]: Math.max(1, Math.min(30, val || 10)),
-      },
-    });
-  };
+  const pcsOnly = visibleCharacters.filter((c) => c.kind === 'pc');
+  const blueprintsCount = pcsOnly.filter((c) => isPcBlueprint(c)).length;
 
-  const updateListEntry = (
-    field: 'traits' | 'actions' | 'reactionsOrLegendary',
-    index: number,
-    patch: Partial<StatblockEntry>
-  ) => {
-    if (!editingChar) return;
-    const current = [...(editingChar[field] || [])];
-    current[index] = { ...current[index], ...patch };
-    setEditingChar({ ...editingChar, [field]: current });
-  };
+  // 1. FULL PAGE: Supervised PC Creation View
+  if (showSupervisedCreate) {
+    return (
+      <SupervisedPgCreateView
+        isBlueprintDefault={showSupervisedCreate.isBlueprint}
+        onCancel={() => setShowSupervisedCreate(null)}
+        onSaveDirect={(createdChar) => {
+          onSaveCharacter(createdChar);
+          setSelectedId(createdChar.id);
+          setShowSupervisedCreate(null);
+        }}
+        onProceedToEditor={(createdChar) => {
+          onSaveCharacter(createdChar);
+          setSelectedId(createdChar.id);
+          setShowSupervisedCreate(null);
+          setEditingChar(structuredClone(createdChar));
+        }}
+      />
+    );
+  }
 
-  const addListEntry = (field: 'traits' | 'actions' | 'reactionsOrLegendary') => {
-    if (!editingChar) return;
-    const current = [...(editingChar[field] || [])];
-    current.push({ name: 'Nuova Capacità / Azione', description: 'Descrizione dell’effetto o tiro per colpire.' });
-    setEditingChar({ ...editingChar, [field]: current });
-  };
+  // 2. FULL PAGE: Character Sheet Editor
+  if (editingChar) {
+    return (
+      <>
+        <FullPageCharacterEditor
+          character={editingChar}
+          onSave={(savedChar) => {
+            onSaveCharacter(savedChar);
+            setSelectedId(savedChar.id);
+            setEditingChar(null);
+          }}
+          onCancel={() => setEditingChar(null)}
+          onLevelUp={(charToLevelUp) => setLevelUpTargetChar(charToLevelUp)}
+        />
 
-  const removeListEntry = (field: 'traits' | 'actions' | 'reactionsOrLegendary', index: number) => {
-    if (!editingChar) return;
-    const current = [...(editingChar[field] || [])];
-    current.splice(index, 1);
-    setEditingChar({ ...editingChar, [field]: current });
-  };
+        {/* Level-Up Modal when invoked from inside the editor */}
+        {levelUpTargetChar && (
+          <LevelUpModal
+            isOpen={Boolean(levelUpTargetChar)}
+            character={levelUpTargetChar}
+            onClose={() => setLevelUpTargetChar(null)}
+            onSave={(updatedChar, saveMode) => {
+              if (saveMode === 'new_blueprint') {
+                const newBp: CharacterEntity = {
+                  ...updatedChar,
+                  id: `pc-bp-${Date.now()}`,
+                  isPreGenBlueprint: true,
+                  sourceBlueprintId: levelUpTargetChar.id,
+                };
+                onSaveCharacter(newBp);
+                setSelectedId(newBp.id);
+                setEditingChar(structuredClone(newBp));
+              } else {
+                onSaveCharacter(updatedChar);
+                setSelectedId(updatedChar.id);
+                setEditingChar(structuredClone(updatedChar));
+              }
+              setLevelUpTargetChar(null);
+            }}
+          />
+        )}
+      </>
+    );
+  }
 
-  const pcsOnly = characters.filter((c) => c.kind === 'pc');
-
+  // 3. MAIN REPOSITORY LIST VIEW
   return (
     <div className="h-full flex flex-col gap-5">
-      {/* Top Bar */}
-      <div className="flex flex-wrap items-center justify-between gap-4 bg-stone-900/90 border border-stone-800 p-4 rounded-xl">
-        <div>
-          <h2 className="font-header text-2xl font-bold text-amber-400 flex items-center gap-2">
-            <Users className="w-6 h-6 text-amber-500" />
-            Repository Globale: PG, NPC, Bestiario & Gruppi
-          </h2>
-          <p className="text-xs text-stone-400 mt-0.5">
-            Crea una sola volta le schede D&D 5e di giocatori, PNG e mostri per riutilizzarli in qualsiasi One-Shot, Campagna o Combattimento.
-          </p>
-        </div>
-
-        <div className="flex flex-wrap items-center gap-2">
-          <button
-            onClick={() => handleCreateNew('pc')}
-            className="px-3 py-2 rounded-lg bg-amber-600 hover:bg-amber-500 text-stone-950 font-bold text-xs flex items-center gap-1.5 transition shadow"
-          >
-            <UserPlus className="w-4 h-4" /> + Nuovo PG
-          </button>
-          <button
-            onClick={() => handleCreateNew('npc')}
-            className="px-3 py-2 rounded-lg bg-sky-700 hover:bg-sky-600 text-white font-bold text-xs flex items-center gap-1.5 transition shadow"
-          >
-            <UserCheck className="w-4 h-4" /> + Nuovo NPC
-          </button>
-          <button
-            onClick={() => handleCreateNew('monster')}
-            className="px-3 py-2 rounded-lg bg-red-800 hover:bg-red-700 text-amber-100 font-bold text-xs flex items-center gap-1.5 transition shadow"
-          >
-            <Skull className="w-4 h-4" /> + Nuovo Mostro/Boss
-          </button>
-          <button
-            onClick={() =>
-              setEditingParty({
-                id: `party-${Date.now()}`,
-                name: 'Nuovo Gruppo di Gioco',
-                description: 'Formazione di PG per sessioni o one-shot.',
-                memberCharacterIds: pcsOnly.slice(0, 3).map((p) => p.id),
-              })
-            }
-            className="px-3 py-2 rounded-lg bg-stone-800 hover:bg-stone-700 text-amber-300 border border-amber-500/30 font-bold text-xs flex items-center gap-1.5 transition"
-          >
-            <FolderPlus className="w-4 h-4" /> + Nuovo Gruppo (Party)
-          </button>
-        </div>
-      </div>
-
-      {/* Filter Tabs & Search */}
+      {/* Toolbar: filters and search on the left, one "New" menu on the right */}
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-1.5 bg-stone-900 p-1 rounded-lg border border-stone-800">
+        <div className="flex flex-wrap items-center gap-1">
           {(
             [
-              ['all', `Tutti (${characters.length})`],
-              ['pc', `PG Giocanti (${characters.filter((c) => c.kind === 'pc').length})`],
-              ['npc', `NPC (${characters.filter((c) => c.kind === 'npc').length})`],
-              ['monster', `Mostri & Boss (${characters.filter((c) => c.kind === 'monster').length})`],
-              ['parties', `Gruppi / Party (${parties.length})`],
+              ['all', tr('All', 'Tutti')],
+              ['pc', tr('PCs', 'PG')],
+              ['pc_blueprints', tr('Pre-gens', 'Pre-gen')],
+              ['npc', 'NPC'],
+              ['monster', tr('Monsters', 'Mostri')],
+              ['parties', tr('Parties', 'Gruppi')],
             ] as const
           ).map(([key, label]) => (
             <button
               key={key}
               onClick={() => setFilterKind(key)}
-              className={`px-3 py-1.5 rounded-md text-xs font-semibold transition ${
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer ${
                 filterKind === key
-                  ? 'bg-amber-600 text-stone-950 font-bold shadow'
-                  : 'text-stone-400 hover:text-stone-200'
+                  ? 'bg-stone-800 text-amber-300'
+                  : 'text-stone-400 hover:text-stone-200 hover:bg-stone-900'
               }`}
             >
               {label}
@@ -249,15 +306,66 @@ export const CharactersView: React.FC<CharactersViewProps> = ({
           ))}
         </div>
 
-        <div className="relative w-full sm:w-72">
-          <Search className="w-4 h-4 text-stone-500 absolute left-3 top-1/2 -translate-y-1/2" />
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Cerca per nome, classe, GS, tag..."
-            className="w-full pl-9 pr-3 py-1.5 rounded-lg bg-stone-900 border border-stone-800 text-sm text-stone-200 focus:outline-none focus:border-amber-500"
-          />
+        <div className="flex items-center gap-2">
+          <div className="relative w-56">
+            <Search className="w-4 h-4 text-stone-500 absolute left-3 top-1/2 -translate-y-1/2" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder={tr('Search…', 'Cerca…')}
+              className="w-full pl-9 pr-3 py-1.5 rounded-lg bg-stone-900 border border-stone-800 text-sm text-stone-200 focus:outline-none focus:border-stone-600"
+            />
+          </div>
+
+          <div className="relative">
+            <button
+              onClick={() => setNewMenuOpen((o) => !o)}
+              className="px-3.5 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-500 text-stone-950 font-semibold text-xs flex items-center gap-1.5 transition cursor-pointer"
+            >
+              <Plus className="w-4 h-4" /> {tr('New', 'Nuovo')} <ChevronDown className="w-3.5 h-3.5" />
+            </button>
+            {newMenuOpen && (
+              <>
+                <div className="fixed inset-0 z-30" onClick={() => setNewMenuOpen(false)} />
+                <div className="absolute right-0 mt-1 z-40 w-60 rounded-xl border border-stone-700 bg-stone-900 shadow-xl py-1 text-xs">
+                  {(
+                    [
+                      [Sparkles, tr('PC blueprint (pre-gen)', 'PG blueprint (pre-gen)'), () => handleCreateNew('pc', true)],
+                      [UserPlus, tr('Player PC', 'PG giocatore'), () => handleCreateNew('pc', false)],
+                      [UserCheck, 'NPC', () => handleCreateNew('npc')],
+                      [Skull, tr('Monster / boss', 'Mostro / boss'), () => handleCreateNew('monster')],
+                      [
+                        FolderPlus,
+                        tr('Party', 'Gruppo'),
+                        () =>
+                          setEditingParty({
+                            id: `party-${Date.now()}`,
+                            name: tr('New Adventuring Party', 'Nuovo Gruppo di Gioco'),
+                            description: tr(
+                              'PC roster for sessions or one-shots.',
+                              'Formazione di PG per sessioni o one-shot.'
+                            ),
+                            memberCharacterIds: pcsOnly.slice(0, 3).map((p) => p.id),
+                          }),
+                      ],
+                    ] as const
+                  ).map(([Icon, label, action]) => (
+                    <button
+                      key={label}
+                      onClick={() => {
+                        setNewMenuOpen(false);
+                        action();
+                      }}
+                      className="w-full px-3 py-2 flex items-center gap-2 text-stone-200 hover:bg-stone-800 cursor-pointer text-left"
+                    >
+                      <Icon className="w-4 h-4 text-stone-400" /> {label}
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
         </div>
       </div>
 
@@ -271,153 +379,238 @@ export const CharactersView: React.FC<CharactersViewProps> = ({
             return (
               <div
                 key={party.id}
-                className="bg-stone-900/90 border border-stone-800 rounded-xl p-5 flex flex-col justify-between gap-4"
+                className="bg-stone-900 border border-stone-800 rounded-xl p-4 flex flex-col justify-between"
               >
                 <div>
-                  <div className="flex items-start justify-between gap-2">
+                  <div className="flex items-start justify-between">
                     <div>
-                      <h3 className="font-header text-lg font-bold text-amber-400">{party.name}</h3>
-                      <p className="text-xs text-stone-400 mt-1">{party.description}</p>
+                      <h3 className="font-header text-lg font-bold text-amber-400 flex items-center gap-2">
+                        <Users className="w-5 h-5 text-amber-500" />
+                        {party.name}
+                      </h3>
+                      <p className="text-xs text-stone-400 mt-0.5">{party.description}</p>
                     </div>
-                    <div className="flex items-center gap-1.5">
+                    <div className="flex items-center gap-1">
                       <button
                         onClick={() => setEditingParty(structuredClone(party))}
-                        className="px-2.5 py-1 rounded bg-stone-800 hover:bg-stone-700 text-xs text-amber-300 font-semibold"
+                        className="px-2.5 py-1 text-xs rounded bg-stone-800 hover:bg-stone-700 text-amber-300 font-semibold"
                       >
-                        Modifica
+                        {tr('Edit', 'Modifica')}
                       </button>
                       <button
                         onClick={() => onDeleteParty(party.id)}
-                        className="p-1.5 rounded bg-stone-800 hover:bg-red-900/60 text-stone-400 hover:text-red-200"
+                        className="p-1 rounded bg-stone-800 hover:bg-red-900/60 text-stone-400 hover:text-red-300"
                       >
-                        <Trash2 className="w-4 h-4" />
+                        <Trash2 className="w-3.5 h-3.5" />
                       </button>
                     </div>
                   </div>
 
-                  <div className="mt-4 space-y-2">
-                    <div className="text-[11px] font-bold uppercase tracking-wider text-stone-400">
-                      Membri del Gruppo ({members.length} PG)
+                  <div className="mt-4">
+                    <div className="text-[11px] font-bold text-stone-400 uppercase tracking-wider mb-2">
+                      {tr('Roster Members', 'Componenti del Gruppo')} ({members.length})
                     </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                      {members.map((m) => (
-                        <div
-                          key={m.id}
-                          className="p-2.5 rounded-lg bg-stone-950 border border-stone-800 flex items-center justify-between"
-                        >
-                          <div>
-                            <div className="font-bold text-sm text-amber-200">{m.name}</div>
-                            <div className="text-[11px] text-stone-400">
-                              {m.classOrArchetype} • {m.levelOrCr}
+                    {members.length === 0 ? (
+                      <div className="text-xs text-stone-500 italic p-3 bg-stone-950/60 rounded border border-stone-800/60">
+                        {tr(
+                          'No characters assigned to this party yet.',
+                          'Nessun personaggio ancora assegnato a questo gruppo.'
+                        )}
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        {members.map((m) => {
+                          const isBp = isPcBlueprint(m);
+                          return (
+                            <div
+                              key={m.id}
+                              className="p-2.5 rounded bg-stone-950 border border-stone-800/80 flex items-center justify-between gap-2"
+                            >
+                              <div className="flex items-center gap-2 min-w-0">
+                                {m.portraitUrl && (
+                                  <img
+                                    src={m.portraitUrl}
+                                    alt={m.name}
+                                    className="w-8 h-8 rounded object-cover border border-amber-500/30 shrink-0"
+                                  />
+                                )}
+                                <div className="min-w-0">
+                                  <div className="font-bold text-xs text-stone-200 truncate">
+                                    {m.name}
+                                  </div>
+                                  <div className="text-[10px] text-stone-400 truncate">
+                                    {isBp
+                                      ? tr('Blueprint (Reusable)', 'Blueprint (Riutilizzabile)')
+                                      : m.playerOrRole || tr('Player PC', 'PG Giocatore')}{' '}
+                                    • {m.levelOrCr}
+                                  </div>
+                                </div>
+                              </div>
+                              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-950/40 text-amber-300 border border-amber-800/40 shrink-0">
+                                {m.classOrArchetype}
+                              </span>
                             </div>
-                          </div>
-                          <div className="text-right text-xs font-mono text-stone-300">
-                            <div>CA {m.ac}</div>
-                            <div className="text-emerald-400">PF {m.hpMax}</div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
+                          );
+                        })}
+                      </div>
+                    )}
                   </div>
                 </div>
 
-                <div className="text-[11px] text-stone-500 border-t border-stone-800 pt-2">
-                  ID Template Gruppo: <code>{party.id}</code> — Associabile a qualsiasi nuova Istanza di Gioco.
+                <div className="mt-4 pt-3 border-t border-stone-800 flex justify-between items-center text-xs text-stone-500">
+                  <span>ID: {party.id}</span>
+                  <span>
+                    {members.length}{' '}
+                    {members.length === 1
+                      ? tr('character', 'personaggio')
+                      : tr('characters', 'personaggi')}
+                  </span>
                 </div>
               </div>
             );
           })}
         </div>
       ) : (
-        /* Main Master-Detail Split for Characters */
+        /* Characters 2-Column View: Master list & Live statblock preview */
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 flex-1 min-h-0">
           {/* Left List */}
-          <div className="lg:col-span-5 space-y-2.5 overflow-y-auto max-h-[72vh] pr-1">
+          <div className="lg:col-span-5 space-y-2 overflow-y-auto max-h-[72vh] pr-1">
+            {filteredCharacters.length === 0 && (
+              <div className="p-8 text-center text-stone-500 bg-stone-900/50 rounded-xl border border-stone-800">
+                {characters.length === 0
+                  ? tr(
+                      'No characters yet. Use New to create your first one.',
+                      'Ancora nessun personaggio. Usa Nuovo per crearne uno.'
+                    )
+                  : tr(
+                      'No characters found matching the current filters.',
+                      'Nessun personaggio trovato con i filtri correnti.'
+                    )}
+              </div>
+            )}
+
             {filteredCharacters.map((c) => {
-              const active = selectedCharacter?.id === c.id;
+              const isSelected = c.id === selectedCharacter?.id;
+              const isBp = isPcBlueprint(c);
+              const iconBtn = 'p-1.5 rounded-md hover:bg-stone-800 text-stone-400 hover:text-stone-200 cursor-pointer';
               return (
                 <div
                   key={c.id}
                   onClick={() => setSelectedId(c.id)}
-                  className={`cursor-pointer p-3.5 rounded-xl border transition flex items-center justify-between gap-3 ${
-                    active
-                      ? 'bg-amber-950/30 border-amber-500/70 shadow-md'
-                      : 'bg-stone-900/80 border-stone-800 hover:border-stone-700'
+                  className={`px-3 py-2.5 rounded-lg border cursor-pointer transition ${
+                    isSelected
+                      ? 'bg-stone-800/70 border-stone-600'
+                      : 'bg-stone-900/40 border-stone-800/70 hover:bg-stone-900'
                   }`}
                 >
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2">
-                      <span
-                        className={`w-2.5 h-2.5 rounded-full shrink-0 ${
-                          c.kind === 'pc'
-                            ? 'bg-amber-400'
-                            : c.kind === 'npc'
-                            ? 'bg-sky-400'
-                            : 'bg-red-500'
-                        }`}
+                  <div className="flex items-center gap-3 min-w-0">
+                    {c.portraitUrl ? (
+                      <img
+                        src={c.portraitUrl}
+                        alt={c.name}
+                        className="w-9 h-9 rounded-md object-cover border border-stone-700 shrink-0"
                       />
-                      <h4 className="font-bold text-stone-100 truncate">{c.name}</h4>
-                      <span className="text-[10px] px-2 py-0.5 rounded bg-stone-800 text-stone-300 font-semibold">
-                        {c.levelOrCr}
-                      </span>
+                    ) : (
+                      <div className="w-9 h-9 rounded-md bg-stone-950 border border-stone-800 flex items-center justify-center shrink-0 text-stone-500">
+                        {c.kind === 'pc' ? (
+                          <Users className="w-4 h-4" />
+                        ) : c.kind === 'npc' ? (
+                          <UserCheck className="w-4 h-4" />
+                        ) : (
+                          <Skull className="w-4 h-4" />
+                        )}
+                      </div>
+                    )}
+
+                    <div className="min-w-0 flex-1">
+                      <div className="font-semibold text-stone-100 text-sm truncate">
+                        {c.name}
+                        {isBp && (
+                          <span className="ml-2 text-[10px] font-medium text-purple-300">
+                            {tr('Blueprint', 'Blueprint')}
+                          </span>
+                        )}
+                      </div>
+                      <div className="text-xs text-stone-500 truncate">
+                        {[c.classOrArchetype, c.levelOrCr].filter(Boolean).join(' · ')}
+                        {c.playerOrRole && !isBp ? ` · ${c.playerOrRole}` : ''}
+                      </div>
                     </div>
-                    <p className="text-xs text-stone-400 truncate mt-0.5">
-                      {c.playerOrRole} {c.classOrArchetype ? `• ${c.classOrArchetype}` : ''}
-                    </p>
-                    <div className="flex flex-wrap gap-1 mt-1.5">
-                      <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-stone-950 text-amber-300 border border-stone-800">
-                        id: @{c.kind === 'pc' ? 'npc' : 'npc'}[{c.id}]
-                      </span>
-                      {c.tags.slice(0, 3).map((t, idx) => (
-                        <span
-                          key={idx}
-                          className="text-[10px] px-1.5 py-0.5 rounded bg-stone-800/80 text-stone-400"
-                        >
-                          {t}
-                        </span>
-                      ))}
+
+                    <div className="text-xs text-stone-500 shrink-0 text-right">
+                      {tr('AC', 'CA')} {c.ac} · {tr('HP', 'PF')} {c.hpMax}
                     </div>
                   </div>
 
-                  <div className="text-right shrink-0">
-                    <div className="flex items-center gap-2 text-xs font-semibold text-stone-200">
-                      <span className="px-2 py-0.5 rounded bg-stone-800">CA {c.ac}</span>
-                      <span className="px-2 py-0.5 rounded bg-red-950/70 text-red-200 border border-red-800/40">
-                        PF {c.hpMax}
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-end gap-1 mt-2">
+                  {isSelected && (
+                    <div className="flex items-center justify-end gap-0.5 mt-2 pt-2 border-t border-stone-800">
+                      {c.kind === 'pc' && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setLevelUpTargetChar(c);
+                          }}
+                          className="px-2 py-1 rounded-md hover:bg-stone-800 text-stone-300 text-xs flex items-center gap-1 cursor-pointer"
+                        >
+                          <TrendingUp className="w-3.5 h-3.5" /> {tr('Level up', 'Sali di livello')}
+                        </button>
+                      )}
+                      {c.kind === 'pc' && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            openInstantiateModal(c);
+                          }}
+                          title={tr(
+                            'Create an assigned player instance from this PC Blueprint',
+                            'Assegna a un giocatore / Crea istanza da questo PG Blueprint'
+                          )}
+                          className="px-2 py-1 rounded-md hover:bg-stone-800 text-stone-300 text-xs cursor-pointer"
+                        >
+                          {tr('Assign', 'Assegna')}
+                        </button>
+                      )}
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
                           setEditingChar(structuredClone(c));
                         }}
-                        className="px-2 py-0.5 text-[11px] rounded bg-stone-800 hover:bg-amber-600 hover:text-stone-950 text-stone-300 transition"
+                        className="px-2 py-1 rounded-md hover:bg-stone-800 text-stone-300 text-xs cursor-pointer"
                       >
-                        Modifica
+                        {tr('Edit', 'Modifica')}
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          downloadOfficialCharacterPdf(c, lang);
+                        }}
+                        title={tr('Export Official D&D 5e PDF', 'Esporta PDF Ufficiale D&D 5e')}
+                        className={iconBtn}
+                      >
+                        <FileDown className="w-4 h-4" />
                       </button>
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
                           handleDuplicate(c);
                         }}
-                        title="Duplica scheda"
-                        className="p-1 rounded bg-stone-800 hover:bg-stone-700 text-stone-400"
+                        title={tr('Duplicate sheet', 'Duplica scheda')}
+                        className={iconBtn}
                       >
-                        <Copy className="w-3.5 h-3.5" />
+                        <Copy className="w-4 h-4" />
                       </button>
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
                           onDeleteCharacter(c.id);
                         }}
-                        title="Elimina scheda"
-                        className="p-1 rounded bg-stone-800 hover:bg-red-900/60 text-stone-400 hover:text-red-200"
+                        title={tr('Delete sheet', 'Elimina scheda')}
+                        className="p-1.5 rounded-md hover:bg-stone-800 text-stone-500 hover:text-red-300 cursor-pointer"
                       >
-                        <Trash2 className="w-3.5 h-3.5" />
+                        <Trash2 className="w-4 h-4" />
                       </button>
                     </div>
-                  </div>
+                  )}
                 </div>
               );
             })}
@@ -427,344 +620,118 @@ export const CharactersView: React.FC<CharactersViewProps> = ({
           <div className="lg:col-span-7 overflow-y-auto max-h-[72vh] pr-1">
             {selectedCharacter ? (
               <div className="space-y-3">
-                <div className="flex items-center justify-between bg-stone-900/90 border border-stone-800 px-4 py-2.5 rounded-xl text-xs">
-                  <div className="flex items-center gap-2 text-stone-300">
-                    <span>Tag per inserimento rapido nella storia Homebrewery:</span>
-                    <code className="px-2 py-0.5 rounded bg-stone-950 text-amber-400 border border-stone-800 font-mono">
-                      @npc[{selectedCharacter.id}]
-                    </code>
-                    <span>oppure</span>
-                    <code className="px-2 py-0.5 rounded bg-stone-950 text-amber-400 border border-stone-800 font-mono">
-                      @statblock[{selectedCharacter.id}]
-                    </code>
-                  </div>
+                <div className="text-xs text-stone-500 flex flex-wrap items-center gap-2">
+                  {tr('Insert in a story:', 'Inserisci in una storia:')}
+                  <code className="font-mono text-stone-400">@npc[{selectedCharacter.id}]</code>
+                  <code className="font-mono text-stone-400">@statblock[{selectedCharacter.id}]</code>
                 </div>
                 <StatblockCard
                   character={selectedCharacter}
-                  onEdit={(ch) => setEditingChar(structuredClone(ch))}
+                  onEdit={(ch) => {
+                    setEditingChar(structuredClone(ch));
+                  }}
+                  onLevelUp={
+                    selectedCharacter.kind === 'pc'
+                      ? (ch) => setLevelUpTargetChar(ch)
+                      : undefined
+                  }
+                  onCreatePcInstance={
+                    selectedCharacter.kind === 'pc'
+                      ? (bp) => openInstantiateModal(bp)
+                      : undefined
+                  }
                 />
               </div>
             ) : (
               <div className="p-12 text-center text-stone-500 bg-stone-900/40 rounded-xl border border-stone-800">
-                Seleziona o crea un personaggio per visualizzare lo Statblock D&D 5e.
+                {tr(
+                  'Select or create a character to view its D&D 5e Statblock.',
+                  'Seleziona o crea un personaggio per visualizzare lo Statblock D&D 5e.'
+                )}
               </div>
             )}
           </div>
         </div>
       )}
 
-      {/* Character Editor Modal */}
-      {editingChar && (
+      {/* Modal: Instantiate Player Character from Blueprint */}
+      {instantiatingBlueprint && (
         <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-stone-900 border border-stone-700 rounded-2xl max-w-5xl w-full max-h-[90vh] flex flex-col shadow-2xl overflow-hidden">
-            <div className="px-6 py-4 border-b border-stone-800 flex items-center justify-between">
-              <h3 className="font-header text-xl font-bold text-amber-400">
-                Editor Scheda D&D 5e — {editingChar.name}
-              </h3>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => setEditingChar(null)}
-                  className="px-3 py-1.5 rounded-lg bg-stone-800 text-stone-300 text-xs font-semibold hover:bg-stone-700"
+          <div className="bg-stone-900 border border-purple-500/50 rounded-2xl max-w-md w-full p-6 space-y-4 shadow-2xl">
+            <h3 className="font-header text-lg font-bold text-purple-300 flex items-center gap-2">
+              <Sparkles className="w-5 h-5 text-purple-400" />
+              {tr('Instantiate PC for Active Campaign', 'Crea PG Giocante da Blueprint')}
+            </h3>
+            <p className="text-xs text-stone-300 leading-relaxed">
+              {tr(
+                'Generate an independent, player-assigned PC sheet cloned from blueprint',
+                'Genera una scheda personaggio indipendente e assegnata partendo dal modello'
+              )}{' '}
+              <strong className="text-amber-400">{instantiatingBlueprint.name}</strong>.
+            </p>
+
+            <div className="space-y-3 text-xs">
+              <div>
+                <label className="block text-stone-300 mb-1 font-semibold">
+                  {tr('Assigned Player Name:', 'Nome del Giocatore Assegnato:')}
+                </label>
+                <input
+                  type="text"
+                  value={instPlayerName}
+                  onChange={(e) => setInstPlayerName(e.target.value)}
+                  placeholder={tr('e.g. Marco, Elena...', 'es. Marco, Elena...')}
+                  className="w-full px-3 py-2 rounded-lg bg-stone-950 border border-stone-700 text-stone-100 font-bold"
+                  autoFocus
+                />
+              </div>
+
+              <div>
+                <label className="block text-stone-300 mb-1 font-semibold">
+                  {tr('Character Name (Customizable):', 'Nome Personaggio (Personalizzabile):')}
+                </label>
+                <input
+                  type="text"
+                  value={instCustomCharName}
+                  onChange={(e) => setInstCustomCharName(e.target.value)}
+                  className="w-full px-3 py-2 rounded-lg bg-stone-950 border border-stone-700 text-stone-100"
+                />
+              </div>
+
+              <div>
+                <label className="block text-stone-300 mb-1 font-semibold">
+                  {tr('Add Directly to Party (Optional):', 'Aggiungi Direttamente al Gruppo:')}
+                </label>
+                <select
+                  value={instTargetPartyId}
+                  onChange={(e) => setInstTargetPartyId(e.target.value)}
+                  className="w-full px-3 py-2 rounded-lg bg-stone-950 border border-stone-700 text-stone-200"
                 >
-                  Annulla
-                </button>
-                <button
-                  onClick={() => {
-                    onSaveCharacter(editingChar);
-                    setSelectedId(editingChar.id);
-                    setEditingChar(null);
-                  }}
-                  className="px-4 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-500 text-stone-950 text-xs font-bold flex items-center gap-1.5"
-                >
-                  <Check className="w-4 h-4" /> Salva Scheda nel Repository
-                </button>
+                  <option value="">
+                    {tr('Do not assign to a party now', 'Non assegnare a nessun gruppo')}
+                  </option>
+                  {parties.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.name}
+                    </option>
+                  ))}
+                </select>
               </div>
             </div>
 
-            <div className="p-6 overflow-y-auto grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* Left Form */}
-              <div className="space-y-4 text-xs">
-                <div className="grid grid-cols-3 gap-3">
-                  <div>
-                    <label className="block text-stone-400 mb-1 font-semibold">Categoria</label>
-                    <select
-                      value={editingChar.kind}
-                      onChange={(e) => setEditingChar({ ...editingChar, kind: e.target.value as EntityKind })}
-                      className="w-full px-2.5 py-2 rounded bg-stone-950 border border-stone-700 text-stone-100"
-                    >
-                      <option value="pc">PG (Giocatore)</option>
-                      <option value="npc">NPC (Alleato/PNG)</option>
-                      <option value="monster">Mostro / Boss</option>
-                    </select>
-                  </div>
-                  <div className="col-span-2">
-                    <label className="block text-stone-400 mb-1 font-semibold">Nome Completo</label>
-                    <input
-                      type="text"
-                      value={editingChar.name}
-                      onChange={(e) => setEditingChar({ ...editingChar, name: e.target.value })}
-                      className="w-full px-2.5 py-2 rounded bg-stone-950 border border-stone-700 text-stone-100 font-bold"
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-stone-400 mb-1 font-semibold">
-                      {editingChar.kind === 'pc' ? 'Nome Giocatore' : 'Ruolo Narrativo / Titolo'}
-                    </label>
-                    <input
-                      type="text"
-                      value={editingChar.playerOrRole}
-                      onChange={(e) => setEditingChar({ ...editingChar, playerOrRole: e.target.value })}
-                      className="w-full px-2.5 py-1.5 rounded bg-stone-950 border border-stone-700 text-stone-200"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-stone-400 mb-1 font-semibold">
-                      Livello (PG) o Grado di Sfida (GS)
-                    </label>
-                    <input
-                      type="text"
-                      value={editingChar.levelOrCr}
-                      onChange={(e) => setEditingChar({ ...editingChar, levelOrCr: e.target.value })}
-                      className="w-full px-2.5 py-1.5 rounded bg-stone-950 border border-stone-700 text-stone-200"
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-3 gap-3">
-                  <div>
-                    <label className="block text-stone-400 mb-1 font-semibold">Tipo / Razza</label>
-                    <input
-                      type="text"
-                      value={editingChar.creatureType}
-                      onChange={(e) => setEditingChar({ ...editingChar, creatureType: e.target.value })}
-                      className="w-full px-2.5 py-1.5 rounded bg-stone-950 border border-stone-700 text-stone-200"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-stone-400 mb-1 font-semibold">Classe / Archetipo</label>
-                    <input
-                      type="text"
-                      value={editingChar.classOrArchetype || ''}
-                      onChange={(e) => setEditingChar({ ...editingChar, classOrArchetype: e.target.value })}
-                      className="w-full px-2.5 py-1.5 rounded bg-stone-950 border border-stone-700 text-stone-200"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-stone-400 mb-1 font-semibold">Allineamento</label>
-                    <input
-                      type="text"
-                      value={editingChar.alignment}
-                      onChange={(e) => setEditingChar({ ...editingChar, alignment: e.target.value })}
-                      className="w-full px-2.5 py-1.5 rounded bg-stone-950 border border-stone-700 text-stone-200"
-                    />
-                  </div>
-                </div>
-
-                {/* Combat Vitals */}
-                <div className="grid grid-cols-5 gap-2 bg-stone-950 p-3 rounded-lg border border-stone-800">
-                  <div>
-                    <label className="block text-stone-400 mb-1">CA</label>
-                    <input
-                      type="number"
-                      value={editingChar.ac}
-                      onChange={(e) => setEditingChar({ ...editingChar, ac: Number(e.target.value) })}
-                      className="w-full px-2 py-1 rounded bg-stone-900 border border-stone-700 text-amber-300 font-bold"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-stone-400 mb-1">PF Max</label>
-                    <input
-                      type="number"
-                      value={editingChar.hpMax}
-                      onChange={(e) => setEditingChar({ ...editingChar, hpMax: Number(e.target.value) })}
-                      className="w-full px-2 py-1 rounded bg-stone-900 border border-stone-700 text-emerald-400 font-bold"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-stone-400 mb-1">Formula Dadi</label>
-                    <input
-                      type="text"
-                      value={editingChar.hitDiceFormula}
-                      onChange={(e) => setEditingChar({ ...editingChar, hitDiceFormula: e.target.value })}
-                      className="w-full px-2 py-1 rounded bg-stone-900 border border-stone-700 text-stone-200"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-stone-400 mb-1">Bonus Iniz.</label>
-                    <input
-                      type="number"
-                      value={editingChar.initiativeBonus}
-                      onChange={(e) =>
-                        setEditingChar({ ...editingChar, initiativeBonus: Number(e.target.value) })
-                      }
-                      className="w-full px-2 py-1 rounded bg-stone-900 border border-stone-700 text-stone-200"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-stone-400 mb-1">Perc. Passiva</label>
-                    <input
-                      type="number"
-                      value={editingChar.passivePerception}
-                      onChange={(e) =>
-                        setEditingChar({ ...editingChar, passivePerception: Number(e.target.value) })
-                      }
-                      className="w-full px-2 py-1 rounded bg-stone-900 border border-stone-700 text-stone-200"
-                    />
-                  </div>
-                </div>
-
-                {/* 6 Abilities */}
-                <div>
-                  <label className="block text-stone-400 mb-1 font-semibold">
-                    Caratteristiche D&D 5e (calcolo automatico modificatore)
-                  </label>
-                  <div className="grid grid-cols-6 gap-2">
-                    {(
-                      [
-                        ['str', 'FOR'],
-                        ['dex', 'DES'],
-                        ['con', 'COS'],
-                        ['int', 'INT'],
-                        ['wis', 'SAG'],
-                        ['cha', 'CAR'],
-                      ] as const
-                    ).map(([k, label]) => (
-                      <div key={k} className="bg-stone-950 p-2 rounded border border-stone-800 text-center">
-                        <div className="text-[10px] font-bold text-amber-400">{label}</div>
-                        <input
-                          type="number"
-                          value={editingChar.abilities[k]}
-                          onChange={(e) => updateAbility(k, Number(e.target.value))}
-                          className="w-full mt-1 text-center py-1 rounded bg-stone-900 border border-stone-700 text-stone-100 font-bold"
-                        />
-                        <div className="text-[10px] text-stone-400 mt-0.5">
-                          {formatMod(editingChar.abilities[k])}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Skills & Saves */}
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-stone-400 mb-1">Tiri Salvezza</label>
-                    <input
-                      type="text"
-                      value={editingChar.savingThrows || ''}
-                      onChange={(e) => setEditingChar({ ...editingChar, savingThrows: e.target.value })}
-                      className="w-full px-2.5 py-1.5 rounded bg-stone-950 border border-stone-700 text-stone-200"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-stone-400 mb-1">Abilità</label>
-                    <input
-                      type="text"
-                      value={editingChar.skills || ''}
-                      onChange={(e) => setEditingChar({ ...editingChar, skills: e.target.value })}
-                      className="w-full px-2.5 py-1.5 rounded bg-stone-950 border border-stone-700 text-stone-200"
-                    />
-                  </div>
-                </div>
-
-                {/* Traits & Actions */}
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="font-bold text-amber-400">Tratti & Capacità Speciali</span>
-                    <button
-                      type="button"
-                      onClick={() => addListEntry('traits')}
-                      className="px-2 py-0.5 rounded bg-stone-800 hover:bg-stone-700 text-amber-300"
-                    >
-                      + Aggiungi Tratto
-                    </button>
-                  </div>
-                  {editingChar.traits.map((t, idx) => (
-                    <div key={idx} className="flex gap-2 items-start bg-stone-950 p-2 rounded border border-stone-800">
-                      <input
-                        type="text"
-                        value={t.name}
-                        onChange={(e) => updateListEntry('traits', idx, { name: e.target.value })}
-                        placeholder="Nome tratto"
-                        className="w-1/3 px-2 py-1 rounded bg-stone-900 border border-stone-700 text-amber-200 font-semibold"
-                      />
-                      <input
-                        type="text"
-                        value={t.description}
-                        onChange={(e) => updateListEntry('traits', idx, { description: e.target.value })}
-                        placeholder="Descrizione"
-                        className="flex-1 px-2 py-1 rounded bg-stone-900 border border-stone-700 text-stone-200"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => removeListEntry('traits', idx)}
-                        className="p-1 text-stone-500 hover:text-red-400"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="font-bold text-amber-400">Azioni & Attacchi</span>
-                    <button
-                      type="button"
-                      onClick={() => addListEntry('actions')}
-                      className="px-2 py-0.5 rounded bg-stone-800 hover:bg-stone-700 text-amber-300"
-                    >
-                      + Aggiungi Azione
-                    </button>
-                  </div>
-                  {editingChar.actions.map((a, idx) => (
-                    <div key={idx} className="flex gap-2 items-start bg-stone-950 p-2 rounded border border-stone-800">
-                      <input
-                        type="text"
-                        value={a.name}
-                        onChange={(e) => updateListEntry('actions', idx, { name: e.target.value })}
-                        placeholder="Nome azione"
-                        className="w-1/3 px-2 py-1 rounded bg-stone-900 border border-stone-700 text-amber-200 font-semibold"
-                      />
-                      <input
-                        type="text"
-                        value={a.description}
-                        onChange={(e) => updateListEntry('actions', idx, { description: e.target.value })}
-                        placeholder="Descrizione attacco / danni"
-                        className="flex-1 px-2 py-1 rounded bg-stone-900 border border-stone-700 text-stone-200"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => removeListEntry('actions', idx)}
-                        className="p-1 text-stone-500 hover:text-red-400"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-
-                <div>
-                  <label className="block text-stone-400 mb-1">Note Incantesimi / Equipaggiamento / Lore</label>
-                  <textarea
-                    rows={2}
-                    value={editingChar.biographyOrLore}
-                    onChange={(e) => setEditingChar({ ...editingChar, biographyOrLore: e.target.value })}
-                    className="w-full px-2.5 py-1.5 rounded bg-stone-950 border border-stone-700 text-stone-200"
-                  />
-                </div>
-              </div>
-
-              {/* Right Live Statblock Preview */}
-              <div>
-                <div className="text-xs font-bold uppercase tracking-wider text-stone-400 mb-2">
-                  Anteprima Live Statblock D&D 5e
-                </div>
-                <StatblockCard character={editingChar} />
-              </div>
+            <div className="flex justify-end gap-2 pt-3 border-t border-stone-800">
+              <button
+                onClick={() => setInstantiatingBlueprint(null)}
+                className="px-3 py-2 rounded-lg bg-stone-800 text-stone-300 font-semibold text-xs"
+              >
+                {tr('Cancel', 'Annulla')}
+              </button>
+              <button
+                onClick={handleConfirmInstantiate}
+                className="px-4 py-2 rounded-lg bg-amber-600 hover:bg-amber-500 text-stone-950 font-extrabold text-xs flex items-center gap-1.5 shadow"
+              >
+                <Check className="w-4 h-4" />
+                {tr('Create Assigned PC Sheet', 'Crea Scheda PG Assegnata')}
+              </button>
             </div>
           </div>
         </div>
@@ -775,11 +742,13 @@ export const CharactersView: React.FC<CharactersViewProps> = ({
         <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-stone-900 border border-stone-700 rounded-2xl max-w-lg w-full p-6 space-y-4 shadow-2xl">
             <h3 className="font-header text-xl font-bold text-amber-400">
-              Configura Gruppo (Party di Giocatori)
+              {tr('Configure Adventuring Party', 'Configura Gruppo (Party di Giocatori)')}
             </h3>
             <div className="space-y-3 text-xs">
               <div>
-                <label className="block text-stone-400 mb-1 font-semibold">Nome del Gruppo</label>
+                <label className="block text-stone-400 mb-1 font-semibold">
+                  {tr('Party Name', 'Nome del Gruppo')}
+                </label>
                 <input
                   type="text"
                   value={editingParty.name}
@@ -788,21 +757,29 @@ export const CharactersView: React.FC<CharactersViewProps> = ({
                 />
               </div>
               <div>
-                <label className="block text-stone-400 mb-1 font-semibold">Descrizione / Giorno di gioco</label>
+                <label className="block text-stone-400 mb-1 font-semibold">
+                  {tr('Description / Schedule', 'Descrizione / Giorno di gioco')}
+                </label>
                 <input
                   type="text"
                   value={editingParty.description}
-                  onChange={(e) => setEditingParty({ ...editingParty, description: e.target.value })}
+                  onChange={(e) =>
+                    setEditingParty({ ...editingParty, description: e.target.value })
+                  }
                   className="w-full px-3 py-2 rounded bg-stone-950 border border-stone-700 text-stone-200"
                 />
               </div>
               <div>
                 <label className="block text-stone-400 mb-1.5 font-semibold">
-                  Seleziona i PG del Repository che fanno parte di questo gruppo:
+                  {tr(
+                    'Select Repository PCs (Assigned or Pre-Gen Blueprints) belonging to this party:',
+                    'Seleziona i PG del Repository (Assegnati o Blueprint Pre-Gen) che fanno parte di questo gruppo:'
+                  )}
                 </label>
                 <div className="space-y-1.5 max-h-56 overflow-y-auto bg-stone-950 p-2.5 rounded border border-stone-800">
                   {pcsOnly.map((pc) => {
                     const checked = editingParty.memberCharacterIds.includes(pc.id);
+                    const bp = isPcBlueprint(pc);
                     return (
                       <label
                         key={pc.id}
@@ -821,7 +798,9 @@ export const CharactersView: React.FC<CharactersViewProps> = ({
                             className="rounded accent-amber-500"
                           />
                           <span className="font-bold text-stone-200">{pc.name}</span>
-                          <span className="text-stone-400">({pc.playerOrRole})</span>
+                          <span className="text-stone-400">
+                            ({bp ? tr('Pre-Gen Blueprint', 'Blueprint Pre-Gen') : pc.playerOrRole})
+                          </span>
                         </div>
                         <span className="text-amber-400 font-semibold">{pc.classOrArchetype}</span>
                       </label>
@@ -835,21 +814,45 @@ export const CharactersView: React.FC<CharactersViewProps> = ({
                 onClick={() => setEditingParty(null)}
                 className="px-3 py-1.5 rounded bg-stone-800 text-stone-300 text-xs font-semibold"
               >
-                Annulla
+                {tr('Cancel', 'Annulla')}
               </button>
               <button
                 onClick={() => {
                   onSaveParty(editingParty);
                   setEditingParty(null);
-                  setFilterKind('parties');
                 }}
                 className="px-4 py-1.5 rounded bg-amber-600 hover:bg-amber-500 text-stone-950 text-xs font-bold"
               >
-                Salva Gruppo
+                {tr('Save Party', 'Salva Gruppo')}
               </button>
             </div>
           </div>
         </div>
+      )}
+
+      {/* Level-Up Wizard Modal from repository cards */}
+      {levelUpTargetChar && (
+        <LevelUpModal
+          isOpen={Boolean(levelUpTargetChar)}
+          character={levelUpTargetChar}
+          onClose={() => setLevelUpTargetChar(null)}
+          onSave={(updatedChar, saveMode) => {
+            if (saveMode === 'new_blueprint') {
+              const newBp: CharacterEntity = {
+                ...updatedChar,
+                id: `pc-bp-${Date.now()}`,
+                isPreGenBlueprint: true,
+                sourceBlueprintId: levelUpTargetChar.id,
+              };
+              onSaveCharacter(newBp);
+              setSelectedId(newBp.id);
+            } else {
+              onSaveCharacter(updatedChar);
+              setSelectedId(updatedChar.id);
+            }
+            setLevelUpTargetChar(null);
+          }}
+        />
       )}
     </div>
   );

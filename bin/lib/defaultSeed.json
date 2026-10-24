@@ -1,0 +1,225 @@
+{
+  "version": 1,
+  "lastSavedAt": "2026-10-24T14:56:29.224Z",
+  "campaigns": [],
+  "characters": [],
+  "parties": [],
+  "sfxCatalog": [
+    {
+      "id": "sfx-tavern-hearth",
+      "name": "Tavern Fire & Chatter",
+      "category": "ambience",
+      "description": "Crackling fire and a low murmur of voices for inns, rests and social scenes.",
+      "loop": true,
+      "defaultVolume": 0.55,
+      "synthPreset": "tavern_hearth",
+      "iconName": "Flame",
+      "color": "#b8895a",
+      "tags": [
+        "Tavern",
+        "Rest",
+        "Social"
+      ]
+    },
+    {
+      "id": "sfx-rain-storm",
+      "name": "Rain & Wind",
+      "category": "ambience",
+      "description": "Steady rain with gusting wind for travel and outdoor night scenes.",
+      "loop": true,
+      "defaultVolume": 0.5,
+      "synthPreset": "rain_storm",
+      "iconName": "CloudRain",
+      "color": "#6b8ea5",
+      "tags": [
+        "Outdoor",
+        "Weather",
+        "Night"
+      ]
+    },
+    {
+      "id": "sfx-dungeon-wind",
+      "name": "Cave Wind",
+      "category": "ambience",
+      "description": "Low wind drifting through tunnels, caves and ruins.",
+      "loop": true,
+      "defaultVolume": 0.5,
+      "synthPreset": "dungeon_wind",
+      "iconName": "Wind",
+      "color": "#7f8a94",
+      "tags": [
+        "Dungeon",
+        "Cave",
+        "Exploration"
+      ]
+    },
+    {
+      "id": "sfx-crypt-whispers",
+      "name": "Eerie Drone",
+      "category": "ambience",
+      "description": "Dark drone with ghostly resonances for crypts, hauntings and dread.",
+      "loop": true,
+      "defaultVolume": 0.6,
+      "synthPreset": "crypt_whispers",
+      "iconName": "Ghost",
+      "color": "#8975aa",
+      "tags": [
+        "Horror",
+        "Undead",
+        "Tension"
+      ]
+    },
+    {
+      "id": "sfx-combat-drums",
+      "name": "War Drums",
+      "category": "combat_music",
+      "description": "Driving percussion loop to run under a fight.",
+      "loop": true,
+      "defaultVolume": 0.65,
+      "synthPreset": "combat_drums",
+      "iconName": "Swords",
+      "color": "#b06461",
+      "tags": [
+        "Combat",
+        "Action"
+      ]
+    },
+    {
+      "id": "sfx-creaking-door",
+      "name": "Heavy Door",
+      "category": "sfx_environment",
+      "description": "Slow creak of an old door, ending in a dull thud.",
+      "loop": false,
+      "defaultVolume": 0.8,
+      "synthPreset": "creaking_door",
+      "iconName": "DoorOpen",
+      "color": "#8a837c",
+      "tags": [
+        "Door",
+        "Entrance"
+      ]
+    },
+    {
+      "id": "sfx-thunder-clap",
+      "name": "Thunderclap",
+      "category": "sfx_environment",
+      "description": "Sudden thunder boom for storms, reveals and plot twists.",
+      "loop": false,
+      "defaultVolume": 0.85,
+      "synthPreset": "thunder_clap",
+      "iconName": "Zap",
+      "color": "#c4ad7c",
+      "tags": [
+        "Weather",
+        "Drama"
+      ]
+    },
+    {
+      "id": "sfx-trap-trigger",
+      "name": "Trap Triggered",
+      "category": "sfx_environment",
+      "description": "Sharp mechanical click followed by a snap.",
+      "loop": false,
+      "defaultVolume": 0.85,
+      "synthPreset": "trap_trigger",
+      "iconName": "AlertTriangle",
+      "color": "#b08a5a",
+      "tags": [
+        "Trap",
+        "Hazard"
+      ]
+    },
+    {
+      "id": "sfx-sword-clash",
+      "name": "Blades Clash",
+      "category": "sfx_creature",
+      "description": "Metallic impact for the start of a duel or an ambush.",
+      "loop": false,
+      "defaultVolume": 0.8,
+      "synthPreset": "sword_clash",
+      "iconName": "ShieldAlert",
+      "color": "#8f9aa6",
+      "tags": [
+        "Weapon",
+        "Attack"
+      ]
+    },
+    {
+      "id": "sfx-dragon-roar",
+      "name": "Monster Roar",
+      "category": "sfx_creature",
+      "description": "Deep reverberating roar for a boss or a large creature.",
+      "loop": false,
+      "defaultVolume": 0.9,
+      "synthPreset": "dragon_roar",
+      "iconName": "Skull",
+      "color": "#96504e",
+      "tags": [
+        "Boss",
+        "Monster"
+      ]
+    },
+    {
+      "id": "sfx-arcane-blast",
+      "name": "Arcane Blast",
+      "category": "sfx_magic",
+      "description": "Burst of magical energy for spells and magic items.",
+      "loop": false,
+      "defaultVolume": 0.8,
+      "synthPreset": "arcane_blast",
+      "iconName": "Sparkles",
+      "color": "#a593c4",
+      "tags": [
+        "Magic",
+        "Spell"
+      ]
+    },
+    {
+      "id": "sfx-healing-chime",
+      "name": "Healing Light",
+      "category": "sfx_magic",
+      "description": "Bright crystalline chord for healing, blessings and divine magic.",
+      "loop": false,
+      "defaultVolume": 0.75,
+      "synthPreset": "healing_chime",
+      "iconName": "Heart",
+      "color": "#82ad98",
+      "tags": [
+        "Healing",
+        "Divine"
+      ]
+    },
+    {
+      "id": "sfx-war-horn",
+      "name": "War Horn",
+      "category": "sfx_ui",
+      "description": "Solemn horn call to open a session or announce arriving reinforcements.",
+      "loop": false,
+      "defaultVolume": 0.8,
+      "synthPreset": "war_horn",
+      "iconName": "Volume2",
+      "color": "#c0a56d",
+      "tags": [
+        "Signal",
+        "Start"
+      ]
+    },
+    {
+      "id": "sfx-dice-roll",
+      "name": "Dice Roll",
+      "category": "sfx_ui",
+      "description": "Dice tumbling on a table, for dramatic rolls.",
+      "loop": false,
+      "defaultVolume": 0.7,
+      "synthPreset": "dice_roll",
+      "iconName": "Dice5",
+      "color": "#b39a62",
+      "tags": [
+        "Dice",
+        "Table"
+      ]
+    }
+  ],
+  "adventures": [],
+  "playInstances": []
+}

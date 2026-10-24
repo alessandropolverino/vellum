@@ -1,0 +1,4 @@
+# Ensure Makefile always uses LF line endings for cross-platform GNU Make compatibility (Unix, WSL, macOS, Windows)
+Makefile text eol=lf
+*.sh text eol=lf
+*.ps1 text eol=crlf
