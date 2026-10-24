@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   AdventureBlueprint,
   AdventureScene,
@@ -27,6 +27,10 @@ import {
   ChevronUp,
   ChevronDown,
   X,
+  CheckCircle2,
+  Loader2,
+  AlertCircle,
+  Save,
 } from 'lucide-react';
 
 interface AdventureStudioViewProps {
@@ -40,6 +44,9 @@ interface AdventureStudioViewProps {
   onDeleteAdventure: (id: string) => void;
   onSaveCampaign: (camp: Campaign) => void;
   onLaunchInstanceModal: (adventure: AdventureBlueprint) => void;
+  saveStatus?: 'saved' | 'saving' | 'error';
+  lastSavedTime?: string;
+  lastSaveInfo?: string;
 }
 
 export const AdventureStudioView: React.FC<AdventureStudioViewProps> = ({
@@ -53,6 +60,9 @@ export const AdventureStudioView: React.FC<AdventureStudioViewProps> = ({
   onDeleteAdventure,
   onSaveCampaign,
   onLaunchInstanceModal,
+  saveStatus = 'saved',
+  lastSavedTime,
+  lastSaveInfo,
 }) => {
   const { tr } = useLanguage();
   const currentAdventure =
@@ -71,6 +81,18 @@ export const AdventureStudioView: React.FC<AdventureStudioViewProps> = ({
   const [newCampDesc, setNewCampDesc] = useState('');
 
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
+        e.preventDefault();
+        onSaveAdventure(currentAdventure);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [currentAdventure, onSaveAdventure]);
+
 
   if (!currentAdventure) {
     return (
@@ -271,6 +293,48 @@ export const AdventureStudioView: React.FC<AdventureStudioViewProps> = ({
           </div>
 
           <div className="flex items-center gap-2">
+            {/* Auto-save Status Badge & Manual Trigger */}
+            <button
+              type="button"
+              onClick={() => onSaveAdventure(currentAdventure)}
+              title={
+                lastSaveInfo
+                  ? `${lastSaveInfo} — ${tr('Click to save again (Ctrl+S)', 'Clicca per salvare nuovamente (Ctrl+S)')}`
+                  : tr(
+                      'All changes are automatically saved to disk. Click to save now (Ctrl+S).',
+                      'Tutte le modifiche sono salvate automaticamente su disco. Clicca per salvare adesso (Ctrl+S).'
+                    )
+              }
+              className={`px-3 py-1.5 rounded-lg border text-xs font-semibold flex items-center gap-1.5 transition select-none cursor-pointer ${
+                saveStatus === 'saving'
+                  ? 'bg-amber-950/60 border-amber-700/70 text-amber-300 animate-pulse'
+                  : saveStatus === 'error'
+                  ? 'bg-red-950/60 border-red-700/80 text-red-300 hover:bg-red-900/60'
+                  : 'bg-stone-950 border-emerald-900/60 text-emerald-400 hover:bg-stone-900 hover:border-emerald-700/70'
+              }`}
+            >
+              {saveStatus === 'saving' ? (
+                <>
+                  <Loader2 className="w-3.5 h-3.5 animate-spin text-amber-400" />
+                  <span>{tr('Saving...', 'Salvataggio in corso...')}</span>
+                </>
+              ) : saveStatus === 'error' ? (
+                <>
+                  <AlertCircle className="w-3.5 h-3.5 text-red-400" />
+                  <span>{tr('Save Error — Click to retry', 'Errore salvataggio — Clicca per riprovare')}</span>
+                </>
+              ) : (
+                <>
+                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                  <span>
+                    {lastSavedTime
+                      ? tr(`Saved (${lastSavedTime})`, `Salvato (${lastSavedTime})`)
+                      : tr('Saved', 'Salvato')}
+                  </span>
+                </>
+              )}
+            </button>
+
             <button
               onClick={() => onLaunchInstanceModal(currentAdventure)}
               className="px-4 py-2 rounded-lg bg-amber-600 hover:bg-amber-500 text-stone-950 font-extrabold text-xs flex items-center gap-1.5 shadow-lg cursor-pointer"
@@ -793,10 +857,49 @@ export const AdventureStudioView: React.FC<AdventureStudioViewProps> = ({
               {viewMode !== 'preview' && (
                 <div className="flex flex-col h-[72vh] bg-stone-950 border border-stone-800 rounded-xl overflow-hidden">
                   <div className="px-3.5 py-2 bg-stone-900 border-b border-stone-800 text-[11px] font-mono text-stone-400 flex items-center justify-between">
-                    <span>
-                      {tr('Homebrewery Markdown Source', 'Sorgente Homebrewery Markdown')} (
-                      {currentScene.code})
-                    </span>
+                    <div className="flex items-center gap-2">
+                      <span>
+                        {tr('Homebrewery Markdown Source', 'Sorgente Homebrewery Markdown')} (
+                        {currentScene.code})
+                      </span>
+                      <span
+                        className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium transition ${
+                          saveStatus === 'saving'
+                            ? 'bg-amber-950/70 border border-amber-800/80 text-amber-300'
+                            : saveStatus === 'error'
+                            ? 'bg-red-950/70 border border-red-800/80 text-red-300'
+                            : 'bg-emerald-950/50 border border-emerald-900/60 text-emerald-400'
+                        }`}
+                        title={
+                          lastSaveInfo ||
+                          tr(
+                            'All changes automatically saved to disk',
+                            'Tutte le modifiche sono salvate automaticamente su disco'
+                          )
+                        }
+                      >
+                        {saveStatus === 'saving' ? (
+                          <>
+                            <Loader2 className="w-2.5 h-2.5 animate-spin text-amber-400" />
+                            <span>{tr('Saving...', 'Salvataggio...')}</span>
+                          </>
+                        ) : saveStatus === 'error' ? (
+                          <>
+                            <AlertCircle className="w-2.5 h-2.5 text-red-400" />
+                            <span>{tr('Save error', 'Errore')}</span>
+                          </>
+                        ) : (
+                          <>
+                            <CheckCircle2 className="w-2.5 h-2.5 text-emerald-400" />
+                            <span>
+                              {lastSavedTime
+                                ? tr(`Saved ${lastSavedTime}`, `Salvato ${lastSavedTime}`)
+                                : tr('Saved', 'Salvato')}
+                            </span>
+                          </>
+                        )}
+                      </span>
+                    </div>
                     <span>
                       {tr(
                         'Supports :::read-aloud, :::dm-note, @sfx[id], @npc[id], @encounter[id]',

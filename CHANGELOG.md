@@ -4,6 +4,11 @@ All notable user-facing changes to Vellum are documented in this file.
 
 ## Unreleased
 
+- App: Add real-time auto-save status indicator and manual save trigger in Adventure Studio:
+  - Contextual status badges displaying real-time save state (`Saving...`, `Saved (HH:MM:SS)`, `Save Error`) in the Adventure Studio top bar and directly above the Homebrewery Markdown editor.
+  - Interactive save trigger and keyboard shortcut (`Ctrl+S` / `Cmd+S`) allowing users and DMs to instantly verify or force persistence with visual feedback while authoring one-shots, campaign modules, and scenes.
+  - Improved header storage status button visibility on medium/laptop screens (`md`).
+
 - App: Add comprehensive Data Preservation, Automatic Backup, and Schema Migration engine across frequent application updates:
   - Atomic disk writes (`fs::write` to temporary file + disk flush + atomic rename) in Tauri desktop backend and local dev API to guarantee zero file truncation or corruption even during power failure or sudden crashes.
   - Automatic rolling snapshots in `backups/` directory (up to 20 retained snapshots) created every 15 minutes of activity, prior to database imports/restores, and before schema upgrades.
