@@ -496,9 +496,9 @@ export const AdventureStudioView: React.FC<AdventureStudioViewProps> = ({
       </div>
 
       {/* Main studio grid: scenes | editor | scene details */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
+      <div className="grid grid-cols-1 lg:grid-cols-[17rem_minmax(0,1fr)] gap-4 items-start">
         {/* Left: scene list */}
-        <div className="lg:col-span-3 xl:col-span-2 space-y-4">
+        <div className="space-y-4 min-w-0">
           {/* Scene Tree */}
           <div className="bg-stone-900/90 border border-stone-800 rounded-xl p-3.5 space-y-2.5">
             <div className="flex items-center justify-between">
@@ -513,7 +513,7 @@ export const AdventureStudioView: React.FC<AdventureStudioViewProps> = ({
               </button>
             </div>
 
-            <div className="space-y-1.5">
+            <div className="space-y-1.5 max-h-[34vh] overflow-y-auto pr-0.5">
               {currentAdventure.scenes.map((scene, idx) => {
                 const active = currentScene?.id === scene.id;
                 return (
@@ -564,11 +564,228 @@ export const AdventureStudioView: React.FC<AdventureStudioViewProps> = ({
               })}
             </div>
           </div>
+          {currentScene && (
+            <div className="space-y-3">
+            <div className="flex items-center gap-1">
+              {(
+                [
+                  ['sounds', tr('Sounds', 'Suoni')],
+                  ['encounters', tr('Encounters', 'Incontri')],
+                  ['npcs', tr('NPCs', 'PNG')],
+                ] as const
+              ).map(([id, label]) => (
+                <button
+                  key={id}
+                  onClick={() => setDetailsTab(id)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer ${
+                    detailsTab === id
+                      ? 'bg-stone-800 text-amber-300'
+                      : 'text-stone-400 hover:text-stone-200 hover:bg-stone-900'
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+
+            <div className="max-h-[calc(100vh-24rem)] min-h-[14rem] overflow-y-auto pr-0.5 space-y-3">
+            {detailsTab === 'sounds' && (
+              <div>
+          {/* Scene Quick-SFX Assignment */}
+          {currentScene && (
+            <div className="bg-stone-900/90 border border-stone-800 rounded-xl p-3.5 space-y-2.5 text-xs">
+              <div className="font-header text-xs font-bold text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
+                <Volume2 className="w-4 h-4" />{' '}
+                {tr('SFX Assigned to This Scene', 'SFX Assegnati a Questa Scena')}
+              </div>
+              <p className="text-[11px] text-stone-400">
+                {tr(
+                  'Check the sound effects you want at your fingertips when running this scene:',
+                  'Seleziona gli effetti che vuoi avere pronti a portata di mano quando giochi questa scena:'
+                )}
+              </p>
+              <div className="max-h-40 overflow-y-auto space-y-1 bg-stone-950 p-2 rounded border border-stone-800">
+                {sfxCatalog.map((sfx) => {
+                  const checked = currentScene.linkedSfxIds.includes(sfx.id);
+                  return (
+                    <label
+                      key={sfx.id}
+                      className="flex items-center justify-between py-1 px-1.5 rounded hover:bg-stone-900 cursor-pointer"
+                    >
+                      <div className="flex items-center gap-2 truncate">
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={() => toggleSceneSfx(sfx.id)}
+                          className="accent-amber-500"
+                        />
+                        <span className={checked ? 'text-amber-200 font-semibold' : 'text-stone-400'}>
+                          {sfx.name}
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          insertSnippet(`@sfx[${sfx.id}] `);
+                        }}
+                        title={tr(
+                          'Insert @sfx button into scene text',
+                          'Inserisci pulsante @sfx nel testo della scena'
+                        )}
+                        className="text-[10px] px-1.5 py-0.5 rounded bg-stone-800 hover:bg-amber-600 hover:text-stone-950 text-amber-300 shrink-0"
+                      >
+                        {tr('+ Text', '+ Testo')}
+                      </button>
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+              </div>
+            )}
+            {detailsTab === 'encounters' && (
+              <div>
+          {/* Scene Encounters Preset Builder */}
+          {currentScene && (
+            <div className="bg-stone-900/90 border border-stone-800 rounded-xl p-3.5 space-y-2.5 text-xs">
+              <div className="flex items-center justify-between">
+                <span className="font-header text-xs font-bold text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
+                  <Swords className="w-4 h-4" />{' '}
+                  {tr('Scene Encounters', 'Incontri della Scena')}
+                </span>
+                <button
+                  onClick={() =>
+                    setEditingEncounter({
+                      id: `enc-${Date.now()}`,
+                      name: tr('New Scene Encounter', 'Nuovo Incontro di Scena'),
+                      difficulty: tr('Medium', 'Media') as EncounterPreset['difficulty'],
+                      environment: currentScene.location,
+                      description: tr(
+                        'Describe the initial enemy deployment.',
+                        'Descrivi lo schieramento iniziale dei nemici.'
+                      ),
+                      slots: monstersAndNpcs[0]
+                        ? [{ characterId: monstersAndNpcs[0].id, count: 2 }]
+                        : [],
+                      autoSfxId: 'sfx-combat-drums',
+                    })
+                  }
+                  className="px-2 py-0.5 rounded bg-red-900/50 hover:bg-red-800 text-amber-100 font-bold text-[11px]"
+                >
+                  {tr('+ Encounter', '+ Incontro')}
+                </button>
+              </div>
+
+              {currentScene.encounters.length === 0 ? (
+                <p className="text-[11px] text-stone-500 italic">
+                  {tr(
+                    'No pre-planned encounters in this scene (you can still launch ad-hoc combat anytime during a session).',
+                    'Nessun incontro pre-programmato in questa scena (puoi comunque avviare combattimenti al volo durante la sessione).'
+                  )}
+                </p>
+              ) : (
+                <div className="space-y-2">
+                  {currentScene.encounters.map((enc) => (
+                    <div
+                      key={enc.id}
+                      className="p-2.5 rounded bg-stone-950 border border-stone-800 space-y-1.5"
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="font-bold text-amber-200">{enc.name}</span>
+                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-red-950 text-red-200">
+                          {enc.difficulty}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-1.5 pt-1">
+                        <button
+                          onClick={() => insertSnippet(`\n@encounter[${enc.id}]\n`)}
+                          className="px-2 py-0.5 rounded bg-stone-800 hover:bg-amber-600 hover:text-stone-950 text-amber-300 text-[10px] font-semibold"
+                        >
+                          {tr('+ Insert in Page', '+ Inserisci nella Pagina')}
+                        </button>
+                        <button
+                          onClick={() => setEditingEncounter(structuredClone(enc))}
+                          className="px-2 py-0.5 rounded bg-stone-800 hover:bg-stone-700 text-stone-300 text-[10px]"
+                        >
+                          {tr('Edit', 'Modifica')}
+                        </button>
+                        <button
+                          onClick={() =>
+                            updateScene({
+                              encounters: currentScene.encounters.filter((e) => e.id !== enc.id),
+                            })
+                          }
+                          className="p-1 text-stone-500 hover:text-red-400 ml-auto"
+                        >
+                          <Trash2 className="w-3 h-3" />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+              </div>
+            )}
+            {detailsTab === 'npcs' && (
+              <div>
+          {/* Scene Linked NPCs/Monsters */}
+          {currentScene && (
+            <div className="bg-stone-900/90 border border-stone-800 rounded-xl p-3.5 space-y-2 text-xs">
+              <div className="font-header text-xs font-bold text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
+                <UserCheck className="w-4 h-4" />{' '}
+                {tr('Scene NPCs & Monsters', 'PNG & Mostri della Scena')}
+              </div>
+              <div className="max-h-36 overflow-y-auto space-y-1 bg-stone-950 p-2 rounded border border-stone-800">
+                {monstersAndNpcs.map((ch) => {
+                  const checked = currentScene.linkedCharacterIds.includes(ch.id);
+                  return (
+                    <label
+                      key={ch.id}
+                      className="flex items-center justify-between py-1 px-1.5 rounded hover:bg-stone-900 cursor-pointer"
+                    >
+                      <div className="flex items-center gap-2 truncate">
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={() => toggleSceneChar(ch.id)}
+                          className="accent-amber-500"
+                        />
+                        <span className={checked ? 'text-amber-200 font-semibold' : 'text-stone-400'}>
+                          {ch.name}
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          insertSnippet(`@npc[${ch.id}] `);
+                        }}
+                        className="text-[10px] px-1.5 py-0.5 rounded bg-stone-800 hover:bg-amber-600 hover:text-stone-950 text-amber-300 shrink-0"
+                      >
+                        + @npc
+                      </button>
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+              </div>
+            )}
+            </div>
+          </div>
+        )}
         </div>
 
         {/* Right 9 Columns: Homebrewery Editor & Live Preview */}
         {currentScene && (
-          <div className="lg:col-span-9 xl:col-span-7 space-y-3">
+          <div className="space-y-3 min-w-0">
             {/* Scene Metadata & View Mode Switcher */}
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="flex flex-wrap items-center gap-2 flex-1">
@@ -785,222 +1002,6 @@ export const AdventureStudioView: React.FC<AdventureStudioViewProps> = ({
           </div>
         )}
 
-        {/* Right: scene details in one tabbed panel */}
-        {currentScene && (
-          <div className="lg:col-span-12 xl:col-span-3 space-y-3">
-            <div className="flex items-center gap-1">
-              {(
-                [
-                  ['sounds', tr('Sounds', 'Suoni')],
-                  ['encounters', tr('Encounters', 'Incontri')],
-                  ['npcs', tr('NPCs', 'PNG')],
-                ] as const
-              ).map(([id, label]) => (
-                <button
-                  key={id}
-                  onClick={() => setDetailsTab(id)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer ${
-                    detailsTab === id
-                      ? 'bg-stone-800 text-amber-300'
-                      : 'text-stone-400 hover:text-stone-200 hover:bg-stone-900'
-                  }`}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
-
-            {detailsTab === 'sounds' && (
-              <div>
-          {/* Scene Quick-SFX Assignment */}
-          {currentScene && (
-            <div className="bg-stone-900/90 border border-stone-800 rounded-xl p-3.5 space-y-2.5 text-xs">
-              <div className="font-header text-xs font-bold text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
-                <Volume2 className="w-4 h-4" />{' '}
-                {tr('SFX Assigned to This Scene', 'SFX Assegnati a Questa Scena')}
-              </div>
-              <p className="text-[11px] text-stone-400">
-                {tr(
-                  'Check the sound effects you want at your fingertips when running this scene:',
-                  'Seleziona gli effetti che vuoi avere pronti a portata di mano quando giochi questa scena:'
-                )}
-              </p>
-              <div className="max-h-40 overflow-y-auto space-y-1 bg-stone-950 p-2 rounded border border-stone-800">
-                {sfxCatalog.map((sfx) => {
-                  const checked = currentScene.linkedSfxIds.includes(sfx.id);
-                  return (
-                    <label
-                      key={sfx.id}
-                      className="flex items-center justify-between py-1 px-1.5 rounded hover:bg-stone-900 cursor-pointer"
-                    >
-                      <div className="flex items-center gap-2 truncate">
-                        <input
-                          type="checkbox"
-                          checked={checked}
-                          onChange={() => toggleSceneSfx(sfx.id)}
-                          className="accent-amber-500"
-                        />
-                        <span className={checked ? 'text-amber-200 font-semibold' : 'text-stone-400'}>
-                          {sfx.name}
-                        </span>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.preventDefault();
-                          insertSnippet(`@sfx[${sfx.id}] `);
-                        }}
-                        title={tr(
-                          'Insert @sfx button into scene text',
-                          'Inserisci pulsante @sfx nel testo della scena'
-                        )}
-                        className="text-[10px] px-1.5 py-0.5 rounded bg-stone-800 hover:bg-amber-600 hover:text-stone-950 text-amber-300 shrink-0"
-                      >
-                        {tr('+ Text', '+ Testo')}
-                      </button>
-                    </label>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-
-              </div>
-            )}
-            {detailsTab === 'encounters' && (
-              <div>
-          {/* Scene Encounters Preset Builder */}
-          {currentScene && (
-            <div className="bg-stone-900/90 border border-stone-800 rounded-xl p-3.5 space-y-2.5 text-xs">
-              <div className="flex items-center justify-between">
-                <span className="font-header text-xs font-bold text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
-                  <Swords className="w-4 h-4" />{' '}
-                  {tr('Scene Encounters', 'Incontri della Scena')}
-                </span>
-                <button
-                  onClick={() =>
-                    setEditingEncounter({
-                      id: `enc-${Date.now()}`,
-                      name: tr('New Scene Encounter', 'Nuovo Incontro di Scena'),
-                      difficulty: tr('Medium', 'Media') as EncounterPreset['difficulty'],
-                      environment: currentScene.location,
-                      description: tr(
-                        'Describe the initial enemy deployment.',
-                        'Descrivi lo schieramento iniziale dei nemici.'
-                      ),
-                      slots: monstersAndNpcs[0]
-                        ? [{ characterId: monstersAndNpcs[0].id, count: 2 }]
-                        : [],
-                      autoSfxId: 'sfx-combat-drums',
-                    })
-                  }
-                  className="px-2 py-0.5 rounded bg-red-900/50 hover:bg-red-800 text-amber-100 font-bold text-[11px]"
-                >
-                  {tr('+ Encounter', '+ Incontro')}
-                </button>
-              </div>
-
-              {currentScene.encounters.length === 0 ? (
-                <p className="text-[11px] text-stone-500 italic">
-                  {tr(
-                    'No pre-planned encounters in this scene (you can still launch ad-hoc combat anytime during a session).',
-                    'Nessun incontro pre-programmato in questa scena (puoi comunque avviare combattimenti al volo durante la sessione).'
-                  )}
-                </p>
-              ) : (
-                <div className="space-y-2">
-                  {currentScene.encounters.map((enc) => (
-                    <div
-                      key={enc.id}
-                      className="p-2.5 rounded bg-stone-950 border border-stone-800 space-y-1.5"
-                    >
-                      <div className="flex items-center justify-between">
-                        <span className="font-bold text-amber-200">{enc.name}</span>
-                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-red-950 text-red-200">
-                          {enc.difficulty}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-1.5 pt-1">
-                        <button
-                          onClick={() => insertSnippet(`\n@encounter[${enc.id}]\n`)}
-                          className="px-2 py-0.5 rounded bg-stone-800 hover:bg-amber-600 hover:text-stone-950 text-amber-300 text-[10px] font-semibold"
-                        >
-                          {tr('+ Insert in Page', '+ Inserisci nella Pagina')}
-                        </button>
-                        <button
-                          onClick={() => setEditingEncounter(structuredClone(enc))}
-                          className="px-2 py-0.5 rounded bg-stone-800 hover:bg-stone-700 text-stone-300 text-[10px]"
-                        >
-                          {tr('Edit', 'Modifica')}
-                        </button>
-                        <button
-                          onClick={() =>
-                            updateScene({
-                              encounters: currentScene.encounters.filter((e) => e.id !== enc.id),
-                            })
-                          }
-                          className="p-1 text-stone-500 hover:text-red-400 ml-auto"
-                        >
-                          <Trash2 className="w-3 h-3" />
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-
-              </div>
-            )}
-            {detailsTab === 'npcs' && (
-              <div>
-          {/* Scene Linked NPCs/Monsters */}
-          {currentScene && (
-            <div className="bg-stone-900/90 border border-stone-800 rounded-xl p-3.5 space-y-2 text-xs">
-              <div className="font-header text-xs font-bold text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
-                <UserCheck className="w-4 h-4" />{' '}
-                {tr('Scene NPCs & Monsters', 'PNG & Mostri della Scena')}
-              </div>
-              <div className="max-h-36 overflow-y-auto space-y-1 bg-stone-950 p-2 rounded border border-stone-800">
-                {monstersAndNpcs.map((ch) => {
-                  const checked = currentScene.linkedCharacterIds.includes(ch.id);
-                  return (
-                    <label
-                      key={ch.id}
-                      className="flex items-center justify-between py-1 px-1.5 rounded hover:bg-stone-900 cursor-pointer"
-                    >
-                      <div className="flex items-center gap-2 truncate">
-                        <input
-                          type="checkbox"
-                          checked={checked}
-                          onChange={() => toggleSceneChar(ch.id)}
-                          className="accent-amber-500"
-                        />
-                        <span className={checked ? 'text-amber-200 font-semibold' : 'text-stone-400'}>
-                          {ch.name}
-                        </span>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.preventDefault();
-                          insertSnippet(`@npc[${ch.id}] `);
-                        }}
-                        className="text-[10px] px-1.5 py-0.5 rounded bg-stone-800 hover:bg-amber-600 hover:text-stone-950 text-amber-300 shrink-0"
-                      >
-                        + @npc
-                      </button>
-                    </label>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-              </div>
-            )}
-          </div>
-        )}
       </div>
 
       {/* Character Quick Inspector Drawer/Modal */}
