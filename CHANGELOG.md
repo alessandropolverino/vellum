@@ -4,6 +4,8 @@ All notable user-facing changes to Vellum are documented in this file.
 
 ## Unreleased
 
+## Windows 0.2.0 — 2026-10-25
+
 - App: Spell slots and class resources (ki, sorcery points, bardic inspiration, rage...). Set the slots per level and any named resources in the character editor (Features & Spells tab); the Live Console's party panel shows tappable slot markers, resource counters and Short rest / Long rest buttons, and players can tick their own slots and resources off from the new Magic tab on their phone. A rest restores slots and resources only, not hit points.
 - App: Redesigned phone views for live sessions: a tabbed character sheet (Overview, Actions, Gear, Story) with the character portrait, a combat screen with turn order, a "your turn" banner and action trackers, and a "Show to players" control in the QR dialog that displays a character's portrait and name on every phone. Combat shows enemies as a health word only (Unhurt, Wounded, Bloodied, Down) and never reveals other characters' hit points.
 - App: Players scanning the live-session QR now enter a nickname and pick their character on the phone (the nickname becomes the player name of that character in the instance) and see a read-only sheet (stats, HP and conditions kept up to date, actions, traits, equipment, notes). Each character can be taken by one phone only; the DM can release it from the QR dialog. Other characters, monsters and DM notes are never sent to phones.
