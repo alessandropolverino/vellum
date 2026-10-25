@@ -4,6 +4,7 @@ All notable user-facing changes to Vellum are documented in this file.
 
 ## Unreleased
 
+- App: Players scanning the live-session QR now pick their character on the phone and see a read-only sheet (stats, HP and conditions kept up to date, actions, traits, equipment, notes). Each character can be taken by one phone only; the DM can release it from the QR dialog. Other characters, monsters and DM notes are never sent to phones.
 - App: Add live session access for players: the new "Players (QR)" button in the Live Console starts a local server and shows a QR code. Phones scan it to connect, over the local Wi-Fi or from any network through a free Cloudflare tunnel (no account needed; the tunnel binary is bundled with the installer). This first step shows the connection status; player sheets and the combat screen follow.
 - Windows: Fix CLI bundling in installer by mapping resources directly to `bin/`, ensuring only `bin/` is in user PATH, providing dedicated `vellum-cli` aliases, and making `vellum.exe` CLI-aware so executing subcommands from a terminal runs the CLI instead of launching the GUI window.
 

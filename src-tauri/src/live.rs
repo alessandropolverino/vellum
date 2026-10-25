@@ -5,17 +5,19 @@
 //! pushes through `live_broadcast`; anything sent here reaches every connected player, so the
 //! frontend must pass already-filtered payloads (never hidden HP, DM notes, ...).
 
+use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::process::Stdio;
 use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex as StdMutex};
 
 use axum::extract::ws::{Message, WebSocket, WebSocketUpgrade};
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
 use axum::response::{Html, IntoResponse};
-use axum::routing::get;
+use axum::Json;
+use axum::routing::{get, post};
 use axum::Router;
 use futures_util::{SinkExt, StreamExt};
 use rand::distributions::Alphanumeric;
@@ -29,12 +31,51 @@ use tokio::sync::{broadcast, oneshot, Mutex};
 
 const PLAYER_PAGE: &str = include_str!("live_player.html");
 
+/// A message for the players. `None` targets everyone, `Some(character_id)` only that
+/// character's phones.
+type Outgoing = (Option<String>, String);
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct RosterEntry {
+    pub id: String,
+    pub name: String,
+    #[serde(default)]
+    pub subtitle: String,
+}
+
+#[derive(Default)]
+struct PlayerData {
+    roster: Vec<RosterEntry>,
+    /// player token -> character id
+    claims: HashMap<String, String>,
+    /// character id -> latest sheet payload (already filtered by the frontend)
+    views: HashMap<String, String>,
+}
+
+impl PlayerData {
+    fn claimed_ids(&self) -> Vec<String> {
+        let mut ids: Vec<String> = self.claims.values().cloned().collect();
+        ids.sort();
+        ids.dedup();
+        ids
+    }
+}
+
+type SharedData = Arc<StdMutex<PlayerData>>;
+
 #[derive(Clone)]
 struct ServerShared {
     token: String,
-    tx: broadcast::Sender<String>,
+    tx: broadcast::Sender<Outgoing>,
     clients: Arc<AtomicUsize>,
+    data: SharedData,
     app: AppHandle,
+}
+
+fn emit_claims(app: &AppHandle, data: &SharedData) {
+    let ids = data.lock().map(|d| d.claimed_ids()).unwrap_or_default();
+    let _ = app.emit("live://claims", ids);
 }
 
 struct Running {
@@ -42,8 +83,9 @@ struct Running {
     port: u16,
     lan_url: Option<String>,
     tunnel_url: Arc<Mutex<Option<String>>>,
-    tx: broadcast::Sender<String>,
+    tx: broadcast::Sender<Outgoing>,
     clients: Arc<AtomicUsize>,
+    data: SharedData,
     shutdown: Option<oneshot::Sender<()>>,
     tunnel: Option<Child>,
 }
@@ -62,6 +104,7 @@ pub struct LiveInfo {
     pub lan_url: Option<String>,
     pub tunnel_url: Option<String>,
     pub clients: usize,
+    pub claimed: Vec<String>,
 }
 
 #[derive(Serialize, Clone, Debug)]
@@ -74,7 +117,33 @@ struct TunnelEvent {
 
 #[derive(Deserialize)]
 struct WsQuery {
-    token: String,
+    p: String,
+}
+
+#[derive(Deserialize)]
+struct SessionQuery {
+    s: String,
+}
+
+#[derive(Deserialize)]
+struct PlayerQuery {
+    p: String,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct ClaimBody {
+    s: String,
+    character_id: String,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct RosterItem {
+    id: String,
+    name: String,
+    subtitle: String,
+    claimed: bool,
 }
 
 fn random_token(len: usize) -> String {
@@ -102,37 +171,112 @@ async fn join_page(State(s): State<ServerShared>, Path(token): Path<String>) -> 
     Html(PLAYER_PAGE.replace("__TOKEN__", &s.token)).into_response()
 }
 
+async fn roster_handler(
+    State(s): State<ServerShared>,
+    Query(q): Query<SessionQuery>,
+) -> impl IntoResponse {
+    if !token_matches(&s.token, &q.s) {
+        return StatusCode::NOT_FOUND.into_response();
+    }
+    let d = s.data.lock().unwrap();
+    let claimed = d.claimed_ids();
+    let items: Vec<RosterItem> = d
+        .roster
+        .iter()
+        .map(|r| RosterItem {
+            id: r.id.clone(),
+            name: r.name.clone(),
+            subtitle: r.subtitle.clone(),
+            claimed: claimed.contains(&r.id),
+        })
+        .collect();
+    Json(items).into_response()
+}
+
+async fn claim_handler(
+    State(s): State<ServerShared>,
+    Json(body): Json<ClaimBody>,
+) -> impl IntoResponse {
+    if !token_matches(&s.token, &body.s) {
+        return StatusCode::NOT_FOUND.into_response();
+    }
+    let player_token = random_token(32);
+    {
+        let mut d = s.data.lock().unwrap();
+        if !d.roster.iter().any(|r| r.id == body.character_id) {
+            return StatusCode::NOT_FOUND.into_response();
+        }
+        if d.claims.values().any(|id| *id == body.character_id) {
+            return StatusCode::CONFLICT.into_response();
+        }
+        d.claims.insert(player_token.clone(), body.character_id.clone());
+    }
+    emit_claims(&s.app, &s.data);
+    Json(serde_json::json!({
+        "playerToken": player_token,
+        "characterId": body.character_id,
+    }))
+    .into_response()
+}
+
+async fn me_handler(
+    State(s): State<ServerShared>,
+    Query(q): Query<PlayerQuery>,
+) -> impl IntoResponse {
+    let d = s.data.lock().unwrap();
+    let Some(character_id) = d.claims.get(&q.p) else {
+        return StatusCode::NOT_FOUND.into_response();
+    };
+    let name = d
+        .roster
+        .iter()
+        .find(|r| &r.id == character_id)
+        .map(|r| r.name.clone())
+        .unwrap_or_default();
+    Json(serde_json::json!({ "characterId": character_id, "name": name })).into_response()
+}
+
 async fn ws_handler(
     State(s): State<ServerShared>,
     Query(q): Query<WsQuery>,
     ws: WebSocketUpgrade,
 ) -> impl IntoResponse {
-    if !token_matches(&s.token, &q.token) {
+    let character_id = {
+        let d = s.data.lock().unwrap();
+        d.claims.get(&q.p).cloned()
+    };
+    let Some(character_id) = character_id else {
         return StatusCode::NOT_FOUND.into_response();
-    }
-    ws.on_upgrade(move |socket| client_loop(socket, s)).into_response()
+    };
+    ws.on_upgrade(move |socket| client_loop(socket, s, character_id))
+        .into_response()
 }
 
 fn emit_clients(s: &ServerShared) {
     let _ = s.app.emit("live://clients", s.clients.load(Ordering::SeqCst));
 }
 
-async fn client_loop(socket: WebSocket, s: ServerShared) {
+async fn client_loop(socket: WebSocket, s: ServerShared, character_id: String) {
     s.clients.fetch_add(1, Ordering::SeqCst);
     emit_clients(&s);
 
     let (mut sink, mut stream) = socket.split();
     let mut rx = s.tx.subscribe();
 
-    let _ = sink
-        .send(Message::Text(r#"{"type":"hello"}"#.to_string()))
-        .await;
+    let current = s.data.lock().unwrap().views.get(&character_id).cloned();
+    if let Some(view) = current {
+        let _ = sink.send(Message::Text(view)).await;
+    }
 
     loop {
         tokio::select! {
             msg = rx.recv() => match msg {
-                Ok(text) => {
-                    if sink.send(Message::Text(text)).await.is_err() {
+                Ok((target, text)) => {
+                    if target.as_deref().is_some_and(|t| t != character_id) {
+                        continue;
+                    }
+                    let release = target.is_some() && text.contains(r#""type":"released""#);
+                    if sink.send(Message::Text(text)).await.is_err() || release {
                         break;
                     }
                 }
@@ -250,6 +394,7 @@ fn info_of(r: &Running, tunnel_url: Option<String>) -> LiveInfo {
         lan_url: r.lan_url.clone(),
         tunnel_url,
         clients: r.clients.load(Ordering::SeqCst),
+        claimed: r.data.lock().map(|d| d.claimed_ids()).unwrap_or_default(),
     }
 }
 
@@ -266,12 +411,14 @@ pub async fn live_start(
     }
 
     let token = random_token(24);
-    let (tx, _) = broadcast::channel::<String>(64);
+    let (tx, _) = broadcast::channel::<Outgoing>(64);
+    let data: SharedData = Arc::new(StdMutex::new(PlayerData::default()));
     let clients = Arc::new(AtomicUsize::new(0));
     let shared = ServerShared {
         token: token.clone(),
         tx: tx.clone(),
         clients: clients.clone(),
+        data: data.clone(),
         app: app.clone(),
     };
 
@@ -282,6 +429,9 @@ pub async fn live_start(
 
     let router = Router::new()
         .route("/join/:token", get(join_page))
+        .route("/api/roster", get(roster_handler))
+        .route("/api/claim", post(claim_handler))
+        .route("/api/me", get(me_handler))
         .route("/ws", get(ws_handler))
         .with_state(shared);
 
@@ -323,6 +473,7 @@ pub async fn live_start(
         tunnel_url,
         tx,
         clients,
+        data,
         shutdown: Some(shutdown_tx),
         tunnel,
     };
@@ -365,7 +516,59 @@ pub async fn live_broadcast(
 ) -> Result<usize, String> {
     let guard = state.inner.lock().await;
     let r = guard.as_ref().ok_or("Live session is not running")?;
-    Ok(r.tx.send(payload).unwrap_or(0))
+    Ok(r.tx.send((None, payload)).unwrap_or(0))
+}
+
+/// Replaces the list of characters players can pick from on their phones.
+#[tauri::command]
+pub async fn live_set_roster(
+    app: AppHandle,
+    state: TauriState<'_, LiveState>,
+    entries: Vec<RosterEntry>,
+) -> Result<(), String> {
+    let guard = state.inner.lock().await;
+    let r = guard.as_ref().ok_or("Live session is not running")?;
+    r.data.lock().map_err(|e| e.to_string())?.roster = entries;
+    emit_claims(&app, &r.data);
+    Ok(())
+}
+
+/// Stores the latest filtered sheet payload for a character and pushes it to that
+/// character's phones.
+#[tauri::command]
+pub async fn live_set_view(
+    state: TauriState<'_, LiveState>,
+    character_id: String,
+    payload: String,
+) -> Result<(), String> {
+    let guard = state.inner.lock().await;
+    let r = guard.as_ref().ok_or("Live session is not running")?;
+    r.data
+        .lock()
+        .map_err(|e| e.to_string())?
+        .views
+        .insert(character_id.clone(), payload.clone());
+    let _ = r.tx.send((Some(character_id), payload));
+    Ok(())
+}
+
+/// Frees a character so another phone can claim it (the current phone is disconnected).
+#[tauri::command]
+pub async fn live_release(
+    app: AppHandle,
+    state: TauriState<'_, LiveState>,
+    character_id: String,
+) -> Result<(), String> {
+    let guard = state.inner.lock().await;
+    let r = guard.as_ref().ok_or("Live session is not running")?;
+    r.data
+        .lock()
+        .map_err(|e| e.to_string())?
+        .claims
+        .retain(|_, id| *id != character_id);
+    let _ = r.tx.send((Some(character_id), r#"{"type":"released"}"#.to_string()));
+    emit_claims(&app, &r.data);
+    Ok(())
 }
 
 /// Make sure the tunnel process dies with the app.

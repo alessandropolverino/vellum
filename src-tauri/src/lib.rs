@@ -553,7 +553,10 @@ pub fn run() {
             live::live_start,
             live::live_stop,
             live::live_status,
-            live::live_broadcast
+            live::live_broadcast,
+            live::live_set_roster,
+            live::live_set_view,
+            live::live_release
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")

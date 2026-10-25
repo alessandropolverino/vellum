@@ -1,86 +1,22 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import QRCode from 'qrcode';
-import { invoke } from '@tauri-apps/api/core';
-import { listen } from '@tauri-apps/api/event';
 import { Wifi, Globe, Copy, Check, Square, Play, X, Users } from 'lucide-react';
 import { useLanguage } from '../i18n/LanguageContext';
-
-interface LiveInfo {
-  running: boolean;
-  token: string;
-  port: number;
-  lanUrl: string | null;
-  tunnelUrl: string | null;
-  clients: number;
-}
-
-type TunnelStatus = 'idle' | 'starting' | 'ready' | 'error';
-
-interface TunnelEvent {
-  status: 'starting' | 'ready' | 'error';
-  url: string | null;
-  error: string | null;
-}
+import type { LiveSessionApi } from '../services/useLiveSession';
 
 interface LiveJoinModalProps {
+  live: LiveSessionApi;
+  /** Characters players can pick on their phones (the active instance's party). */
+  players: { id: string; name: string }[];
   onClose: () => void;
 }
 
-const isTauri = () =>
-  typeof window !== 'undefined' &&
-  Boolean((window as unknown as { __TAURI_INTERNALS__?: unknown }).__TAURI_INTERNALS__);
-
-/** The tunnel URL is the root; the player route lives under /join/<token>. */
-const joinUrlFor = (base: string, token: string) => `${base.replace(/\/$/, '')}/join/${token}`;
-
-export const LiveJoinModal: React.FC<LiveJoinModalProps> = ({ onClose }) => {
+export const LiveJoinModal: React.FC<LiveJoinModalProps> = ({ live, players, onClose }) => {
   const { tr } = useLanguage();
-  const [info, setInfo] = useState<LiveInfo | null>(null);
+  const { desktop, info, joinUrl, tunnelStatus, tunnelUrl, tunnelError, clients, claimed, error, busy } = live;
   const [useTunnel, setUseTunnel] = useState(true);
-  const [tunnelStatus, setTunnelStatus] = useState<TunnelStatus>('idle');
-  const [tunnelUrl, setTunnelUrl] = useState<string | null>(null);
-  const [tunnelError, setTunnelError] = useState<string | null>(null);
-  const [clients, setClients] = useState(0);
-  const [error, setError] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
   const [qr, setQr] = useState<string>('');
   const [copied, setCopied] = useState(false);
-
-  const desktop = isTauri();
-
-  useEffect(() => {
-    if (!desktop) return;
-    invoke<LiveInfo | null>('live_status')
-      .then((cur) => {
-        if (cur) {
-          setInfo(cur);
-          setClients(cur.clients);
-          if (cur.tunnelUrl) {
-            setTunnelUrl(cur.tunnelUrl);
-            setTunnelStatus('ready');
-          }
-        }
-      })
-      .catch(() => {});
-    const offs: Array<Promise<() => void>> = [
-      listen<number>('live://clients', (e) => setClients(e.payload)),
-      listen<TunnelEvent>('live://tunnel', (e) => {
-        setTunnelStatus(e.payload.status);
-        setTunnelUrl(e.payload.url);
-        setTunnelError(e.payload.error);
-      }),
-    ];
-    return () => {
-      offs.forEach((p) => p.then((off) => off()));
-    };
-  }, [desktop]);
-
-  // Prefer the internet URL once the tunnel is up; fall back to the LAN address.
-  const joinUrl = info
-    ? tunnelUrl
-      ? joinUrlFor(tunnelUrl, info.token)
-      : info.lanUrl
-    : null;
 
   useEffect(() => {
     if (!joinUrl) {
@@ -92,35 +28,8 @@ export const LiveJoinModal: React.FC<LiveJoinModalProps> = ({ onClose }) => {
       .catch(() => setQr(''));
   }, [joinUrl]);
 
-  const start = useCallback(async () => {
-    setBusy(true);
-    setError(null);
-    setTunnelError(null);
-    setTunnelUrl(null);
-    setTunnelStatus(useTunnel ? 'starting' : 'idle');
-    try {
-      setInfo(await invoke<LiveInfo>('live_start', { useTunnel }));
-    } catch (e) {
-      setError(String(e));
-    } finally {
-      setBusy(false);
-    }
-  }, [useTunnel]);
-
-  const stop = useCallback(async () => {
-    setBusy(true);
-    try {
-      await invoke('live_stop');
-      setInfo(null);
-      setClients(0);
-      setTunnelUrl(null);
-      setTunnelStatus('idle');
-    } catch (e) {
-      setError(String(e));
-    } finally {
-      setBusy(false);
-    }
-  }, []);
+  const start = () => live.start(useTunnel);
+  const stop = () => live.stop();
 
   const copy = async () => {
     if (!joinUrl) return;
@@ -228,6 +137,36 @@ export const LiveJoinModal: React.FC<LiveJoinModalProps> = ({ onClose }) => {
                 {copied ? <Check className="w-3.5 h-3.5 shrink-0 text-emerald-400" /> : <Copy className="w-3.5 h-3.5 shrink-0" />}
               </button>
             )}
+
+            <div className="space-y-1">
+              <div className="text-xs font-semibold text-stone-400">
+                {tr('Characters', 'Personaggi')}
+              </div>
+              {players.length === 0 && (
+                <div className="text-xs text-stone-500">
+                  {tr('Add player characters to this instance first.', 'Aggiungi prima dei PG a questa istanza.')}
+                </div>
+              )}
+              {players.map((p) => {
+                const taken = claimed.includes(p.id);
+                return (
+                  <div key={p.id} className="flex items-center justify-between gap-2 text-xs bg-stone-950 border border-stone-800 rounded-lg px-2 py-1.5">
+                    <span className="truncate text-stone-200">{p.name}</span>
+                    {taken ? (
+                      <button
+                        onClick={() => live.release(p.id)}
+                        className="shrink-0 px-2 py-0.5 rounded bg-stone-800 hover:bg-stone-700 text-amber-200"
+                        title={tr('Free this character so another phone can pick it', 'Libera il personaggio per farlo scegliere a un altro telefono')}
+                      >
+                        {tr('Taken · Release', 'Scelto · Libera')}
+                      </button>
+                    ) : (
+                      <span className="shrink-0 text-stone-500">{tr('Free', 'Libero')}</span>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
 
             <div className="flex items-center justify-between">
               <span className="flex items-center gap-1.5 text-sm text-stone-200">

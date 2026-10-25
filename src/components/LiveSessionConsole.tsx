@@ -19,6 +19,7 @@ import { HomebreweryRenderer } from './HomebreweryRenderer';
 import { StatblockCard } from './StatblockCard';
 import { LevelUpModal } from './LevelUpModal';
 import { LiveJoinModal } from './LiveJoinModal';
+import { useLiveSession } from '../services/useLiveSession';
 import { soundboardEngine } from '../services/audioEngine';
 import { downloadOfficialCharacterPdf } from '../services/pdfExporter';
 import {
@@ -145,6 +146,8 @@ export const LiveSessionConsole: React.FC<LiveSessionConsoleProps> = ({
 
   const currentInstance =
     instances.find((i) => i.id === activeInstanceId) || instances[0];
+
+  const live = useLiveSession(currentInstance, characters);
 
   if (!currentInstance) {
     return (
@@ -1868,7 +1871,19 @@ export const LiveSessionConsole: React.FC<LiveSessionConsoleProps> = ({
       )}
 
       {/* Markdown Recap Modal */}
-      {showJoinModal && <LiveJoinModal onClose={() => setShowJoinModal(false)} />}
+      {showJoinModal && (
+        <LiveJoinModal
+          live={live}
+          players={currentInstance.partyCharacterIds
+            .map((id) => charMap.get(id))
+            .filter((c): c is CharacterEntity => Boolean(c))
+            .map((c) => ({
+              id: c.id,
+              name: currentInstance.pcStatus[c.id]?.customNameOverride || c.name,
+            }))}
+          onClose={() => setShowJoinModal(false)}
+        />
+      )}
 
       {showRecapModal && (
         <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
