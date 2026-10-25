@@ -18,6 +18,7 @@ import { useConfirmDelete } from './ConfirmDialog';
 import { HomebreweryRenderer } from './HomebreweryRenderer';
 import { StatblockCard } from './StatblockCard';
 import { LevelUpModal } from './LevelUpModal';
+import { InitiativeModal } from './InitiativeModal';
 import { soundboardEngine } from '../services/audioEngine';
 import { downloadOfficialCharacterPdf } from '../services/pdfExporter';
 import {
@@ -91,6 +92,14 @@ export const LiveSessionConsole: React.FC<LiveSessionConsoleProps> = ({
   const [hpDeltaInputs, setHpDeltaInputs] = useState<Record<string, string>>({});
 
   const [showRecapModal, setShowRecapModal] = useState(false);
+  // Combat waiting for the DM to enter (or roll) everyone's initiative before it starts.
+  const [initiativeDraft, setInitiativeDraft] = useState<{
+    title: string;
+    sceneId: string;
+    autoSfxId?: string;
+    firstEvent: string;
+    participants: CombatParticipant[];
+  } | null>(null);
   const [copiedRecap, setCopiedRecap] = useState(false);
 
   // Modal to add an existing PC Blueprint or a custom Session-Only PC to this PlayInstance
@@ -325,7 +334,7 @@ export const LiveSessionConsole: React.FC<LiveSessionConsoleProps> = ({
           sourceCharacterId: ch.id,
           name: runtime?.customNameOverride || ch.name,
           kind: 'pc' as const,
-          initiative: rollD20(ch.initiativeBonus),
+          initiative: 0, // filled in by the initiative dialog
           ac: ch.ac,
           hpCurrent: runtime ? runtime.hpCurrent : ch.hpMax,
           hpMax: ch.hpMax,
@@ -352,7 +361,7 @@ export const LiveSessionConsole: React.FC<LiveSessionConsoleProps> = ({
           sourceCharacterId: monster.id,
           name: `${slot.customLabel || monster.name}${suffix}`,
           kind: monster.kind,
-          initiative: rollD20(monster.initiativeBonus),
+          initiative: 0, // filled in by the initiative dialog
           ac: monster.ac,
           hpCurrent: monster.hpMax,
           hpMax: monster.hpMax,
@@ -364,52 +373,54 @@ export const LiveSessionConsole: React.FC<LiveSessionConsoleProps> = ({
       }
     });
 
-    const all = [...partyParticipants, ...monsterParticipants].sort(
-      (a, b) => b.initiative - a.initiative
-    );
+    setInitiativeDraft({
+      title: preset.name,
+      sceneId: currentScene.id,
+      autoSfxId: preset.autoSfxId,
+      firstEvent: tr(`Round 1 started: ${preset.name}`, `Round 1 iniziato: ${preset.name}`),
+      participants: [...partyParticipants, ...monsterParticipants],
+    });
+  };
 
-    if (preset.autoSfxId) {
-      const sfx = sfxMap.get(preset.autoSfxId);
+  const startAdHocCombat = () => {
+    setInitiativeDraft({
+      title: tr(
+        `Unplanned Encounter (${currentScene.code})`,
+        `Scontro Imprevisto (${currentScene.code})`
+      ),
+      sceneId: currentScene.id,
+      firstEvent: tr(
+        `Ad-hoc encounter started in scene ${currentScene.title}`,
+        `Scontro improvviso avviato nella scena ${currentScene.title}`
+      ),
+      participants: buildPartyCombatants(),
+    });
+  };
+
+  const confirmInitiative = (initiatives: Record<string, number>) => {
+    if (!initiativeDraft) return;
+    const ordered = initiativeDraft.participants
+      .map((p) => ({ ...p, initiative: initiatives[p.id] ?? 0 }))
+      .sort((a, b) => b.initiative - a.initiative);
+
+    if (initiativeDraft.autoSfxId) {
+      const sfx = sfxMap.get(initiativeDraft.autoSfxId);
       if (sfx) soundboardEngine.play(sfx);
     }
 
     const combatState: ActiveCombatState = {
       isActive: true,
-      encounterTitle: preset.name,
-      sceneId: currentScene.id,
+      encounterTitle: initiativeDraft.title,
+      sceneId: initiativeDraft.sceneId,
       round: 1,
       turnIndex: 0,
       startedAt: new Date().toISOString(),
-      participants: all,
-      combatEvents: [tr(`Round 1 started: ${preset.name}`, `Round 1 iniziato: ${preset.name}`)],
+      participants: ordered,
+      combatEvents: [initiativeDraft.firstEvent],
     };
 
     updateInstance({ activeCombat: combatState });
-    setCenterTab('combat');
-  };
-
-  const startAdHocCombat = () => {
-    const partyParticipants = buildPartyCombatants();
-    const sorted = partyParticipants.sort((a, b) => b.initiative - a.initiative);
-    const combatState: ActiveCombatState = {
-      isActive: true,
-      encounterTitle: tr(
-        `Unplanned Encounter (${currentScene.code})`,
-        `Scontro Imprevisto (${currentScene.code})`
-      ),
-      sceneId: currentScene.id,
-      round: 1,
-      turnIndex: 0,
-      startedAt: new Date().toISOString(),
-      participants: sorted,
-      combatEvents: [
-        tr(
-          `Ad-hoc encounter started in scene ${currentScene.title}`,
-          `Scontro improvviso avviato nella scena ${currentScene.title}`
-        ),
-      ],
-    };
-    updateInstance({ activeCombat: combatState });
+    setInitiativeDraft(null);
     setCenterTab('combat');
   };
 
@@ -1857,6 +1868,20 @@ export const LiveSessionConsole: React.FC<LiveSessionConsoleProps> = ({
       )}
 
       {/* Markdown Recap Modal */}
+      {initiativeDraft && (
+        <InitiativeModal
+          title={initiativeDraft.title}
+          rows={initiativeDraft.participants.map((p) => ({
+            id: p.id,
+            name: p.name,
+            kind: p.kind,
+            bonus: (p.sourceCharacterId && charMap.get(p.sourceCharacterId)?.initiativeBonus) || 0,
+          }))}
+          onConfirm={confirmInitiative}
+          onCancel={() => setInitiativeDraft(null)}
+        />
+      )}
+
       {showRecapModal && (
         <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-stone-900 border border-stone-700 rounded-2xl max-w-2xl w-full p-6 space-y-4 shadow-2xl">
