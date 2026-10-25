@@ -148,7 +148,8 @@ export const LiveJoinModal: React.FC<LiveJoinModalProps> = ({ live, players, onC
                 </div>
               )}
               {players.map((p) => {
-                const taken = claimed.includes(p.id);
+                const claim = claimed.find((c) => c.characterId === p.id);
+                const taken = Boolean(claim);
                 return (
                   <div key={p.id} className="flex items-center justify-between gap-2 text-xs bg-stone-950 border border-stone-800 rounded-lg px-2 py-1.5">
                     <span className="truncate text-stone-200">{p.name}</span>
@@ -158,7 +159,8 @@ export const LiveJoinModal: React.FC<LiveJoinModalProps> = ({ live, players, onC
                         className="shrink-0 px-2 py-0.5 rounded bg-stone-800 hover:bg-stone-700 text-amber-200"
                         title={tr('Free this character so another phone can pick it', 'Libera il personaggio per farlo scegliere a un altro telefono')}
                       >
-                        {tr('Taken · Release', 'Scelto · Libera')}
+                        {claim?.nickname ? `${claim.nickname} · ` : ''}
+                        {tr('Release', 'Libera')}
                       </button>
                     ) : (
                       <span className="shrink-0 text-stone-500">{tr('Free', 'Libero')}</span>

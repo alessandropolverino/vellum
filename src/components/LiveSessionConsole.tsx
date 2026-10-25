@@ -147,7 +147,26 @@ export const LiveSessionConsole: React.FC<LiveSessionConsoleProps> = ({
   const currentInstance =
     instances.find((i) => i.id === activeInstanceId) || instances[0];
 
-  const live = useLiveSession(currentInstance, characters);
+  const live = useLiveSession(
+    currentInstance,
+    characters,
+    (inst, characterId, nickname) => {
+      const pc = characters.find((c) => c.id === characterId);
+      const st = inst.pcStatus[characterId] || {
+        characterId,
+        hpCurrent: pc?.hpMax ?? 0,
+        tempHp: 0,
+        conditions: [],
+        inspiration: false,
+        sessionNotes: '',
+      };
+      onSaveInstance({
+        ...inst,
+        pcStatus: { ...inst.pcStatus, [characterId]: { ...st, playerOverride: nickname } },
+        lastPlayedAt: new Date().toISOString(),
+      });
+    }
+  );
 
   if (!currentInstance) {
     return (

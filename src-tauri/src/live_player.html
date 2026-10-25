@@ -30,6 +30,9 @@
       .entry b { color: #fde68a; }
       .pre { white-space: pre-wrap; font-size: .9rem; }
       .err { color: #fca5a5; }
+      .nick { width: 100%; margin: 8px 0 4px; padding: 12px; border-radius: 10px; border: 1px solid #44403c;
+              background: #1c1917; color: #f5f5f4; font-size: 1rem; }
+      .nick.bad { border-color: #ef4444; }
     </style>
   </head>
   <body>
@@ -52,6 +55,10 @@
       function clear() { while (app.firstChild) app.removeChild(app.firstChild); }
       function store(v) { try { if (v) localStorage.setItem(KEY, v); else localStorage.removeItem(KEY); } catch (_) {} }
       function stored() { try { return localStorage.getItem(KEY); } catch (_) { return null; } }
+      var NICK_KEY = "vellum.nickname";
+      function savedNick() { try { return localStorage.getItem(NICK_KEY) || ""; } catch (_) { return ""; } }
+      function saveNick(v) { try { localStorage.setItem(NICK_KEY, v); } catch (_) {} }
+      var nickInput = null;
       function setBanner(msg) { banner.hidden = !msg; banner.textContent = msg || ""; }
 
       /* ---------- character picker ---------- */
@@ -59,6 +66,15 @@
         clear();
         app.appendChild(el("h1", null, t("Who are you playing?", "Chi interpreti?")));
         if (message) app.appendChild(el("p", "muted", message));
+        app.appendChild(el("div", "muted", t("Your nickname (shown to the DM)", "Il tuo nickname (lo vede il master)")));
+        nickInput = el("input", "nick");
+        nickInput.type = "text";
+        nickInput.maxLength = 30;
+        nickInput.autocomplete = "nickname";
+        nickInput.placeholder = t("Nickname", "Nickname");
+        nickInput.value = savedNick();
+        nickInput.oninput = function () { nickInput.className = "nick"; saveNick(nickInput.value); };
+        app.appendChild(nickInput);
         var list = el("div");
         app.appendChild(list);
         fetch("/api/roster?s=" + encodeURIComponent(SESSION))
@@ -66,7 +82,7 @@
           .then(function (items) {
             if (!items.length) {
               list.appendChild(el("p", "muted", t("Waiting for the DM to add characters…", "In attesa che il master aggiunga i personaggi…")));
-              setTimeout(function () { showPicker(message); }, 3000);
+              setTimeout(function () { if (!stored()) showPicker(message); }, 3000);
               return;
             }
             items.forEach(function (it) {
@@ -82,10 +98,16 @@
       }
 
       function claim(id) {
+        var nick = nickInput ? nickInput.value.trim() : savedNick().trim();
+        if (!nick) {
+          if (nickInput) { nickInput.className = "nick bad"; nickInput.focus(); }
+          return;
+        }
+        saveNick(nick);
         fetch("/api/claim", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ s: SESSION, characterId: id })
+          body: JSON.stringify({ s: SESSION, characterId: id, nickname: nick })
         }).then(function (r) {
           if (r.status === 409) { showPicker(t("Someone else just picked that character.", "Qualcuno ha appena scelto quel personaggio.")); return null; }
           if (!r.ok) throw new Error(r.status);

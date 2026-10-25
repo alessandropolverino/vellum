@@ -4,6 +4,11 @@ import { listen } from '@tauri-apps/api/event';
 import { buildPlayerSheet, type PlayerRosterEntry } from './liveSheet';
 import type { CharacterEntity, PlayInstance } from '../types/dnd';
 
+export interface ClaimInfo {
+  characterId: string;
+  nickname: string;
+}
+
 export interface LiveInfo {
   running: boolean;
   token: string;
@@ -11,7 +16,7 @@ export interface LiveInfo {
   lanUrl: string | null;
   tunnelUrl: string | null;
   clients: number;
-  claimed: string[];
+  claimed: ClaimInfo[];
 }
 
 export type TunnelStatus = 'idle' | 'starting' | 'ready' | 'error';
@@ -37,7 +42,9 @@ export const joinUrlFor = (base: string, token: string) =>
  */
 export function useLiveSession(
   instance: PlayInstance | undefined,
-  characters: CharacterEntity[]
+  characters: CharacterEntity[],
+  /** Called when a player picks a character with a nickname that the instance doesn't have yet. */
+  onNickname?: (instance: PlayInstance, characterId: string, nickname: string) => void
 ) {
   const desktop = isDesktopApp();
   const [info, setInfo] = useState<LiveInfo | null>(null);
@@ -45,10 +52,14 @@ export function useLiveSession(
   const [tunnelUrl, setTunnelUrl] = useState<string | null>(null);
   const [tunnelError, setTunnelError] = useState<string | null>(null);
   const [clients, setClients] = useState(0);
-  const [claimed, setClaimed] = useState<string[]>([]);
+  const [claimed, setClaimed] = useState<ClaimInfo[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const sentViews = useRef<Map<string, string>>(new Map());
+  const instanceRef = useRef(instance);
+  const onNicknameRef = useRef(onNickname);
+  instanceRef.current = instance;
+  onNicknameRef.current = onNickname;
 
   useEffect(() => {
     if (!desktop) return;
@@ -66,7 +77,7 @@ export function useLiveSession(
       .catch(() => {});
     const offs: Array<Promise<() => void>> = [
       listen<number>('live://clients', (e) => setClients(e.payload)),
-      listen<string[]>('live://claims', (e) => setClaimed(e.payload)),
+      listen<ClaimInfo[]>('live://claims', (e) => setClaimed(e.payload)),
       listen<TunnelEvent>('live://tunnel', (e) => {
         setTunnelStatus(e.payload.status);
         setTunnelUrl(e.payload.url);
@@ -77,6 +88,18 @@ export function useLiveSession(
       offs.forEach((p) => p.then((off) => off()));
     };
   }, [desktop]);
+
+  // A player's nickname becomes the player name of the character they picked.
+  useEffect(() => {
+    const inst = instanceRef.current;
+    if (!inst || !onNicknameRef.current) return;
+    for (const claim of claimed) {
+      if (!claim.nickname || !inst.partyCharacterIds.includes(claim.characterId)) continue;
+      if (inst.pcStatus[claim.characterId]?.playerOverride === claim.nickname) continue;
+      onNicknameRef.current(inst, claim.characterId, claim.nickname);
+      break; // the save re-renders; remaining claims are handled on the next pass
+    }
+  }, [claimed, instance]);
 
   // Push the roster and each player's sheet whenever the instance or characters change.
   useEffect(() => {

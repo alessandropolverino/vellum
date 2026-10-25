@@ -51,6 +51,26 @@ struct PlayerData {
     claims: HashMap<String, String>,
     /// character id -> latest sheet payload (already filtered by the frontend)
     views: HashMap<String, String>,
+    /// character id -> nickname the player typed when picking it
+    nicknames: HashMap<String, String>,
+}
+
+#[derive(Serialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct ClaimInfo {
+    pub character_id: String,
+    pub nickname: String,
+}
+
+/// Players type their own nickname: keep it short, single-line and free of control characters.
+fn sanitize_nickname(raw: &str) -> String {
+    raw.chars()
+        .filter(|c| !c.is_control())
+        .collect::<String>()
+        .trim()
+        .chars()
+        .take(30)
+        .collect()
 }
 
 impl PlayerData {
@@ -59,6 +79,16 @@ impl PlayerData {
         ids.sort();
         ids.dedup();
         ids
+    }
+
+    fn claim_infos(&self) -> Vec<ClaimInfo> {
+        self.claimed_ids()
+            .into_iter()
+            .map(|id| ClaimInfo {
+                nickname: self.nicknames.get(&id).cloned().unwrap_or_default(),
+                character_id: id,
+            })
+            .collect()
     }
 }
 
@@ -74,8 +104,8 @@ struct ServerShared {
 }
 
 fn emit_claims(app: &AppHandle, data: &SharedData) {
-    let ids = data.lock().map(|d| d.claimed_ids()).unwrap_or_default();
-    let _ = app.emit("live://claims", ids);
+    let claims = data.lock().map(|d| d.claim_infos()).unwrap_or_default();
+    let _ = app.emit("live://claims", claims);
 }
 
 struct Running {
@@ -104,7 +134,7 @@ pub struct LiveInfo {
     pub lan_url: Option<String>,
     pub tunnel_url: Option<String>,
     pub clients: usize,
-    pub claimed: Vec<String>,
+    pub claimed: Vec<ClaimInfo>,
 }
 
 #[derive(Serialize, Clone, Debug)]
@@ -135,6 +165,7 @@ struct PlayerQuery {
 struct ClaimBody {
     s: String,
     character_id: String,
+    nickname: String,
 }
 
 #[derive(Serialize)]
@@ -200,6 +231,10 @@ async fn claim_handler(
     if !token_matches(&s.token, &body.s) {
         return StatusCode::NOT_FOUND.into_response();
     }
+    let nickname = sanitize_nickname(&body.nickname);
+    if nickname.is_empty() {
+        return StatusCode::BAD_REQUEST.into_response();
+    }
     let player_token = random_token(32);
     {
         let mut d = s.data.lock().unwrap();
@@ -210,6 +245,7 @@ async fn claim_handler(
             return StatusCode::CONFLICT.into_response();
         }
         d.claims.insert(player_token.clone(), body.character_id.clone());
+        d.nicknames.insert(body.character_id.clone(), nickname);
     }
     emit_claims(&s.app, &s.data);
     Json(serde_json::json!({
@@ -394,7 +430,7 @@ fn info_of(r: &Running, tunnel_url: Option<String>) -> LiveInfo {
         lan_url: r.lan_url.clone(),
         tunnel_url,
         clients: r.clients.load(Ordering::SeqCst),
-        claimed: r.data.lock().map(|d| d.claimed_ids()).unwrap_or_default(),
+        claimed: r.data.lock().map(|d| d.claim_infos()).unwrap_or_default(),
     }
 }
 
@@ -561,11 +597,11 @@ pub async fn live_release(
 ) -> Result<(), String> {
     let guard = state.inner.lock().await;
     let r = guard.as_ref().ok_or("Live session is not running")?;
-    r.data
-        .lock()
-        .map_err(|e| e.to_string())?
-        .claims
-        .retain(|_, id| *id != character_id);
+    {
+        let mut d = r.data.lock().map_err(|e| e.to_string())?;
+        d.claims.retain(|_, id| *id != character_id);
+        d.nicknames.remove(&character_id);
+    }
     let _ = r.tx.send((Some(character_id), r#"{"type":"released"}"#.to_string()));
     emit_claims(&app, &r.data);
     Ok(())
@@ -599,6 +635,15 @@ mod tests {
             Some("https://quiet-river-1234.trycloudflare.com")
         );
         assert_eq!(extract_tunnel_url("no url here"), None);
+    }
+
+    #[test]
+    fn nickname_is_sanitized() {
+        assert_eq!(sanitize_nickname("  Ale
+	  "), "Ale");
+        assert_eq!(sanitize_nickname(&"x".repeat(80)).chars().count(), 30);
+        assert_eq!(sanitize_nickname("
+ 	"), "");
     }
 
     #[test]
