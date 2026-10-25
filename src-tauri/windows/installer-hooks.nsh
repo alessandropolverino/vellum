@@ -1,30 +1,34 @@
 ; Vellum NSIS Installer Hooks
-; Appends Vellum installation directory ($INSTDIR) and ($INSTDIR\bin) to User PATH environment variable
-; and broadcasts the setting change so open shells / new terminal windows pick up 'vellum'.
+; Ensures $INSTDIR\bin is present in User PATH environment variable
+; and cleans up any raw $INSTDIR entries so the CLI wrapper takes precedence.
 
 !macro NSIS_HOOK_POSTINSTALL
+  ; If resources were extracted to _up_\bin (older version fallback), copy them to bin\
+  CreateDirectory "$INSTDIR\bin"
+  IfFileExists "$INSTDIR\_up_\bin\*.*" 0 +3
+    CopyFiles /SILENT "$INSTDIR\_up_\bin\*.*" "$INSTDIR\bin\"
+    RMDir /r "$INSTDIR\_up_"
+
   ; Read current user PATH from HKCU
   ReadRegStr $R0 HKCU "Environment" "PATH"
   StrCmp $R0 "" AddPathNew
 
   ; Check if $INSTDIR\bin is already in PATH using shlwapi::StrStrI (case-insensitive substring check)
   System::Call 'shlwapi::StrStrI(t r0, t "$INSTDIR\bin") p .r2'
-  IntCmp $2 0 0 CheckInstDir CheckInstDir
+  IntCmp $2 0 0 CheckBroadcast CheckBroadcast
 
   ; Append $INSTDIR\bin to PATH
   StrCpy $R0 "$R0;$INSTDIR\bin"
-
-CheckInstDir:
-  System::Call 'shlwapi::StrStrI(t r0, t "$INSTDIR") p .r2'
-  IntCmp $2 0 0 WritePath WritePath
-  StrCpy $R0 "$R0;$INSTDIR"
-  goto WritePath
-
-AddPathNew:
-  StrCpy $R0 "$INSTDIR;$INSTDIR\bin"
-
-WritePath:
   WriteRegExpandStr HKCU "Environment" "PATH" "$R0"
+
+CheckBroadcast:
   ; Broadcast WM_SETTINGCHANGE (0x001A) with "Environment" so Windows Explorer and terminal sessions refresh
   System::Call 'user32::SendMessageTimeout(i 0xFFFF, i 0x1A, i 0, t "Environment", i 0x2, i 5000, *i .r1) i .r0'
+  goto EndHook
+
+AddPathNew:
+  WriteRegExpandStr HKCU "Environment" "PATH" "$INSTDIR\bin"
+  System::Call 'user32::SendMessageTimeout(i 0xFFFF, i 0x1A, i 0, t "Environment", i 0x2, i 5000, *i .r1) i .r0'
+
+EndHook:
 !macroend
