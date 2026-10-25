@@ -4,7 +4,7 @@ All notable user-facing changes to Vellum are documented in this file.
 
 ## Unreleased
 
-- App: Starting a combat now opens a "Roll initiative" dialog. Type the result of each roll for every character, player or not, or tap the dice button next to a field to roll a d20 with that character's initiative modifier. Fields left empty are rolled automatically.
+- App: Starting a combat now opens a "Roll initiative" dialog. Type the result of each roll for every character, player or not, or tap the dice button next to a field to roll a d20 with that character's initiative modifier. Fields left empty are rolled automatically. The same dialog appears when adding creatures to a combat in progress, and the turn stays on whoever is acting.
 ## Windows 0.1.5 — 2026-10-25
 
 - Windows: Fix CLI bundling in installer by mapping resources directly to `bin/`, ensuring only `bin/` is in user PATH, providing dedicated `vellum-cli` aliases, and making `vellum.exe` CLI-aware so executing subcommands from a terminal runs the CLI instead of launching the GUI window.

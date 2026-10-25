@@ -13,6 +13,8 @@ export interface InitiativeRow {
 
 interface InitiativeModalProps {
   title: string;
+  /** Label of the confirm button (defaults to starting the combat). */
+  confirmLabel?: string;
   rows: InitiativeRow[];
   /** Resolves every row to a number; rows left empty are rolled automatically. */
   onConfirm: (initiatives: Record<string, number>) => void;
@@ -28,6 +30,7 @@ const isPartialInt = (s: string) => /^-?\d{0,3}$/.test(s);
 
 export const InitiativeModal: React.FC<InitiativeModalProps> = ({
   title,
+  confirmLabel,
   rows,
   onConfirm,
   onCancel,
@@ -143,7 +146,7 @@ export const InitiativeModal: React.FC<InitiativeModalProps> = ({
             onClick={confirm}
             className="px-4 py-2 rounded-lg bg-amber-600 hover:bg-amber-500 text-stone-950 text-sm font-bold"
           >
-            {tr('Start combat', 'Inizia combattimento')}
+            {confirmLabel ?? tr('Start combat', 'Inizia combattimento')}
           </button>
         </div>
       </div>

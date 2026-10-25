@@ -92,6 +92,8 @@ export const LiveSessionConsole: React.FC<LiveSessionConsoleProps> = ({
   const [hpDeltaInputs, setHpDeltaInputs] = useState<Record<string, string>>({});
 
   const [showRecapModal, setShowRecapModal] = useState(false);
+  // Creatures joining a running combat, waiting for their initiative.
+  const [addDraft, setAddDraft] = useState<{ title: string; participants: CombatParticipant[] } | null>(null);
   // Combat waiting for the DM to enter (or roll) everyone's initiative before it starts.
   const [initiativeDraft, setInitiativeDraft] = useState<{
     title: string;
@@ -511,7 +513,7 @@ export const LiveSessionConsole: React.FC<LiveSessionConsoleProps> = ({
         sourceCharacterId: char.id,
         name: `${char.name}${suffix}`,
         kind: char.kind,
-        initiative: rollD20(char.initiativeBonus),
+        initiative: 0, // filled in by the initiative dialog
         ac: char.ac,
         hpCurrent: char.hpMax,
         hpMax: char.hpMax,
@@ -521,19 +523,28 @@ export const LiveSessionConsole: React.FC<LiveSessionConsoleProps> = ({
         notes: char.levelOrCr,
       });
     }
-    const merged = [...combat.participants, ...added].sort(
-      (a, b) => b.initiative - a.initiative
-    );
+    setAddDraft({ title: combat.encounterTitle, participants: added });
+  };
+
+  const confirmAddedCreatures = (initiatives: Record<string, number>) => {
+    const combat = currentInstance.activeCombat;
+    if (!combat || !addDraft) return;
+    const added = addDraft.participants.map((p) => ({ ...p, initiative: initiatives[p.id] ?? 0 }));
+    // Keep the turn on whoever is acting now, wherever the newcomers land in the order.
+    const actingId = combat.participants[combat.turnIndex]?.id;
+    const merged = [...combat.participants, ...added].sort((a, b) => b.initiative - a.initiative);
+    const turnIndex = Math.max(0, merged.findIndex((p) => p.id === actingId));
+    const label =
+      added.length === 1 ? added[0].name : `${added.length}× ${added[0].name.replace(/ #\d+$/, '')}`;
     updateCombat({
       participants: merged,
+      turnIndex,
       combatEvents: [
-        tr(
-          `Added to encounter: ${count}× ${char.name}`,
-          `Aggiunti allo scontro: ${count}× ${char.name}`
-        ),
+        tr(`Added to encounter: ${label}`, `Aggiunti allo scontro: ${label}`),
         ...combat.combatEvents,
       ],
     });
+    setAddDraft(null);
     setCenterTab('combat');
   };
 
@@ -1868,6 +1879,21 @@ export const LiveSessionConsole: React.FC<LiveSessionConsoleProps> = ({
       )}
 
       {/* Markdown Recap Modal */}
+      {addDraft && (
+        <InitiativeModal
+          title={addDraft.title}
+          confirmLabel={tr('Add to combat', 'Aggiungi al combattimento')}
+          rows={addDraft.participants.map((p) => ({
+            id: p.id,
+            name: p.name,
+            kind: p.kind,
+            bonus: (p.sourceCharacterId && charMap.get(p.sourceCharacterId)?.initiativeBonus) || 0,
+          }))}
+          onConfirm={confirmAddedCreatures}
+          onCancel={() => setAddDraft(null)}
+        />
+      )}
+
       {initiativeDraft && (
         <InitiativeModal
           title={initiativeDraft.title}
