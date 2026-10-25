@@ -11,6 +11,31 @@ All notable user-facing changes to Vellum are documented in this file.
   - Relocated portrait in `StatblockCard` to the upper right corner to optimize space utilization and align with the official 5e statblock PDF layout, with an interactive hover crop trigger directly from the live preview.
   - Preservation of original uncropped image source (`portraitOriginalUrl`) so users can re-adjust framing at any time without re-uploading.
 
+## Windows 0.1.3 — 2026-10-25
+
+- Windows: Bundle the Vellum CLI (`vellum`) and agent skills inside the Windows installer, automatically adding the Vellum installation path to the user's PATH environment variable so AI coding agents and users can run `vellum` from any terminal.
+- App: Rename database storage file from `dnd5e-db.json` to `vellum-db.json` across desktop and local server storage with transparent backward compatibility (existing `dnd5e-db.json` databases are automatically migrated and renamed upon first run).
+- App: Add automatic desktop AppData discovery in the Vellum CLI so it can directly inspect, create, and update adventures, scenes, encounters, and characters from the installed desktop app without needing manual `--db` path configuration.
+- App: Live external database synchronization: Vellum now detects external updates to `vellum-db.json` in real time (via window focus, visibility change, and lightweight background mtime check), automatically reloading adventures, scenes, encounters, and characters without restarting the app or overwriting changes, with a subtle update toast indicator.
+
+## Windows 0.1.2 — 2026-10-24
+
+- Windows: Deleting an adventure, scene, encounter, character sheet, party, play instance or sound now asks for confirmation first.
+- Windows: Leaving the character sheet editor or the PC creation wizard with unsaved changes now asks whether to save, discard or keep editing.
+- Windows: Update dialog is now centered in the window and scrolls when tall, instead of being cut off at the top.
+- Windows: Character sheet editor is organised in tabs that follow the official sheet (Identity, Abilities & Skills, Combat, Senses & Proficiencies, Features & Spells, Gear & Story). New fields: size, senses and languages with one-click presets, other proficiencies, damage and condition immunities, spellcasting ability with spell DC / attack bonus, equipment, personality, ideals, bonds and flaws. All controls keep a fixed minimum size. The official PDF export includes the new fields.
+- Windows: PC creation wizard now has five steps: identity, race and class, ability scores (standard array, point buy, 4d6 roll or manual), background and skills, details and equipment. Saving throws, skills and passive perception are computed on creation.
+
+## Windows 0.1.1 — 2026-10-24
+
+- Windows: Story Editor layout. The Sounds / Encounters / NPCs panel now sits under the scenes list in a fixed-width left column (scrolling internally), so the Markdown source and Page preview get the full remaining width.
+
+## Windows 0.1.0 — 2026-10-24
+
+- Windows: In-app updates. The app checks GitHub Releases a few seconds after launch and shows a dot on the new download icon in the header when a newer version exists; the dialog shows the release notes, takes an automatic data backup, then downloads the signed installer and restarts the app. You can also check manually at any time. Pre-release builds (`-rc`) are never offered.
+
+- Windows: Calmer, less cluttered UI: muted color palette, slimmer header with a single Data & Backups button (export, import and restore live there), quieter footer, and a new layout for every page: Dashboard with a "continue playing" card and compact lists, Story Editor with a tabbed scene-details panel and a collapsible adventure details bar, Live Session with a single tabbed side panel (Scenes, Party, Sounds, Log), Characters with one filter row and a single "New" menu, and SFX as a compact list.
+- Windows: A fresh install no longer ships demo adventures, characters, parties or sessions; only the built-in sound library is included. Built-in sounds are now generic (no demo-specific names), with two new ones (Cave Wind, Dice Roll), and their names follow the UI language. Existing data is untouched.
 - App: Add real-time auto-save status indicator and manual save trigger in Adventure Studio:
   - Contextual status badges displaying real-time save state (`Saving...`, `Saved (HH:MM:SS)`, `Save Error`) in the Adventure Studio top bar and directly above the Homebrewery Markdown editor.
   - Interactive save trigger and keyboard shortcut (`Ctrl+S` / `Cmd+S`) allowing users and DMs to instantly verify or force persistence with visual feedback while authoring one-shots, campaign modules, and scenes.

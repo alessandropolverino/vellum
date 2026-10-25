@@ -114,8 +114,17 @@ export interface CharacterEntity {
   savingThrows?: string;
   skills?: string;
   damageResistances?: string;
+  damageImmunities?: string;
+  conditionImmunities?: string;
   senses?: string;
   languages?: string;
+  otherProficiencies?: string; // Armor, weapons and tools (official sheet "Other Proficiencies")
+  spellcastingAbility?: AbilityKey;
+  equipment?: string;
+  personalityTraits?: string;
+  ideals?: string;
+  bonds?: string;
+  flaws?: string;
   traits: StatblockEntry[];
   actions: StatblockEntry[];
   reactionsOrLegendary?: StatblockEntry[];

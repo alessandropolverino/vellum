@@ -14,6 +14,7 @@ import {
   isPcBlueprint,
 } from '../types/dnd';
 import { useLanguage } from '../i18n/LanguageContext';
+import { useConfirmDelete } from './ConfirmDialog';
 import { HomebreweryRenderer } from './HomebreweryRenderer';
 import { StatblockCard } from './StatblockCard';
 import { LevelUpModal } from './LevelUpModal';
@@ -71,8 +72,10 @@ export const LiveSessionConsole: React.FC<LiveSessionConsoleProps> = ({
   onOpenNewInstanceModal,
 }) => {
   const { lang, tr } = useLanguage();
+  const confirmDelete = useConfirmDelete();
   const [, setAudioTick] = useState(0);
   const [centerTab, setCenterTab] = useState<'story' | 'combat'>('story');
+  const [sideTab, setSideTab] = useState<'scenes' | 'party' | 'sounds' | 'log'>('scenes');
   const [hideDmNotes, setHideDmNotes] = useState(false);
   const [inspectedChar, setInspectedChar] = useState<CharacterEntity | null>(null);
   const [levelUpPc, setLevelUpPc] = useState<CharacterEntity | null>(null);
@@ -675,16 +678,12 @@ export const LiveSessionConsole: React.FC<LiveSessionConsoleProps> = ({
   return (
     <div className="space-y-4">
       {/* Top Multi-Instance Bar */}
-      <div className="bg-stone-900/95 border border-stone-800 rounded-xl p-3.5 flex flex-wrap items-center justify-between gap-3">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-2.5">
-          <div className="px-2.5 py-1 rounded bg-amber-500/15 border border-amber-500/40 text-amber-300 text-xs font-bold uppercase tracking-wider flex items-center gap-1.5">
-            <Flame className="w-3.5 h-3.5" /> {tr('Active Instance', 'Istanza Attiva')}
-          </div>
-
           <select
             value={currentInstance.id}
             onChange={(e) => onSelectInstance(e.target.value)}
-            className="px-3 py-2 rounded-lg bg-stone-950 border border-stone-700 text-amber-300 font-header font-bold text-sm"
+            className="px-3 py-1.5 rounded-lg bg-stone-950 border border-stone-700 text-stone-100 font-header font-bold text-sm"
           >
             {instances.map((inst) => {
               const adv = adventures.find((a) => a.id === inst.adventureId);
@@ -699,43 +698,45 @@ export const LiveSessionConsole: React.FC<LiveSessionConsoleProps> = ({
 
           <button
             onClick={() => onOpenNewInstanceModal(adventure)}
-            className="px-3 py-2 rounded-lg bg-stone-800 hover:bg-amber-600 text-amber-300 hover:text-stone-950 text-xs font-bold transition flex items-center gap-1.5"
+            className="px-3 py-1.5 rounded-lg bg-stone-900 hover:bg-stone-800 border border-stone-800 text-stone-200 text-xs font-medium transition flex items-center gap-1.5"
             title={tr(
               'Launch the same adventure (or another) for a different player group',
               "Avvia la stessa avventura (o un'altra) per un altro gruppo di giocatori"
             )}
           >
             <Plus className="w-3.5 h-3.5" />{' '}
-            {tr('+ New Parallel Instance', '+ Nuova Istanza Parallela')}
+            {tr('New instance', 'Nuova istanza')}
           </button>
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
           <button
             onClick={() => setHideDmNotes((v) => !v)}
-            className={`px-3 py-1.5 rounded-lg text-xs font-semibold border flex items-center gap-1.5 transition ${
+            className={`px-3 py-1.5 rounded-lg text-xs font-medium border flex items-center gap-1.5 transition ${
               hideDmNotes
-                ? 'bg-emerald-950/60 border-emerald-600 text-emerald-300'
-                : 'bg-stone-800 border-stone-700 text-stone-300'
+                ? 'bg-stone-800 border-stone-600 text-amber-300'
+                : 'bg-stone-900 border-stone-800 text-stone-300 hover:bg-stone-800'
             }`}
           >
             {hideDmNotes ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
             {hideDmNotes
-              ? tr('Player View (DM Notes Hidden)', 'Vista Giocatori (Note DM Nascoste)')
-              : tr('Full DM View', 'Vista DM Completa')}
+              ? tr('Player view', 'Vista giocatori')
+              : tr('DM view', 'Vista DM')}
           </button>
 
           <button
             onClick={() => setShowRecapModal(true)}
-            className="px-3.5 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-500 text-stone-950 font-extrabold text-xs flex items-center gap-1.5 shadow"
+            className="px-3 py-1.5 rounded-lg bg-stone-900 hover:bg-stone-800 border border-stone-800 text-stone-200 font-medium text-xs flex items-center gap-1.5"
           >
             <ScrollText className="w-4 h-4" />{' '}
-            {tr('Generate Session Recap', 'Genera Riepilogo Partita')}
+            {tr('Recap', 'Riepilogo')}
           </button>
 
-          {instances.length > 1 && (
+          {instances.length > 0 && (
             <button
-              onClick={() => onDeleteInstance(currentInstance.id)}
+              onClick={async () => {
+                if (await confirmDelete(tr(`the instance “${currentInstance.instanceName}”`, `l’istanza “${currentInstance.instanceName}”`), tr('Session progress, notes and state will be lost.', 'Progressi, note e stato della sessione andranno persi.'))) onDeleteInstance(currentInstance.id);
+              }}
               title={tr('Delete this instance', 'Elimina questa istanza')}
               className="p-1.5 rounded-lg bg-stone-800 hover:bg-red-900/70 text-stone-400 hover:text-red-200"
             >
@@ -747,352 +748,34 @@ export const LiveSessionConsole: React.FC<LiveSessionConsoleProps> = ({
 
       {/* 3-Column Live DM Console */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
-        {/* LEFT COLUMN (3 cols): Scene Progress + Contextual Scene Soundboard + Party Live Status */}
-        <div className="lg:col-span-3 space-y-4">
-          {/* 1. Scene Progression */}
-          <div className="bg-stone-900/90 border border-stone-800 rounded-xl p-3.5 space-y-2.5">
-            <div className="flex items-center justify-between">
-              <span className="font-header text-xs font-bold text-amber-400 uppercase tracking-wider">
-                {tr('Chapters / Scenes', 'Capitoli / Scene')} ({adventure.title})
-              </span>
-            </div>
-
-            <div className="space-y-1.5">
-              {adventure.scenes.map((scene) => {
-                const isCurrent = scene.id === currentScene.id;
-                const isVisited = currentInstance.visitedSceneIds.includes(scene.id);
-                const hasNote = Boolean(currentInstance.sceneNotes[scene.id]?.trim());
-                return (
-                  <button
-                    key={scene.id}
-                    onClick={() => handleSelectScene(scene.id)}
-                    className={`w-full text-left p-2.5 rounded-lg border transition flex items-center justify-between gap-2 cursor-pointer ${
-                      isCurrent
-                        ? 'bg-amber-950/50 border-amber-500 text-amber-200 shadow'
-                        : 'bg-stone-950/70 border-stone-800 text-stone-300 hover:border-stone-700'
-                    }`}
-                  >
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-1.5">
-                        {isVisited && (
-                          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                        )}
-                        <span className="text-[10px] font-bold uppercase text-amber-400">
-                          {scene.code}
-                        </span>
-                        {hasNote && (
-                          <span className="text-[9px] px-1.5 py-0.2 rounded bg-amber-500/20 text-amber-300">
-                            {tr('Note', 'Nota')}
-                          </span>
-                        )}
-                      </div>
-                      <div className="font-bold text-xs truncate mt-0.5">{scene.title}</div>
-                    </div>
-                    <ChevronRight className="w-4 h-4 text-stone-500 shrink-0" />
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* 2. Scene Quick SFX Soundboard */}
-          <div className="bg-stone-900/90 border border-amber-500/30 rounded-xl p-3.5 space-y-2.5">
-            <div className="flex items-center justify-between">
-              <span className="font-header text-xs font-bold text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
-                <Volume2 className="w-4 h-4 text-amber-400" />{' '}
-                {tr('Scene SFX', 'SFX di Scena')} ({currentScene.code})
-              </span>
-              {soundboardEngine.getActiveTrackIds().length > 0 && (
-                <button
-                  onClick={() => soundboardEngine.stopAll()}
-                  className="text-[10px] px-2 py-0.5 rounded bg-red-900 text-amber-100 font-bold flex items-center gap-1"
-                >
-                  <VolumeX className="w-3 h-3" /> Stop
-                </button>
-              )}
-            </div>
-
-            {sceneSfxItems.length === 0 ? (
-              <p className="text-xs text-stone-500 italic">
-                {tr(
-                  'No specific SFX assigned to this scene.',
-                  'Nessun SFX specifico assegnato a questa scena.'
-                )}
-              </p>
-            ) : (
-              <div className="grid grid-cols-1 gap-1.5">
-                {sceneSfxItems.map((sfx) => {
-                  const playing = soundboardEngine.isPlaying(sfx.id);
-                  return (
-                    <button
-                      key={sfx.id}
-                      onClick={() => soundboardEngine.toggle(sfx)}
-                      className={`w-full px-3 py-2 rounded-lg border text-left text-xs font-bold flex items-center justify-between transition cursor-pointer ${
-                        playing
-                          ? 'bg-amber-600 text-stone-950 border-amber-400 shadow animate-pulse'
-                          : 'bg-stone-950 hover:bg-stone-800 text-amber-200 border-stone-800'
-                      }`}
-                    >
-                      <div className="flex items-center gap-2 truncate">
-                        {playing ? (
-                          <Square className="w-3.5 h-3.5 fill-current shrink-0" />
-                        ) : (
-                          <Play className="w-3.5 h-3.5 fill-current shrink-0" />
-                        )}
-                        <span className="truncate">{sfx.name}</span>
-                      </div>
-                      <span className="text-[10px] uppercase opacity-75 shrink-0">
-                        {sfx.loop ? 'Loop' : 'SFX'}
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
-            )}
-
-            {/* Quick dropdown for any other global SFX */}
-            <div className="pt-2 border-t border-stone-800">
-              <select
-                defaultValue=""
-                onChange={(e) => {
-                  const sfx = sfxMap.get(e.target.value);
-                  if (sfx) soundboardEngine.toggle(sfx);
-                  e.target.value = '';
-                }}
-                className="w-full px-2.5 py-1.5 rounded bg-stone-950 border border-stone-800 text-stone-300 text-xs"
-              >
-                <option value="">
-                  {tr('+ Play Global SFX on the fly...', '+ Riproduci SFX Globale al volo...')}
-                </option>
-                {sfxCatalog.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    🔊 {s.name} ({s.loop ? 'Loop' : 'One-Shot'})
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          {/* 3. Party Runtime Tracker (Specific to THIS Instance!) */}
-          <div className="bg-stone-900/90 border border-stone-800 rounded-xl p-3.5 space-y-2.5">
-            <div className="flex items-center justify-between gap-2">
-              <div className="font-header text-xs font-bold text-amber-400 uppercase tracking-wider flex items-center gap-1.5 truncate">
-                <Users className="w-4 h-4 shrink-0" /> {tr('Party:', 'Gruppo:')}{' '}
-                <span className="truncate">{currentInstance.groupName}</span>
-              </div>
-              <button
-                onClick={() => {
-                  setSelectedRepoPcId(availableRepoPcs[0]?.id || '');
-                  setShowAddPcModal(true);
-                }}
-                className="px-2 py-1 rounded bg-amber-600/20 hover:bg-amber-600 text-amber-300 hover:text-stone-950 text-[10px] font-bold flex items-center gap-1 transition shrink-0 cursor-pointer"
-                title={tr(
-                  'Add a PC Blueprint or a custom Session-Only PC to this instance',
-                  'Aggiungi un PG Blueprint o un PG creato solo per questa istanza'
-                )}
-              >
-                <UserPlus className="w-3 h-3" /> {tr('+ Add PC', '+ Aggiungi PG')}
-              </button>
-            </div>
-
-            <div className="space-y-2">
-              {currentInstance.partyCharacterIds.map((pcId) => {
-                const pc = charMap.get(pcId);
-                if (!pc) return null;
-                const st = currentInstance.pcStatus[pcId] || {
-                  characterId: pcId,
-                  hpCurrent: pc.hpMax,
-                  tempHp: 0,
-                  conditions: [],
-                  inspiration: false,
-                  sessionNotes: '',
-                };
-
-                const updatePc = (patch: Partial<typeof st>) => {
-                  updateInstance({
-                    pcStatus: {
-                      ...currentInstance.pcStatus,
-                      [pcId]: { ...st, ...patch },
-                    },
-                  });
-                };
-
-                return (
-                  <div
-                    key={pcId}
-                    className="p-2.5 rounded-lg bg-stone-950 border border-stone-800 space-y-2 text-xs"
-                  >
-                    <div className="flex items-center justify-between gap-1">
-                      <div className="flex items-center gap-2 min-w-0">
-                        {pc.portraitUrl && (
-                          <img
-                            src={pc.portraitUrl}
-                            alt={pc.name}
-                            className="w-7 h-7 rounded object-cover border border-amber-500/40 shrink-0"
-                          />
-                        )}
-                        <button
-                          onClick={() => setInspectedChar(pc)}
-                          className="font-bold text-amber-300 hover:underline text-left truncate"
-                        >
-                          {st.customNameOverride || pc.name}
-                        </button>
-                      </div>
-                      <div className="flex items-center gap-1 shrink-0">
-                        <span className="px-1.5 py-0.5 rounded bg-stone-900 text-stone-300 text-[10px]">
-                          {tr('AC', 'CA')} {pc.ac}
-                        </span>
-                        <span className="px-1.5 py-0.5 rounded bg-stone-900 text-stone-400 text-[10px]">
-                          PP {pc.passivePerception}
-                        </span>
-                        <button
-                          onClick={() => updatePc({ inspiration: !st.inspiration })}
-                          title={tr('Heroic Inspiration', 'Ispirazione Eroica')}
-                          className={`px-1.5 py-0.5 rounded text-[10px] font-bold border ${
-                            st.inspiration
-                              ? 'bg-amber-500 text-stone-950 border-amber-400'
-                              : 'bg-stone-900 text-stone-500 border-stone-800'
-                          }`}
-                        >
-                          ★ {tr('Insp', 'Isp')}
-                        </button>
-                        <button
-                          onClick={() =>
-                            downloadOfficialCharacterPdf(pc, lang, 'pc_sheet', st)
-                          }
-                          title={tr(
-                            'Export Official 5e PDF for this instance PC',
-                            'Esporta Scheda PDF Ufficiale 5e per questo PG'
-                          )}
-                          className="p-1 rounded bg-stone-900 hover:bg-amber-600 hover:text-stone-950 text-amber-300"
-                        >
-                          <FileDown className="w-3 h-3" />
-                        </button>
-                        <button
-                          onClick={() => setLevelUpPc(pc)}
-                          title={tr('Level Up this hero', 'Fai salire di livello questo eroe')}
-                          className="p-1 rounded bg-stone-900 hover:bg-purple-600 hover:text-white text-purple-300 transition"
-                        >
-                          <TrendingUp className="w-3 h-3" />
-                        </button>
-                        <button
-                          onClick={() => handleRemovePcFromInstance(pcId)}
-                          title={tr(
-                            'Remove PC from this instance',
-                            'Rimuovi PG da questa istanza'
-                          )}
-                          className="p-0.5 text-stone-500 hover:text-red-400"
-                        >
-                          <X className="w-3 h-3" />
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* Player Name Override in this Instance (especially handy for Pre-Gen Blueprints) */}
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-[10px] text-stone-500 shrink-0">
-                        {tr('Player:', 'Giocatore:')}
-                      </span>
-                      <input
-                        type="text"
-                        value={
-                          st.playerOverride !== undefined
-                            ? st.playerOverride
-                            : isPcBlueprint(pc)
-                            ? ''
-                            : pc.playerOrRole.replace(/^(Player:|Giocatore:)\s*/i, '')
-                        }
-                        onChange={(e) => updatePc({ playerOverride: e.target.value })}
-                        placeholder={tr(
-                          'Assign player in this run...',
-                          'Assegna giocatore in questa sessione...'
-                        )}
-                        className="flex-1 px-1.5 py-0.5 rounded bg-stone-900 border border-stone-800 text-[11px] text-amber-200"
-                      />
-                    </div>
-
-                    {/* HP Bar & Quick Controls */}
-                    <div className="flex items-center justify-between gap-2">
-                      <div className="flex items-center gap-1">
-                        <Heart className="w-3.5 h-3.5 text-red-500" />
-                        <span className="font-bold text-emerald-400">
-                          {st.hpCurrent}/{pc.hpMax}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <button
-                          onClick={() =>
-                            updatePc({ hpCurrent: Math.max(0, st.hpCurrent - 1) })
-                          }
-                          className="px-2 py-0.5 rounded bg-red-950/80 hover:bg-red-900 text-red-200 font-bold"
-                        >
-                          -1
-                        </button>
-                        <button
-                          onClick={() =>
-                            updatePc({ hpCurrent: Math.max(0, st.hpCurrent - 5) })
-                          }
-                          className="px-2 py-0.5 rounded bg-red-950/80 hover:bg-red-900 text-red-200 font-bold"
-                        >
-                          -5
-                        </button>
-                        <button
-                          onClick={() =>
-                            updatePc({ hpCurrent: Math.min(pc.hpMax, st.hpCurrent + 5) })
-                          }
-                          className="px-2 py-0.5 rounded bg-emerald-950/80 hover:bg-emerald-900 text-emerald-200 font-bold"
-                        >
-                          +5
-                        </button>
-                      </div>
-                    </div>
-
-                    <input
-                      type="text"
-                      value={st.sessionNotes}
-                      onChange={(e) => updatePc({ sessionNotes: e.target.value })}
-                      placeholder={tr(
-                        'Quick PC note in this instance...',
-                        'Nota rapida PG in questa istanza...'
-                      )}
-                      className="w-full px-2 py-1 rounded bg-stone-900 border border-stone-800 text-[11px] text-stone-300"
-                    />
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        </div>
-
         {/* CENTER COLUMN (6 cols): Interactive Homebrewery Page OR Combat Tracker */}
-        <div className="lg:col-span-6 space-y-3">
+        <div className="lg:col-span-8 space-y-3">
           {/* Mode Switcher Bar */}
-          <div className="bg-stone-900/90 border border-stone-800 rounded-xl p-2.5 flex flex-wrap items-center justify-between gap-2">
+          <div className="flex flex-wrap items-center justify-between gap-2">
             <div className="flex items-center gap-1.5">
               <button
                 onClick={() => setCenterTab('story')}
                 className={`px-3.5 py-2 rounded-lg text-xs font-bold flex items-center gap-1.5 transition cursor-pointer ${
                   centerTab === 'story'
-                    ? 'bg-amber-600 text-stone-950 shadow'
-                    : 'bg-stone-950 text-stone-300 hover:bg-stone-800'
+                    ? 'bg-stone-800 text-amber-300'
+                    : 'text-stone-400 hover:text-stone-200 hover:bg-stone-900'
                 }`}
               >
-                <BookOpen className="w-4 h-4" />{' '}
-                {tr('Story Page (Homebrewery)', 'Pagina Storia (Homebrewery)')}
+                <BookOpen className="w-4 h-4" /> {tr('Story', 'Storia')}
               </button>
 
               <button
                 onClick={() => setCenterTab('combat')}
                 className={`px-3.5 py-2 rounded-lg text-xs font-bold flex items-center gap-1.5 transition cursor-pointer ${
                   centerTab === 'combat'
-                    ? 'bg-red-700 text-amber-100 shadow'
+                    ? 'bg-stone-800 text-amber-300'
                     : currentInstance.activeCombat
-                    ? 'bg-red-950/80 text-red-300 border border-red-700 animate-pulse'
-                    : 'bg-stone-950 text-stone-300 hover:bg-stone-800'
+                    ? 'text-red-300 hover:bg-stone-900'
+                    : 'text-stone-400 hover:text-stone-200 hover:bg-stone-900'
                 }`}
               >
                 <Swords className="w-4 h-4" />
-                Combat Tracker
+                {tr('Combat', 'Combattimento')}
                 {currentInstance.activeCombat && (
                   <span className="px-1.5 py-0.2 rounded-full bg-amber-400 text-stone-950 text-[10px] font-extrabold">
                     R{currentInstance.activeCombat.round}
@@ -1436,8 +1119,81 @@ export const LiveSessionConsole: React.FC<LiveSessionConsoleProps> = ({
           )}
         </div>
 
-        {/* RIGHT COLUMN (3 cols): Scene Notes + Step-by-Step Timeline & Recap */}
-        <div className="lg:col-span-3 space-y-4">
+        {/* SIDE PANEL (4 cols): one tabbed panel instead of two side columns */}
+        <div className="lg:col-span-4 space-y-3">
+          {/* Side panel tabs */}
+          <div className="flex items-center gap-1">
+            {(
+              [
+                ['scenes', tr('Scenes', 'Scene')],
+                ['party', tr('Party', 'Gruppo')],
+                ['sounds', tr('Sounds', 'Suoni')],
+                ['log', tr('Log', 'Diario')],
+              ] as const
+            ).map(([id, label]) => (
+              <button
+                key={id}
+                onClick={() => setSideTab(id)}
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer ${
+                  sideTab === id
+                    ? 'bg-stone-800 text-amber-300'
+                    : 'text-stone-400 hover:text-stone-200 hover:bg-stone-900'
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+
+          {sideTab === 'scenes' && (
+            <div className="space-y-4">
+          {/* 1. Scene Progression */}
+          <div className="bg-stone-900/90 border border-stone-800 rounded-xl p-3.5 space-y-2.5">
+            <div className="flex items-center justify-between">
+              <span className="font-header text-xs font-bold text-amber-400 uppercase tracking-wider">
+                {tr('Chapters / Scenes', 'Capitoli / Scene')} ({adventure.title})
+              </span>
+            </div>
+
+            <div className="space-y-1.5">
+              {adventure.scenes.map((scene) => {
+                const isCurrent = scene.id === currentScene.id;
+                const isVisited = currentInstance.visitedSceneIds.includes(scene.id);
+                const hasNote = Boolean(currentInstance.sceneNotes[scene.id]?.trim());
+                return (
+                  <button
+                    key={scene.id}
+                    onClick={() => handleSelectScene(scene.id)}
+                    className={`w-full text-left p-2.5 rounded-lg border transition flex items-center justify-between gap-2 cursor-pointer ${
+                      isCurrent
+                        ? 'bg-amber-950/50 border-amber-500 text-amber-200 shadow'
+                        : 'bg-stone-950/70 border-stone-800 text-stone-300 hover:border-stone-700'
+                    }`}
+                  >
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-1.5">
+                        {isVisited && (
+                          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                        )}
+                        <span className="text-[10px] font-bold uppercase text-amber-400">
+                          {scene.code}
+                        </span>
+                        {hasNote && (
+                          <span className="text-[9px] px-1.5 py-0.2 rounded bg-amber-500/20 text-amber-300">
+                            {tr('Note', 'Nota')}
+                          </span>
+                        )}
+                      </div>
+                      <div className="font-bold text-xs truncate mt-0.5">{scene.title}</div>
+                    </div>
+                    <ChevronRight className="w-4 h-4 text-stone-500 shrink-0" />
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+
           {/* 1. Per-Scene Instance Notes */}
           <div className="bg-stone-900/90 border border-stone-800 rounded-xl p-3.5 space-y-2">
             <div className="font-header text-xs font-bold text-amber-400 uppercase tracking-wider">
@@ -1465,6 +1221,288 @@ export const LiveSessionConsole: React.FC<LiveSessionConsoleProps> = ({
             />
           </div>
 
+            </div>
+          )}
+
+          {sideTab === 'party' && (
+            <div className="space-y-4">
+          {/* 3. Party Runtime Tracker (Specific to THIS Instance!) */}
+          <div className="bg-stone-900/90 border border-stone-800 rounded-xl p-3.5 space-y-2.5">
+            <div className="flex items-center justify-between gap-2">
+              <div className="font-header text-xs font-bold text-amber-400 uppercase tracking-wider flex items-center gap-1.5 truncate">
+                <Users className="w-4 h-4 shrink-0" /> {tr('Party:', 'Gruppo:')}{' '}
+                <span className="truncate">{currentInstance.groupName}</span>
+              </div>
+              <button
+                onClick={() => {
+                  setSelectedRepoPcId(availableRepoPcs[0]?.id || '');
+                  setShowAddPcModal(true);
+                }}
+                className="px-2 py-1 rounded bg-amber-600/20 hover:bg-amber-600 text-amber-300 hover:text-stone-950 text-[10px] font-bold flex items-center gap-1 transition shrink-0 cursor-pointer"
+                title={tr(
+                  'Add a PC Blueprint or a custom Session-Only PC to this instance',
+                  'Aggiungi un PG Blueprint o un PG creato solo per questa istanza'
+                )}
+              >
+                <UserPlus className="w-3 h-3" /> {tr('+ Add PC', '+ Aggiungi PG')}
+              </button>
+            </div>
+
+            <div className="space-y-2">
+              {currentInstance.partyCharacterIds.map((pcId) => {
+                const pc = charMap.get(pcId);
+                if (!pc) return null;
+                const st = currentInstance.pcStatus[pcId] || {
+                  characterId: pcId,
+                  hpCurrent: pc.hpMax,
+                  tempHp: 0,
+                  conditions: [],
+                  inspiration: false,
+                  sessionNotes: '',
+                };
+
+                const updatePc = (patch: Partial<typeof st>) => {
+                  updateInstance({
+                    pcStatus: {
+                      ...currentInstance.pcStatus,
+                      [pcId]: { ...st, ...patch },
+                    },
+                  });
+                };
+
+                return (
+                  <div
+                    key={pcId}
+                    className="p-2.5 rounded-lg bg-stone-950 border border-stone-800 space-y-2 text-xs"
+                  >
+                    <div className="flex items-center justify-between gap-1">
+                      <div className="flex items-center gap-2 min-w-0">
+                        {pc.portraitUrl && (
+                          <img
+                            src={pc.portraitUrl}
+                            alt={pc.name}
+                            className="w-7 h-7 rounded object-cover border border-amber-500/40 shrink-0"
+                          />
+                        )}
+                        <button
+                          onClick={() => setInspectedChar(pc)}
+                          className="font-bold text-amber-300 hover:underline text-left truncate"
+                        >
+                          {st.customNameOverride || pc.name}
+                        </button>
+                      </div>
+                      <div className="flex items-center gap-1 shrink-0">
+                        <span className="px-1.5 py-0.5 rounded bg-stone-900 text-stone-300 text-[10px]">
+                          {tr('AC', 'CA')} {pc.ac}
+                        </span>
+                        <span className="px-1.5 py-0.5 rounded bg-stone-900 text-stone-400 text-[10px]">
+                          PP {pc.passivePerception}
+                        </span>
+                        <button
+                          onClick={() => updatePc({ inspiration: !st.inspiration })}
+                          title={tr('Heroic Inspiration', 'Ispirazione Eroica')}
+                          className={`px-1.5 py-0.5 rounded text-[10px] font-bold border ${
+                            st.inspiration
+                              ? 'bg-amber-500 text-stone-950 border-amber-400'
+                              : 'bg-stone-900 text-stone-500 border-stone-800'
+                          }`}
+                        >
+                          ★ {tr('Insp', 'Isp')}
+                        </button>
+                        <button
+                          onClick={() =>
+                            downloadOfficialCharacterPdf(pc, lang, 'pc_sheet', st)
+                          }
+                          title={tr(
+                            'Export Official 5e PDF for this instance PC',
+                            'Esporta Scheda PDF Ufficiale 5e per questo PG'
+                          )}
+                          className="p-1 rounded bg-stone-900 hover:bg-amber-600 hover:text-stone-950 text-amber-300"
+                        >
+                          <FileDown className="w-3 h-3" />
+                        </button>
+                        <button
+                          onClick={() => setLevelUpPc(pc)}
+                          title={tr('Level Up this hero', 'Fai salire di livello questo eroe')}
+                          className="p-1 rounded bg-stone-900 hover:bg-purple-600 hover:text-white text-purple-300 transition"
+                        >
+                          <TrendingUp className="w-3 h-3" />
+                        </button>
+                        <button
+                          onClick={() => handleRemovePcFromInstance(pcId)}
+                          title={tr(
+                            'Remove PC from this instance',
+                            'Rimuovi PG da questa istanza'
+                          )}
+                          className="p-0.5 text-stone-500 hover:text-red-400"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Player Name Override in this Instance (especially handy for Pre-Gen Blueprints) */}
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-[10px] text-stone-500 shrink-0">
+                        {tr('Player:', 'Giocatore:')}
+                      </span>
+                      <input
+                        type="text"
+                        value={
+                          st.playerOverride !== undefined
+                            ? st.playerOverride
+                            : isPcBlueprint(pc)
+                            ? ''
+                            : pc.playerOrRole.replace(/^(Player:|Giocatore:)\s*/i, '')
+                        }
+                        onChange={(e) => updatePc({ playerOverride: e.target.value })}
+                        placeholder={tr(
+                          'Assign player in this run...',
+                          'Assegna giocatore in questa sessione...'
+                        )}
+                        className="flex-1 px-1.5 py-0.5 rounded bg-stone-900 border border-stone-800 text-[11px] text-amber-200"
+                      />
+                    </div>
+
+                    {/* HP Bar & Quick Controls */}
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-1">
+                        <Heart className="w-3.5 h-3.5 text-red-500" />
+                        <span className="font-bold text-emerald-400">
+                          {st.hpCurrent}/{pc.hpMax}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <button
+                          onClick={() =>
+                            updatePc({ hpCurrent: Math.max(0, st.hpCurrent - 1) })
+                          }
+                          className="px-2 py-0.5 rounded bg-red-950/80 hover:bg-red-900 text-red-200 font-bold"
+                        >
+                          -1
+                        </button>
+                        <button
+                          onClick={() =>
+                            updatePc({ hpCurrent: Math.max(0, st.hpCurrent - 5) })
+                          }
+                          className="px-2 py-0.5 rounded bg-red-950/80 hover:bg-red-900 text-red-200 font-bold"
+                        >
+                          -5
+                        </button>
+                        <button
+                          onClick={() =>
+                            updatePc({ hpCurrent: Math.min(pc.hpMax, st.hpCurrent + 5) })
+                          }
+                          className="px-2 py-0.5 rounded bg-emerald-950/80 hover:bg-emerald-900 text-emerald-200 font-bold"
+                        >
+                          +5
+                        </button>
+                      </div>
+                    </div>
+
+                    <input
+                      type="text"
+                      value={st.sessionNotes}
+                      onChange={(e) => updatePc({ sessionNotes: e.target.value })}
+                      placeholder={tr(
+                        'Quick PC note in this instance...',
+                        'Nota rapida PG in questa istanza...'
+                      )}
+                      className="w-full px-2 py-1 rounded bg-stone-900 border border-stone-800 text-[11px] text-stone-300"
+                    />
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+            </div>
+          )}
+
+          {sideTab === 'sounds' && (
+            <div className="space-y-4">
+          {/* 2. Scene Quick SFX Soundboard */}
+          <div className="bg-stone-900/90 border border-amber-500/30 rounded-xl p-3.5 space-y-2.5">
+            <div className="flex items-center justify-between">
+              <span className="font-header text-xs font-bold text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
+                <Volume2 className="w-4 h-4 text-amber-400" />{' '}
+                {tr('Scene SFX', 'SFX di Scena')} ({currentScene.code})
+              </span>
+              {soundboardEngine.getActiveTrackIds().length > 0 && (
+                <button
+                  onClick={() => soundboardEngine.stopAll()}
+                  className="text-[10px] px-2 py-0.5 rounded bg-red-900 text-amber-100 font-bold flex items-center gap-1"
+                >
+                  <VolumeX className="w-3 h-3" /> Stop
+                </button>
+              )}
+            </div>
+
+            {sceneSfxItems.length === 0 ? (
+              <p className="text-xs text-stone-500 italic">
+                {tr(
+                  'No specific SFX assigned to this scene.',
+                  'Nessun SFX specifico assegnato a questa scena.'
+                )}
+              </p>
+            ) : (
+              <div className="grid grid-cols-1 gap-1.5">
+                {sceneSfxItems.map((sfx) => {
+                  const playing = soundboardEngine.isPlaying(sfx.id);
+                  return (
+                    <button
+                      key={sfx.id}
+                      onClick={() => soundboardEngine.toggle(sfx)}
+                      className={`w-full px-3 py-2 rounded-lg border text-left text-xs font-bold flex items-center justify-between transition cursor-pointer ${
+                        playing
+                          ? 'bg-amber-600 text-stone-950 border-amber-400 shadow animate-pulse'
+                          : 'bg-stone-950 hover:bg-stone-800 text-amber-200 border-stone-800'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2 truncate">
+                        {playing ? (
+                          <Square className="w-3.5 h-3.5 fill-current shrink-0" />
+                        ) : (
+                          <Play className="w-3.5 h-3.5 fill-current shrink-0" />
+                        )}
+                        <span className="truncate">{sfx.name}</span>
+                      </div>
+                      <span className="text-[10px] uppercase opacity-75 shrink-0">
+                        {sfx.loop ? 'Loop' : 'SFX'}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* Quick dropdown for any other global SFX */}
+            <div className="pt-2 border-t border-stone-800">
+              <select
+                defaultValue=""
+                onChange={(e) => {
+                  const sfx = sfxMap.get(e.target.value);
+                  if (sfx) soundboardEngine.toggle(sfx);
+                  e.target.value = '';
+                }}
+                className="w-full px-2.5 py-1.5 rounded bg-stone-950 border border-stone-800 text-stone-300 text-xs"
+              >
+                <option value="">
+                  {tr('+ Play Global SFX on the fly...', '+ Riproduci SFX Globale al volo...')}
+                </option>
+                {sfxCatalog.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    🔊 {s.name} ({s.loop ? 'Loop' : 'One-Shot'})
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+            </div>
+          )}
+
+          {sideTab === 'log' && (
+            <div className="space-y-4">
           {/* 2. Step-by-Step Session Log Composer */}
           <div className="bg-stone-900/90 border border-stone-800 rounded-xl p-3.5 space-y-3">
             <div className="font-header text-xs font-bold text-amber-400 uppercase tracking-wider flex items-center justify-between">
@@ -1551,6 +1589,8 @@ export const LiveSessionConsole: React.FC<LiveSessionConsoleProps> = ({
               })}
             </div>
           </div>
+            </div>
+          )}
         </div>
       </div>
 

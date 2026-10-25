@@ -1,0 +1,21 @@
+#!/usr/bin/env sh
+set -e
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+
+if ! command -v node >/dev/null 2>&1; then
+  echo "[Vellum CLI] Error: Node.js was not found in PATH." >&2
+  echo "Please install Node.js (https://nodejs.org) to execute Vellum CLI commands." >&2
+  exit 1
+fi
+
+if [ -f "$SCRIPT_DIR/vellum.mjs" ]; then
+  exec node "$SCRIPT_DIR/vellum.mjs" "$@"
+elif [ -f "$SCRIPT_DIR/bin/vellum.mjs" ]; then
+  exec node "$SCRIPT_DIR/bin/vellum.mjs" "$@"
+elif [ -f "$SCRIPT_DIR/resources/bin/vellum.mjs" ]; then
+  exec node "$SCRIPT_DIR/resources/bin/vellum.mjs" "$@"
+else
+  echo "[Vellum CLI] Error: Could not locate vellum.mjs in $SCRIPT_DIR" >&2
+  exit 1
+fi

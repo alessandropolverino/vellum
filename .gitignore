@@ -13,6 +13,7 @@ src-tauri/gen/
 .claude/worktrees/
 
 # Local runtime database (generated at runtime)
+data/vellum-db.json
 data/dnd5e-db.json
 
 # OS & Editor files
