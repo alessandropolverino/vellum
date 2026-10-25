@@ -4,6 +4,8 @@ All notable user-facing changes to Vellum are documented in this file.
 
 ## Unreleased
 
+## Windows 0.1.4 — 2026-10-25
+
 - App: Add interactive character portrait framing and cropping modal with real-time statblock and token previews:
   - Automatic framing/crop dialog immediately after uploading an image file or via the new "Adjust Framing / Crop" action in the character sheet editor.
   - Interactive pan and zoom controls (drag to pan, mouse wheel zoom, zoom slider with +/- buttons, reset button, and rule-of-thirds grid guides) ensuring character faces, monsters, or focal details are never cut off.
