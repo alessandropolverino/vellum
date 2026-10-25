@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import QRCode from 'qrcode';
-import { Wifi, Globe, Copy, Check, Square, Play, X, Users } from 'lucide-react';
+import { Wifi, Globe, Copy, Check, Square, Play, X, Users, Presentation } from 'lucide-react';
 import { useLanguage } from '../i18n/LanguageContext';
 import type { LiveSessionApi } from '../services/useLiveSession';
 
@@ -8,15 +8,19 @@ interface LiveJoinModalProps {
   live: LiveSessionApi;
   /** Characters players can pick on their phones (the active instance's party). */
   players: { id: string; name: string }[];
+  /** Characters the DM can show to the table (name and portrait only are shared). */
+  showable: { id: string; name: string; kind: 'pc' | 'npc' | 'monster' }[];
   onClose: () => void;
 }
 
-export const LiveJoinModal: React.FC<LiveJoinModalProps> = ({ live, players, onClose }) => {
+export const LiveJoinModal: React.FC<LiveJoinModalProps> = ({ live, players, showable, onClose }) => {
   const { tr } = useLanguage();
   const { desktop, info, joinUrl, tunnelStatus, tunnelUrl, tunnelError, clients, claimed, error, busy } = live;
   const [useTunnel, setUseTunnel] = useState(true);
   const [qr, setQr] = useState<string>('');
   const [copied, setCopied] = useState(false);
+  const [pickShow, setPickShow] = useState('');
+  const shownChar = showable.find((c) => c.id === live.shownId);
 
   useEffect(() => {
     if (!joinUrl) {
@@ -168,6 +172,64 @@ export const LiveJoinModal: React.FC<LiveJoinModalProps> = ({ live, players, onC
                   </div>
                 );
               })}
+            </div>
+
+            <div className="space-y-1.5">
+              <div className="text-xs font-semibold text-stone-400 flex items-center gap-1.5">
+                <Presentation className="w-3.5 h-3.5" />
+                {tr('Show to players', 'Mostra ai giocatori')}
+              </div>
+              {shownChar ? (
+                <div className="flex items-center justify-between gap-2 text-xs bg-stone-950 border border-amber-700/50 rounded-lg px-2 py-1.5">
+                  <span className="truncate text-amber-200">
+                    {tr('Showing', 'In mostra')}: {shownChar.name}
+                  </span>
+                  <button
+                    onClick={() => live.show(null)}
+                    className="shrink-0 px-2 py-0.5 rounded bg-stone-800 hover:bg-stone-700 text-stone-200"
+                  >
+                    {tr('Stop', 'Nascondi')}
+                  </button>
+                </div>
+              ) : (
+                <div className="flex items-center gap-2">
+                  <select
+                    value={pickShow}
+                    onChange={(e) => setPickShow(e.target.value)}
+                    className="flex-1 min-w-0 bg-stone-950 border border-stone-800 rounded-lg px-2 py-1.5 text-xs text-stone-200"
+                  >
+                    <option value="">{tr('Choose a character…', 'Scegli un personaggio…')}</option>
+                    {(['pc', 'npc', 'monster'] as const).map((kind) => (
+                      <optgroup
+                        key={kind}
+                        label={
+                          kind === 'pc'
+                            ? tr('Player characters', 'Personaggi giocanti')
+                            : kind === 'npc'
+                              ? 'NPC'
+                              : tr('Monsters', 'Mostri')
+                        }
+                      >
+                        {showable
+                          .filter((c) => c.kind === kind)
+                          .map((c) => (
+                            <option key={c.id} value={c.id}>
+                              {c.name}
+                            </option>
+                          ))}
+                      </optgroup>
+                    ))}
+                  </select>
+                  <button
+                    onClick={() => {
+                      if (pickShow) live.show(pickShow);
+                    }}
+                    className="shrink-0 px-2.5 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-500 text-stone-950 text-xs font-bold"
+                  >
+                    {tr('Show', 'Mostra')}
+                  </button>
+                </div>
+              )}
             </div>
 
             <div className="flex items-center justify-between">

@@ -14,6 +14,8 @@ use std::sync::{Arc, Mutex as StdMutex};
 
 use axum::extract::ws::{Message, WebSocket, WebSocketUpgrade};
 use axum::extract::{Path, Query, State};
+use axum::http::header;
+use base64::Engine;
 use axum::http::StatusCode;
 use axum::response::{Html, IntoResponse};
 use axum::Json;
@@ -53,6 +55,10 @@ struct PlayerData {
     views: HashMap<String, String>,
     /// character id -> nickname the player typed when picking it
     nicknames: HashMap<String, String>,
+    /// kind ("combat", "shown") -> latest payload for every player; replayed to late joiners
+    shared: HashMap<String, String>,
+    /// character id -> (mime type, image bytes) used as the small icon on phones
+    portraits: HashMap<String, (String, Vec<u8>)>,
 }
 
 #[derive(Serialize, Clone, Debug)]
@@ -152,6 +158,11 @@ struct WsQuery {
 
 #[derive(Deserialize)]
 struct SessionQuery {
+    s: String,
+}
+
+#[derive(Deserialize)]
+struct PortraitQuery {
     s: String,
 }
 
@@ -272,6 +283,29 @@ async fn me_handler(
     Json(serde_json::json!({ "characterId": character_id, "name": name })).into_response()
 }
 
+async fn portrait_handler(
+    State(s): State<ServerShared>,
+    Path(id): Path<String>,
+    Query(q): Query<PortraitQuery>,
+) -> impl IntoResponse {
+    if !token_matches(&s.token, &q.s) {
+        return StatusCode::NOT_FOUND.into_response();
+    }
+    let found = s.data.lock().unwrap().portraits.get(&id).cloned();
+    match found {
+        Some((mime, bytes)) => (
+            [
+                (header::CONTENT_TYPE, mime),
+                // The URL carries a version query, so a changed portrait gets a new URL.
+                (header::CACHE_CONTROL, "private, max-age=86400".to_string()),
+            ],
+            bytes,
+        )
+            .into_response(),
+        None => StatusCode::NOT_FOUND.into_response(),
+    }
+}
+
 async fn ws_handler(
     State(s): State<ServerShared>,
     Query(q): Query<WsQuery>,
@@ -299,9 +333,17 @@ async fn client_loop(socket: WebSocket, s: ServerShared, character_id: String) {
     let (mut sink, mut stream) = socket.split();
     let mut rx = s.tx.subscribe();
 
-    let current = s.data.lock().unwrap().views.get(&character_id).cloned();
-    if let Some(view) = current {
-        let _ = sink.send(Message::Text(view)).await;
+    let initial: Vec<String> = {
+        let d = s.data.lock().unwrap();
+        d.views
+            .get(&character_id)
+            .into_iter()
+            .chain(d.shared.values())
+            .cloned()
+            .collect()
+    };
+    for text in initial {
+        let _ = sink.send(Message::Text(text)).await;
     }
 
     loop {
@@ -329,6 +371,22 @@ async fn client_loop(socket: WebSocket, s: ServerShared, character_id: String) {
 
     s.clients.fetch_sub(1, Ordering::SeqCst);
     emit_clients(&s);
+}
+
+/// Accepts only small raster images; anything else (svg, html, ...) is refused so the
+/// portrait endpoint can never serve active content.
+fn parse_data_url(data_url: &str) -> Option<(String, Vec<u8>)> {
+    let rest = data_url.strip_prefix("data:")?;
+    let (meta, body) = rest.split_once(',')?;
+    let mime = meta.strip_suffix(";base64")?;
+    if !matches!(mime, "image/png" | "image/jpeg" | "image/webp") {
+        return None;
+    }
+    let bytes = base64::engine::general_purpose::STANDARD.decode(body).ok()?;
+    if bytes.len() > 2 * 1024 * 1024 {
+        return None;
+    }
+    Some((mime.to_string(), bytes))
 }
 
 fn cloudflared_candidates() -> Vec<PathBuf> {
@@ -468,6 +526,7 @@ pub async fn live_start(
         .route("/api/roster", get(roster_handler))
         .route("/api/claim", post(claim_handler))
         .route("/api/me", get(me_handler))
+        .route("/api/portrait/:id", get(portrait_handler))
         .route("/ws", get(ws_handler))
         .with_state(shared);
 
@@ -588,6 +647,44 @@ pub async fn live_set_view(
     Ok(())
 }
 
+/// Stores a payload every player should see (combat order, content shown by the DM) under
+/// `kind`, replacing the previous one, and pushes it to all connected phones. Late joiners
+/// get the latest payload of each kind when they connect.
+#[tauri::command]
+pub async fn live_set_shared(
+    state: TauriState<'_, LiveState>,
+    kind: String,
+    payload: String,
+) -> Result<(), String> {
+    let guard = state.inner.lock().await;
+    let r = guard.as_ref().ok_or("Live session is not running")?;
+    r.data
+        .lock()
+        .map_err(|e| e.to_string())?
+        .shared
+        .insert(kind, payload.clone());
+    let _ = r.tx.send((None, payload));
+    Ok(())
+}
+
+/// Registers the (already downscaled) data URL used as a character's icon on phones.
+#[tauri::command]
+pub async fn live_set_portrait(
+    state: TauriState<'_, LiveState>,
+    character_id: String,
+    data_url: String,
+) -> Result<(), String> {
+    let (mime, bytes) = parse_data_url(&data_url).ok_or("Unsupported portrait format")?;
+    let guard = state.inner.lock().await;
+    let r = guard.as_ref().ok_or("Live session is not running")?;
+    r.data
+        .lock()
+        .map_err(|e| e.to_string())?
+        .portraits
+        .insert(character_id, (mime, bytes));
+    Ok(())
+}
+
 /// Frees a character so another phone can claim it (the current phone is disconnected).
 #[tauri::command]
 pub async fn live_release(
@@ -644,6 +741,15 @@ mod tests {
         assert_eq!(sanitize_nickname(&"x".repeat(80)).chars().count(), 30);
         assert_eq!(sanitize_nickname("
  	"), "");
+    }
+
+    #[test]
+    fn data_url_parsing_is_strict() {
+        let ok = parse_data_url("data:image/png;base64,aGVsbG8=");
+        assert_eq!(ok.map(|(m, b)| (m, b)), Some(("image/png".to_string(), b"hello".to_vec())));
+        assert!(parse_data_url("data:image/svg+xml;base64,aGVsbG8=").is_none());
+        assert!(parse_data_url("data:image/png,hello").is_none());
+        assert!(parse_data_url("https://example.com/a.png").is_none());
     }
 
     #[test]

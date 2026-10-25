@@ -3,7 +3,9 @@ import {
   formatSignedBonus,
   getProficiencyBonus,
   type AbilityKey,
+  type ActiveCombatState,
   type CharacterEntity,
+  type CombatParticipant,
   type PcRuntimeStatus,
 } from '../types/dnd';
 
@@ -22,11 +24,14 @@ export interface PlayerRosterEntry {
  */
 export function buildPlayerSheet(
   pc: CharacterEntity,
-  runtime: PcRuntimeStatus | undefined
+  runtime: PcRuntimeStatus | undefined,
+  iconVersion: string | null
 ) {
   return {
     type: 'sheet',
     c: {
+      id: pc.id,
+      icon: iconVersion,
       name: runtime?.customNameOverride || pc.name,
       player: runtime?.playerOverride || pc.playerOrRole,
       classOrArchetype: pc.classOrArchetype || '',
@@ -66,5 +71,68 @@ export function buildPlayerSheet(
       },
       biography: pc.biographyOrLore || '',
     },
+  };
+}
+
+/** What a player may know about an enemy's health: a word, never numbers. */
+export type EnemyStatus = 'unhurt' | 'wounded' | 'bloodied' | 'down';
+
+export function enemyStatus(p: Pick<CombatParticipant, 'hpCurrent' | 'hpMax'>): EnemyStatus {
+  if (p.hpMax <= 0) return 'unhurt';
+  if (p.hpCurrent <= 0) return 'down';
+  if (p.hpCurrent * 2 <= p.hpMax) return 'bloodied';
+  if (p.hpCurrent < p.hpMax) return 'wounded';
+  return 'unhurt';
+}
+
+/**
+ * Combat order for every phone. Player characters carry only their character id (their own HP
+ * comes with their sheet); monsters and NPCs carry a health word. No hit points, AC, notes or
+ * conditions of other participants are ever included.
+ */
+export function buildCombatPayload(
+  combat: ActiveCombatState | null | undefined,
+  iconVersions: Map<string, string>
+) {
+  if (!combat || !combat.isActive) return { type: 'combat', active: false };
+  return {
+    type: 'combat',
+    active: true,
+    title: combat.encounterTitle,
+    round: combat.round,
+    turn: combat.turnIndex,
+    participants: combat.participants.map((p) => {
+      const isPc = p.kind === 'pc';
+      const iconKey = p.sourceCharacterId;
+      return {
+        id: p.id,
+        name: p.name,
+        kind: isPc ? 'pc' : 'foe',
+        initiative: p.initiative,
+        characterId: isPc ? p.sourceCharacterId || null : null,
+        status: isPc ? null : enemyStatus(p),
+        iconId: iconKey && iconVersions.has(iconKey) ? iconKey : null,
+        icon: iconKey ? iconVersions.get(iconKey) ?? null : null,
+      };
+    }),
+  };
+}
+
+/**
+ * A character the DM shows to the table. Only the name, a short role line and the portrait are
+ * shared; statblocks, lore and notes stay on the DM's machine.
+ */
+export function buildShownPayload(
+  character: CharacterEntity | null,
+  iconVersion: string | null
+) {
+  if (!character) return { type: 'shown', item: null };
+  const subtitle =
+    character.kind === 'pc'
+      ? [character.classOrArchetype, character.levelOrCr].filter(Boolean).join(' · ')
+      : character.playerOrRole || character.creatureType;
+  return {
+    type: 'shown',
+    item: { title: character.name, subtitle, icon: iconVersion },
   };
 }

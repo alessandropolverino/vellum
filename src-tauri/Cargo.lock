@@ -4401,6 +4401,7 @@ name = "vellum"
 version = "0.1.4"
 dependencies = [
  "axum",
+ "base64 0.22.1",
  "futures-util",
  "local-ip-address",
  "rand",

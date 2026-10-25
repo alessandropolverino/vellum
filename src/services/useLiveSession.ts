@@ -1,7 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
-import { buildPlayerSheet, type PlayerRosterEntry } from './liveSheet';
+import {
+  buildCombatPayload,
+  buildPlayerSheet,
+  buildShownPayload,
+  type PlayerRosterEntry,
+} from './liveSheet';
+import { portraitVersion, shrinkPortrait } from './livePortraits';
 import type { CharacterEntity, PlayInstance } from '../types/dnd';
 
 export interface ClaimInfo {
@@ -55,7 +61,10 @@ export function useLiveSession(
   const [claimed, setClaimed] = useState<ClaimInfo[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const sentViews = useRef<Map<string, string>>(new Map());
+  const [shownId, setShownId] = useState<string | null>(null);
+  const sentPayloads = useRef<Map<string, string>>(new Map());
+  const portraitSources = useRef<Map<string, string>>(new Map());
+  const iconVersions = useRef<Map<string, string>>(new Map());
   const instanceRef = useRef(instance);
   const onNicknameRef = useRef(onNickname);
   instanceRef.current = instance;
@@ -101,7 +110,7 @@ export function useLiveSession(
     }
   }, [claimed, instance]);
 
-  // Push the roster and each player's sheet whenever the instance or characters change.
+  // Keep every phone in sync: roster, own sheets, combat order and what the DM is showing.
   useEffect(() => {
     if (!desktop || !info || !instance) return;
     const charMap = new Map(characters.map((c) => [c.id, c]));
@@ -113,19 +122,63 @@ export function useLiveSession(
       name: instance.pcStatus[pc.id]?.customNameOverride || pc.name,
       subtitle: [pc.classOrArchetype, pc.levelOrCr].filter(Boolean).join(' · '),
     }));
+    const combat = instance.activeCombat?.isActive ? instance.activeCombat : null;
+    const shown = shownId ? charMap.get(shownId) ?? null : null;
     let cancelled = false;
+
+    // Downscales and uploads a portrait once per image; returns its version, or null if none.
+    const ensureIcon = async (id: string, storeAs: string, size: number) => {
+      const src = charMap.get(id)?.portraitUrl;
+      if (!src || !src.startsWith('data:image/')) return null;
+      const key = `${storeAs}:${size}`;
+      if (portraitSources.current.get(key) !== src) {
+        const small = await shrinkPortrait(src, size);
+        if (!small) return null;
+        await invoke('live_set_portrait', { characterId: storeAs, dataUrl: small });
+        portraitSources.current.set(key, src);
+        iconVersions.current.set(key, portraitVersion(small));
+      }
+      return iconVersions.current.get(key) ?? null;
+    };
+    const push = async (kind: string, payload: string, send: () => Promise<unknown>) => {
+      if (sentPayloads.current.get(kind) === payload) return;
+      await send();
+      sentPayloads.current.set(kind, payload);
+    };
+
     (async () => {
       try {
         await invoke('live_set_roster', { entries: roster });
-        for (const pc of pcs) {
+
+        const icons = new Map<string, string>();
+        const wanted = new Set<string>(pcs.map((p) => p.id));
+        combat?.participants.forEach((p) => p.sourceCharacterId && wanted.add(p.sourceCharacterId));
+        for (const id of wanted) {
+          const v = await ensureIcon(id, id, 128);
+          if (v) icons.set(id, v);
           if (cancelled) return;
-          const payload = JSON.stringify(
-            buildPlayerSheet(pc, instance.pcStatus[pc.id])
-          );
-          if (sentViews.current.get(pc.id) === payload) continue;
-          await invoke('live_set_view', { characterId: pc.id, payload });
-          sentViews.current.set(pc.id, payload);
         }
+
+        for (const pc of pcs) {
+          const payload = JSON.stringify(
+            buildPlayerSheet(pc, instance.pcStatus[pc.id], icons.get(pc.id) ?? null)
+          );
+          await push(`view:${pc.id}`, payload, () =>
+            invoke('live_set_view', { characterId: pc.id, payload })
+          );
+          if (cancelled) return;
+        }
+
+        const combatPayload = JSON.stringify(buildCombatPayload(combat, icons));
+        await push('combat', combatPayload, () =>
+          invoke('live_set_shared', { kind: 'combat', payload: combatPayload })
+        );
+
+        const shownIcon = shown ? await ensureIcon(shown.id, 'shown', 480) : null;
+        const shownPayload = JSON.stringify(buildShownPayload(shown, shownIcon));
+        await push('shown', shownPayload, () =>
+          invoke('live_set_shared', { kind: 'shown', payload: shownPayload })
+        );
       } catch (e) {
         if (!cancelled) setError(String(e));
       }
@@ -133,7 +186,7 @@ export function useLiveSession(
     return () => {
       cancelled = true;
     };
-  }, [desktop, info, instance, characters]);
+  }, [desktop, info, instance, characters, shownId]);
 
   const start = useCallback(async (useTunnel: boolean) => {
     setBusy(true);
@@ -141,7 +194,10 @@ export function useLiveSession(
     setTunnelError(null);
     setTunnelUrl(null);
     setTunnelStatus(useTunnel ? 'starting' : 'idle');
-    sentViews.current.clear();
+    sentPayloads.current.clear();
+    portraitSources.current.clear();
+    iconVersions.current.clear();
+    setShownId(null);
     try {
       const started = await invoke<LiveInfo>('live_start', { useTunnel });
       setInfo(started);
@@ -162,7 +218,10 @@ export function useLiveSession(
       setClaimed([]);
       setTunnelUrl(null);
       setTunnelStatus('idle');
-      sentViews.current.clear();
+      sentPayloads.current.clear();
+      portraitSources.current.clear();
+      iconVersions.current.clear();
+      setShownId(null);
     } catch (e) {
       setError(String(e));
     } finally {
@@ -195,6 +254,8 @@ export function useLiveSession(
     claimed,
     error,
     busy,
+    shownId,
+    show: setShownId,
     start,
     stop,
     release,

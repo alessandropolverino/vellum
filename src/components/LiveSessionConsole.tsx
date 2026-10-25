@@ -1893,6 +1893,9 @@ export const LiveSessionConsole: React.FC<LiveSessionConsoleProps> = ({
       {showJoinModal && (
         <LiveJoinModal
           live={live}
+          showable={characters
+            .filter((c) => !c.isPreGenBlueprint)
+            .map((c) => ({ id: c.id, name: c.name, kind: c.kind }))}
           players={currentInstance.partyCharacterIds
             .map((id) => charMap.get(id))
             .filter((c): c is CharacterEntity => Boolean(c))
