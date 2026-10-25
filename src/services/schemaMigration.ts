@@ -98,6 +98,7 @@ export function normalizeDatabase(raw: unknown): DndDatabase {
         sourceBlueprintId: ch?.sourceBlueprintId ? String(ch.sourceBlueprintId) : undefined,
         instanceOnlyId: ch?.instanceOnlyId ? String(ch.instanceOnlyId) : undefined,
         portraitUrl: typeof ch?.portraitUrl === 'string' ? ch.portraitUrl : undefined,
+        portraitOriginalUrl: typeof ch?.portraitOriginalUrl === 'string' ? ch.portraitOriginalUrl : undefined,
         background: ch?.background ? String(ch.background) : undefined,
         proficiencyBonus: typeof ch?.proficiencyBonus === 'number' ? ch.proficiencyBonus : undefined,
         savingThrowProficiencies: typeof ch?.savingThrowProficiencies === 'object' && ch?.savingThrowProficiencies
