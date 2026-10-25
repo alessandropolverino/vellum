@@ -14,7 +14,7 @@ import {
   isPcBlueprint,
 } from '../types/dnd';
 import { useLanguage } from '../i18n/LanguageContext';
-import { useConfirmDelete } from './ConfirmDialog';
+import { useConfirmDelete, useDialogs } from './ConfirmDialog';
 import { HomebreweryRenderer } from './HomebreweryRenderer';
 import { StatblockCard } from './StatblockCard';
 import { LevelUpModal } from './LevelUpModal';
@@ -74,6 +74,7 @@ export const LiveSessionConsole: React.FC<LiveSessionConsoleProps> = ({
 }) => {
   const { lang, tr } = useLanguage();
   const confirmDelete = useConfirmDelete();
+  const { confirm: confirmDialog } = useDialogs();
   const [, setAudioTick] = useState(0);
   const [centerTab, setCenterTab] = useState<'story' | 'combat'>('story');
   const [sideTab, setSideTab] = useState<'scenes' | 'party' | 'sounds' | 'log'>('scenes');
@@ -548,6 +549,23 @@ export const LiveSessionConsole: React.FC<LiveSessionConsoleProps> = ({
     setCenterTab('combat');
   };
 
+  // Drops the running combat as if it never started: nothing is logged and hit points are not
+  // synced back, so everyone keeps the values they had before the fight.
+  const cancelCombat = async () => {
+    if (!currentInstance.activeCombat) return;
+    const ok = await confirmDialog({
+      title: tr('Cancel this combat?', 'Annullare questo combattimento?'),
+      message: tr(
+        'Nothing is added to the timeline and hit points changed during the fight are discarded.',
+        'Non viene aggiunto nulla al diario e i punti ferita cambiati durante lo scontro vengono scartati.'
+      ),
+      confirmLabel: tr('Cancel combat', 'Annulla combattimento'),
+      cancelLabel: tr('Keep fighting', 'Continua'),
+      danger: true,
+    });
+    if (ok) updateInstance({ activeCombat: null });
+  };
+
   const finishAndLogCombat = () => {
     const combat = currentInstance.activeCombat;
     if (!combat) return;
@@ -931,6 +949,14 @@ export const LiveSessionConsole: React.FC<LiveSessionConsoleProps> = ({
                         className="px-3 py-2 rounded-lg bg-emerald-800 hover:bg-emerald-700 text-white font-bold text-xs"
                       >
                         🏁 {tr('End & Log to Timeline', 'Termina & Registra nel Diario')}
+                      </button>
+                      <button
+                        onClick={cancelCombat}
+                        title={tr('Discard this combat without logging it', 'Scarta questo combattimento senza registrarlo')}
+                        className="px-3 py-2 rounded-lg bg-stone-800 hover:bg-red-900/70 text-stone-300 hover:text-red-100 font-bold text-xs flex items-center gap-1.5"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                        {tr('Cancel', 'Annulla')}
                       </button>
                     </div>
                   </div>

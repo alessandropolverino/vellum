@@ -4,6 +4,7 @@ All notable user-facing changes to Vellum are documented in this file.
 
 ## Unreleased
 
+- App: A combat started by mistake can now be cancelled from the combat header; it is discarded without adding anything to the timeline or changing anyone's hit points.
 - App: Starting a combat now opens a "Roll initiative" dialog. Type the result of each roll for every character, player or not, or tap the dice button next to a field to roll a d20 with that character's initiative modifier. Fields left empty are rolled automatically. The same dialog appears when adding creatures to a combat in progress, and the turn stays on whoever is acting.
 ## Windows 0.1.5 — 2026-10-25
 
