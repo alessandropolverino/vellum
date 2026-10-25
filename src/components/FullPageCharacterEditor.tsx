@@ -23,6 +23,7 @@ import {
 import { useLanguage } from '../i18n/LanguageContext';
 import { useDialogs } from './ConfirmDialog';
 import { StatblockCard } from './StatblockCard';
+import { ImageCropModal } from './ImageCropModal';
 import {
   validatePgCombination,
   STANDARD_RACES,
@@ -73,6 +74,7 @@ import {
   Heart,
   Zap,
   Eye,
+  Crop,
 } from 'lucide-react';
 
 interface FullPageCharacterEditorProps {
@@ -96,6 +98,8 @@ export const FullPageCharacterEditor: React.FC<FullPageCharacterEditorProps> = (
   const [showWarningConfirmation, setShowWarningConfirmation] = useState(false);
   const [showStatblockPreview, setShowStatblockPreview] = useState(true);
   const [tab, setTab] = useState<SheetTabId>('identity');
+  const [cropModalOpen, setCropModalOpen] = useState(false);
+  const [pendingCropUrl, setPendingCropUrl] = useState<string | null>(null);
 
   const isPc = editingChar.kind === 'pc';
   const isBlueprint = isPcBlueprint(editingChar);
@@ -153,9 +157,37 @@ export const FullPageCharacterEditor: React.FC<FullPageCharacterEditorProps> = (
     if (!file) return;
     const reader = new FileReader();
     reader.onload = () => {
-      setEditingChar({ ...editingChar, portraitUrl: String(reader.result) });
+      const dataUrl = String(reader.result);
+      setPendingCropUrl(dataUrl);
+      setCropModalOpen(true);
     };
     reader.readAsDataURL(file);
+    e.target.value = '';
+  };
+
+  const handleOpenCropModal = () => {
+    const src = editingChar.portraitOriginalUrl || editingChar.portraitUrl;
+    if (!src) return;
+    setPendingCropUrl(src);
+    setCropModalOpen(true);
+  };
+
+  const handleCropConfirm = (croppedDataUrl: string) => {
+    patch({
+      portraitUrl: croppedDataUrl,
+      portraitOriginalUrl: pendingCropUrl || editingChar.portraitOriginalUrl || croppedDataUrl,
+    });
+    setCropModalOpen(false);
+  };
+
+  const handleCropCancel = () => {
+    if (!editingChar.portraitUrl && pendingCropUrl) {
+      patch({
+        portraitUrl: pendingCropUrl,
+        portraitOriginalUrl: pendingCropUrl,
+      });
+    }
+    setCropModalOpen(false);
   };
 
   const updateListEntry = (
@@ -744,7 +776,7 @@ export const FullPageCharacterEditor: React.FC<FullPageCharacterEditorProps> = (
                   {editingChar.portraitUrl && (
                     <button
                       type="button"
-                      onClick={() => patch({ portraitUrl: undefined })}
+                      onClick={() => patch({ portraitUrl: undefined, portraitOriginalUrl: undefined })}
                       className="text-[11px] text-red-400 hover:underline cursor-pointer"
                     >
                       {tr('Remove Image', 'Rimuovi Immagine')}
@@ -753,20 +785,45 @@ export const FullPageCharacterEditor: React.FC<FullPageCharacterEditorProps> = (
                 </div>
                 <div className="flex flex-wrap items-center gap-3">
                   {editingChar.portraitUrl && (
-                    <img
-                      src={editingChar.portraitUrl}
-                      alt="Portrait preview"
-                      className="w-16 h-16 rounded-xl object-cover border border-amber-500/50 shrink-0"
-                    />
+                    <button
+                      type="button"
+                      onClick={handleOpenCropModal}
+                      title={tr('Click to adjust framing / crop', 'Clicca per regolare l\'inquadratura / ritaglia')}
+                      className="relative group cursor-pointer shrink-0"
+                    >
+                      <img
+                        src={editingChar.portraitUrl}
+                        alt="Portrait preview"
+                        className="w-16 h-16 rounded-xl object-cover border border-amber-500/50"
+                      />
+                      <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity rounded-xl flex items-center justify-center text-amber-300">
+                        <Crop className="w-5 h-5 drop-shadow" />
+                      </div>
+                    </button>
                   )}
                   <label className="px-3.5 py-2 rounded-xl bg-stone-800 hover:bg-stone-700 text-amber-300 font-semibold cursor-pointer border border-stone-700 text-xs transition shrink-0">
                     {tr('Upload Image File...', 'Carica File Immagine...')}
                     <input type="file" accept="image/*" onChange={handlePortraitUpload} className="hidden" />
                   </label>
+                  {editingChar.portraitUrl && (
+                    <button
+                      type="button"
+                      onClick={handleOpenCropModal}
+                      className="px-3.5 py-2 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 font-semibold border border-amber-500/40 text-xs flex items-center gap-1.5 cursor-pointer transition shrink-0"
+                    >
+                      <Crop className="w-3.5 h-3.5" />
+                      <span>{tr('Adjust Framing / Crop', 'Regola Inquadratura')}</span>
+                    </button>
+                  )}
                   <input
                     type="text"
                     value={editingChar.portraitUrl || ''}
-                    onChange={(e) => patch({ portraitUrl: e.target.value || undefined })}
+                    onChange={(e) =>
+                      patch({
+                        portraitUrl: e.target.value || undefined,
+                        portraitOriginalUrl: e.target.value || undefined,
+                      })
+                    }
                     placeholder={tr('Or paste image URL / DataURL...', 'Oppure incolla URL immagine / DataURL...')}
                     className={`${inputCls} flex-1 min-w-[12rem]`}
                   />
@@ -1196,7 +1253,10 @@ export const FullPageCharacterEditor: React.FC<FullPageCharacterEditorProps> = (
                 {tr('Updates automatically as you edit', 'Si aggiorna in tempo reale')}
               </span>
             </div>
-            <StatblockCard character={editingChar} />
+            <StatblockCard
+              character={editingChar}
+              onEditPortrait={editingChar.portraitUrl ? handleOpenCropModal : undefined}
+            />
           </div>
         )}
       </div>
@@ -1258,6 +1318,15 @@ export const FullPageCharacterEditor: React.FC<FullPageCharacterEditorProps> = (
           </div>
         </div>
       )}
+
+      {/* Image Crop & Framing Modal */}
+      <ImageCropModal
+        isOpen={cropModalOpen}
+        imageUrl={pendingCropUrl || ''}
+        characterName={editingChar.name}
+        onConfirm={handleCropConfirm}
+        onCancel={handleCropCancel}
+      />
     </div>
   );
 };

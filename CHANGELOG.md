@@ -4,6 +4,13 @@ All notable user-facing changes to Vellum are documented in this file.
 
 ## Unreleased
 
+- App: Add interactive character portrait framing and cropping modal with real-time statblock and token previews:
+  - Automatic framing/crop dialog immediately after uploading an image file or via the new "Adjust Framing / Crop" action in the character sheet editor.
+  - Interactive pan and zoom controls (drag to pan, mouse wheel zoom, zoom slider with +/- buttons, reset button, and rule-of-thirds grid guides) ensuring character faces, monsters, or focal details are never cut off.
+  - Synchronized real-time live previews displaying both square statblock card framing and circular combat token avatar framing side-by-side.
+  - Relocated portrait in `StatblockCard` to the upper right corner to optimize space utilization and align with the official 5e statblock PDF layout, with an interactive hover crop trigger directly from the live preview.
+  - Preservation of original uncropped image source (`portraitOriginalUrl`) so users can re-adjust framing at any time without re-uploading.
+
 ## Windows 0.1.3 — 2026-10-25
 
 - Windows: Bundle the Vellum CLI (`vellum`) and agent skills inside the Windows installer, automatically adding the Vellum installation path to the user's PATH environment variable so AI coding agents and users can run `vellum` from any terminal.

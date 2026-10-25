@@ -26,6 +26,7 @@ import {
   ChevronDown,
   ChevronUp,
   TrendingUp,
+  Crop,
 } from 'lucide-react';
 
 interface StatblockCardProps {
@@ -35,6 +36,7 @@ interface StatblockCardProps {
   onLevelUp?: (char: CharacterEntity) => void;
   onAddToCombat?: (char: CharacterEntity) => void;
   onCreatePcInstance?: (blueprint: CharacterEntity) => void;
+  onEditPortrait?: () => void;
   runtimeOverrides?: {
     playerOverride?: string;
     customNameOverride?: string;
@@ -52,6 +54,7 @@ export const StatblockCard: React.FC<StatblockCardProps> = ({
   onLevelUp,
   onAddToCombat,
   onCreatePcInstance,
+  onEditPortrait,
   runtimeOverrides,
 }) => {
   const { lang, tr } = useLanguage();
@@ -86,20 +89,8 @@ export const StatblockCard: React.FC<StatblockCardProps> = ({
       <div className="h-2 bg-gradient-to-r from-[#58180D] via-[#c9ad6a] to-[#58180D] border-b border-[#58180D]" />
 
       <div className={compact ? 'p-3.5' : 'p-5'}>
-        {/* Header with optional Portrait */}
-        <div className="flex items-start gap-3.5 min-w-0">
-          {character.portraitUrl && (
-            <div className="shrink-0">
-              <img
-                src={character.portraitUrl}
-                alt={character.name}
-                className={`${
-                  compact ? 'w-14 h-14' : 'w-16 h-16 sm:w-20 sm:h-20'
-                } rounded-lg object-cover border-2 border-[#58180D] shadow-md bg-[#efe0bb]`}
-              />
-            </div>
-          )}
-
+        {/* Header with identity on left and optional Portrait on top-right */}
+        <div className="flex items-start justify-between gap-3.5 min-w-0">
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2 flex-wrap">
               <h3 className="font-header text-xl md:text-2xl font-extrabold tracking-wide text-[#58180D] uppercase leading-tight break-words">
@@ -150,6 +141,29 @@ export const StatblockCard: React.FC<StatblockCardProps> = ({
               </span>
             </p>
           </div>
+
+          {character.portraitUrl && (
+            <div className="shrink-0 relative group ml-1">
+              <img
+                src={character.portraitUrl}
+                alt={character.name}
+                className={`${
+                  compact ? 'w-14 h-14' : 'w-16 h-16 sm:w-20 sm:h-20'
+                } rounded-lg object-cover border-2 border-[#58180D] shadow-md bg-[#efe0bb]`}
+              />
+              {onEditPortrait && (
+                <button
+                  type="button"
+                  onClick={onEditPortrait}
+                  title={tr('Adjust Framing / Crop', 'Regola Inquadratura / Ritaglia')}
+                  className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity rounded-lg flex flex-col items-center justify-center text-amber-300 text-[10px] font-sans font-bold cursor-pointer"
+                >
+                  <Crop className="w-5 h-5 drop-shadow" />
+                  <span className="mt-0.5 drop-shadow">{tr('Crop', 'Ritaglia')}</span>
+                </button>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Action Toolbar */}
