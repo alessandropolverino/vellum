@@ -1,6 +1,6 @@
 [package]
 name = "vellum"
-version = "0.1.2"
+version = "0.1.3"
 description = "Vellum — D&D 5e Campaign & One-Shot Manager"
 authors = ["DM"]
 edition = "2021"
