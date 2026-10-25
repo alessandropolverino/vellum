@@ -1,3 +1,4 @@
+import { deathStateAtZero } from './deathSaves';
 import {
   formatMod,
   formatSignedBonus,
@@ -25,8 +26,12 @@ export interface PlayerRosterEntry {
 export function buildPlayerSheet(
   pc: CharacterEntity,
   runtime: PcRuntimeStatus | undefined,
-  iconVersion: string | null
+  iconVersion: string | null,
+  /** This character's entry in the running combat, if any: it holds the live hit points. */
+  fighting?: CombatParticipant
 ) {
+  const hpCurrent = fighting ? fighting.hpCurrent : runtime?.hpCurrent ?? pc.hpMax;
+  const saves = fighting?.deathSaves;
   return {
     type: 'sheet',
     c: {
@@ -40,10 +45,19 @@ export function buildPlayerSheet(
       alignment: pc.alignment,
       ac: pc.ac,
       acNote: pc.acNote || '',
-      hpCurrent: runtime?.hpCurrent ?? pc.hpMax,
+      hpCurrent,
       hpMax: pc.hpMax,
-      tempHp: runtime?.tempHp ?? 0,
-      conditions: runtime?.conditions ?? [],
+      tempHp: fighting ? fighting.tempHp : runtime?.tempHp ?? 0,
+      conditions: fighting ? fighting.conditions : runtime?.conditions ?? [],
+      // Only the character's own tally: at 0 HP during a fight they are dying, stable or dead.
+      death:
+        fighting && hpCurrent === 0
+          ? {
+              state: deathStateAtZero(saves),
+              successes: saves?.successes ?? 0,
+              failures: saves?.failures ?? 0,
+            }
+          : null,
       inspiration: runtime?.inspiration ?? false,
       speed: pc.speed,
       initiative: formatSignedBonus(pc.initiativeBonus),
@@ -85,6 +99,12 @@ export function enemyStatus(p: Pick<CombatParticipant, 'hpCurrent' | 'hpMax'>): 
   return 'unhurt';
 }
 
+/** Allies at 0 HP show as down (or dead); anyone else shows nothing. No numbers. */
+function fallenAlly(p: CombatParticipant): 'down' | 'dead' | null {
+  if (p.hpCurrent > 0) return null;
+  return deathStateAtZero(p.deathSaves) === 'dead' ? 'dead' : 'down';
+}
+
 /**
  * Combat order for every phone. Player characters carry only their character id (their own HP
  * comes with their sheet); monsters and NPCs carry a health word. No hit points, AC, notes or
@@ -110,7 +130,7 @@ export function buildCombatPayload(
         kind: isPc ? 'pc' : 'foe',
         initiative: p.initiative,
         characterId: isPc ? p.sourceCharacterId || null : null,
-        status: isPc ? null : enemyStatus(p),
+        status: isPc ? fallenAlly(p) : enemyStatus(p),
         iconId: iconKey && iconVersions.has(iconKey) ? iconKey : null,
         icon: iconKey ? iconVersions.get(iconKey) ?? null : null,
       };

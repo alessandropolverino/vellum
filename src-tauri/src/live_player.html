@@ -74,6 +74,20 @@
       .big-img { width: 100%; aspect-ratio: 1 / 1; max-height: 52vh; border-radius: 14px; background: var(--s2); overflow: hidden; display: flex; align-items: center; justify-content: center; font-size: 40px; color: var(--mu); }
       .big-img img { width: 100%; height: 100%; object-fit: cover; }
       .gbtn { height: 44px; border-radius: 12px; background: var(--s2); border: 0; font-size: 15px; width: 100%; }
+      .death { display: flex; flex-direction: column; gap: 10px; }
+      .death.dying { background: #2a2008; border-color: var(--am); }
+      .death.stable { background: #0c1f2e; border-color: #38bdf8; }
+      .death.dead { background: #2a0d0d; border-color: var(--rd); }
+      .death .ttl { font-size: 20px; font-weight: 500; }
+      .death.dying .ttl { color: var(--am); }
+      .death.stable .ttl { color: #7dd3fc; }
+      .death.dead .ttl { color: #fca5a5; }
+      .death .hint { font-size: 13px; font-weight: 400; color: #d6d3d1; line-height: 1.5; }
+      .pips { display: flex; align-items: center; gap: 8px; }
+      .pips .lb { width: 86px; font-size: 12px; color: var(--mu); }
+      .pip { width: 20px; height: 20px; border-radius: 50%; border: 1.5px solid var(--ln); background: var(--s2); }
+      .pip.ok { background: var(--gr); border-color: var(--gr); }
+      .pip.bad { background: var(--rd); border-color: var(--rd); }
       .err { color: #fca5a5; font-size: 14px; }
       .center { text-align: center; padding-top: 18vh; color: var(--mu); }
     </style>
@@ -217,6 +231,29 @@
         return add(d, top, big, hpBar(c));
       }
 
+      function pipRow(label, n, cls) {
+        var r = el("div", "pips");
+        r.appendChild(el("span", "lb", label));
+        for (var i = 0; i < 3; i++) r.appendChild(el("span", "pip" + (i < n ? " " + cls : "")));
+        return r;
+      }
+      // Death saves: only the player's own tally, shown instead of the HP block at 0 HP.
+      function deathCard(c, compact) {
+        var d = c.death, card = el("div", "card death " + d.state);
+        var title = d.state === "dead" ? t("You have died", "Il tuo personaggio è morto")
+          : d.state === "stable" ? t("Stable at 0 HP", "Stabile a 0 PF") : t("You’re dying", "Stai morendo");
+        add(card, el("div", "ttl", title));
+        if (!compact) {
+          var hint = d.state === "dead" ? t("Ask your DM what comes next.", "Chiedi al master come proseguire.")
+            : d.state === "stable" ? t("You’re unconscious but no longer dying.", "Sei privo di sensi ma non stai più morendo.")
+            : t("At the start of your turn roll a d20: 10 or more is a success, 9 or less a failure. Three of either decides your fate.",
+                "All’inizio del tuo turno tira un d20: 10 o più è un successo, 9 o meno un fallimento. Tre dello stesso tipo decidono il tuo destino.");
+          card.appendChild(el("p", "hint", hint));
+        }
+        add(card, pipRow(t("Successes", "Successi"), d.successes, "ok"), pipRow(t("Failures", "Fallimenti"), d.failures, "bad"));
+        return card;
+      }
+
       /* ---------- sheet tabs ---------- */
       function viewOverview(c) {
         var f = document.createDocumentFragment();
@@ -226,7 +263,7 @@
         if (c.player) who.appendChild(el("p", "sub", c.player));
         add(head, who, avatar(c.name, c.id, c.icon, "lg"));
         f.appendChild(head);
-        f.appendChild(hpCard(c));
+        f.appendChild(c.death ? deathCard(c) : hpCard(c));
         var stats = el("div", "grid3");
         add(stats, tile(c.ac, t("Armor", "CA")), tile(c.initiative, t("Initiative", "Iniziativa")), tile(c.speed || "—", t("Speed", "Velocità")));
         f.appendChild(stats);
@@ -286,7 +323,8 @@
         unhurt: [t("Unhurt", "Illeso"), "var(--gr)"],
         wounded: [t("Wounded", "Ferito"), "var(--am)"],
         bloodied: [t("Bloodied", "Sanguinante"), "var(--rd)"],
-        down: [t("Down", "A terra"), "var(--mu)"]
+        down: [t("Down", "A terra"), "var(--mu)"],
+        dead: [t("Dead", "Morto"), "var(--rd)"]
       };
       function myIndex() {
         var ps = (S.combat && S.combat.participants) || [];
@@ -306,19 +344,23 @@
         var card = el("div", "card" + (dist === 0 ? " turn" : ""));
         if (dist === 0) {
           var nxt = ps[(cb.turn + 1) % n];
-          var yt = el("div", null, t("Your turn", "Tocca a te")); yt.style.cssText = "font-size:18px;font-weight:500;color:var(--am)";
-          add(card, yt, nxt ? el("p", "sub", t("Next up", "Poi") + ": " + nxt.name) : null);
+          var dying = S.sheet && S.sheet.death && S.sheet.death.state === "dying";
+          var yt = el("div", null, dying ? t("Death save time", "Tiro salvezza contro morte") : t("Your turn", "Tocca a te"));
+          yt.style.cssText = "font-size:18px;font-weight:500;color:var(--am)";
+          add(card, yt, dying ? el("p", "sub", t("Roll a d20: 10 or more succeeds.", "Tira un d20: 10 o più è un successo.")) : null,
+            !dying && nxt ? el("p", "sub", t("Next up", "Poi") + ": " + nxt.name) : null);
         } else {
           var cur = ps[cb.turn];
           add(card, el("div", "lbl", cur ? cur.name + " " + t("is acting", "sta agendo") : ""));
-          var line = el("div", null, dist > 0 ? (dist === 1 ? t("You’re up next", "Tocca a te dopo") : t("You’re up in ", "Tocchi tra ") + dist + t(" turns", " turni")) : t("You’re not in this fight", "Non sei in questo scontro"));
+          var out = S.sheet && S.sheet.death && S.sheet.death.state === "dead";
+          var line = el("div", null, out ? t("Your character is out of the fight", "Il tuo personaggio è fuori dallo scontro") : dist > 0 ? (dist === 1 ? t("You’re up next", "Tocca a te dopo") : t("You’re up in ", "Tocchi tra ") + dist + t(" turns", " turni")) : t("You’re not in this fight", "Non sei in questo scontro"));
           line.style.cssText = "font-size:17px;font-weight:500;margin-top:2px";
           card.appendChild(line);
-          if (dist > 0) { var seg = el("div", "seg"); for (var k = 0; k < Math.min(dist, 5); k++) seg.appendChild(el("i", k === 0 ? "on" : "")); card.appendChild(seg); }
+          if (dist > 0 && !out) { var seg = el("div", "seg"); for (var k = 0; k < Math.min(dist, 5); k++) seg.appendChild(el("i", k === 0 ? "on" : "")); card.appendChild(seg); }
         }
         f.appendChild(card);
 
-        if (dist === 0) {
+        if (dist === 0 && !(S.sheet && S.sheet.death)) {
           var tg = el("div", "tg");
           [["Action", t("Action", "Azione")], ["Bonus", t("Bonus", "Bonus")], ["Reaction", t("Reaction", "Reazione")]].forEach(function (x) {
             var b = el("button", S.used[x[0]] ? "used" : "", x[1]);
@@ -331,11 +373,11 @@
         var list = el("div");
         ps.forEach(function (p, i) {
           var isMe = p.characterId && p.characterId === S.me;
-          var row = el("div", "init" + (i === cb.turn ? " now" : "") + (isMe ? " me" : "") + (p.status === "down" ? " down" : ""));
+          var row = el("div", "init" + (i === cb.turn ? " now" : "") + (isMe ? " me" : "") + ((p.kind === "foe" && p.status === "down") || p.status === "dead" ? " down" : ""));
           var num = el("span", "n", i === cb.turn ? "▶" : p.initiative);
           if (i === cb.turn) num.style.color = "var(--am)";
           add(row, num, avatar(p.name, p.iconId, p.icon, "sm"), el("span", "nm", p.name));
-          if (p.kind === "foe" && p.status) {
+          if (p.status) {
             var st = STATUS[p.status] || STATUS.unhurt, w = el("span", "st");
             var dot = el("span", "dot"); dot.style.background = st[1];
             add(w, dot, document.createTextNode(st[0])); row.appendChild(w);
@@ -345,7 +387,9 @@
           list.appendChild(row);
         });
         f.appendChild(list);
-        if (S.sheet) {
+        if (S.sheet && S.sheet.death) {
+          f.appendChild(deathCard(S.sheet, true));
+        } else if (S.sheet) {
           var c = S.sheet, m = el("div", "card");
           var r2 = el("div", "row sp"); r2.style.marginBottom = "6px";
           add(r2, el("span", null, c.name), el("span", "lbl", t("AC", "CA") + " " + c.ac + " · " + c.hpCurrent + " / " + c.hpMax));

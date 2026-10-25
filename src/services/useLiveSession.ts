@@ -160,8 +160,11 @@ export function useLiveSession(
         }
 
         for (const pc of pcs) {
+          const fighting = combat?.participants.find(
+            (p) => p.kind === 'pc' && p.sourceCharacterId === pc.id
+          );
           const payload = JSON.stringify(
-            buildPlayerSheet(pc, instance.pcStatus[pc.id], icons.get(pc.id) ?? null)
+            buildPlayerSheet(pc, instance.pcStatus[pc.id], icons.get(pc.id) ?? null, fighting)
           );
           await push(`view:${pc.id}`, payload, () =>
             invoke('live_set_view', { characterId: pc.id, payload })
