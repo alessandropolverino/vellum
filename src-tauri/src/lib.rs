@@ -4,6 +4,8 @@ use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 use tauri::Manager;
 
+mod live;
+
 #[derive(serde::Serialize, serde::Deserialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct DatabaseCheckResult {
@@ -535,6 +537,7 @@ fn read_audio_media(
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .manage(live::LiveState::default())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
         .invoke_handler(tauri::generate_handler![
@@ -546,8 +549,22 @@ pub fn run() {
             restore_database_backup,
             open_data_folder,
             save_audio_media,
-            read_audio_media
+            read_audio_media,
+            live::live_start,
+            live::live_stop,
+            live::live_status,
+            live::live_broadcast,
+            live::live_set_roster,
+            live::live_set_view,
+            live::live_release,
+            live::live_set_shared,
+            live::live_set_portrait
         ])
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .build(tauri::generate_context!())
+        .expect("error while building tauri application")
+        .run(|app, event| {
+            if let tauri::RunEvent::Exit = event {
+                live::shutdown_on_exit(app);
+            }
+        });
 }

@@ -84,6 +84,15 @@ export interface StatblockEntry {
   damageFormula?: string;
 }
 
+/** A limited pool a class feature draws on: ki, sorcery points, bardic inspiration uses... */
+export interface ClassResource {
+  id: string;
+  name: string;
+  max: number;
+  /** 'short' refills on short and long rests, 'long' only on long rests, 'manual' never by itself. */
+  recharge: 'short' | 'long' | 'manual';
+}
+
 export interface CharacterEntity {
   id: string;
   kind: EntityKind;
@@ -129,6 +138,8 @@ export interface CharacterEntity {
   actions: StatblockEntry[];
   reactionsOrLegendary?: StatblockEntry[];
   spellsNotes?: string;
+  spellSlots?: number[]; // Maximum slots for spell levels 1-9 (index 0 = 1st level)
+  classResources?: ClassResource[];
   biographyOrLore: string;
   tags: string[];
   accentColor?: string;
@@ -263,6 +274,14 @@ export interface SessionLogEntry {
   pinnedForRecap: boolean;
 }
 
+/** Death saving throw tally for a player character at 0 hit points. */
+export interface DeathSaves {
+  successes: number;
+  failures: number;
+  /** Stabilized (three successes, or by a Medicine check or spell) while still at 0 HP. */
+  stable?: boolean;
+}
+
 export interface CombatParticipant {
   id: string;
   sourceCharacterId?: string;
@@ -276,6 +295,7 @@ export interface CombatParticipant {
   conditions: string[];
   isConcentrating: boolean;
   notes: string;
+  deathSaves?: DeathSaves; // Only meaningful for PCs at 0 HP
 }
 
 export interface ActiveCombatState {
@@ -298,6 +318,8 @@ export interface PcRuntimeStatus {
   conditions: string[];
   inspiration: boolean;
   sessionNotes: string;
+  slotsUsed?: number[]; // Spent spell slots per level 1-9 in this instance
+  resourcesUsed?: Record<string, number>; // Spent uses per class resource id
 }
 
 export interface PlayInstance {

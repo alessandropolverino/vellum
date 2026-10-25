@@ -1,0 +1,560 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#0c0a09" />
+    <title>Vellum — Live session</title>
+    <style>
+      :root { --bg:#0c0a09; --s1:#1c1917; --s2:#292524; --ln:#3a3633; --tx:#f5f5f4; --mu:#a8a29e; --am:#fbbf24; --gr:#34d399; --rd:#f87171; }
+      * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+      body { margin: 0; background: var(--bg); color: var(--tx); font-family: system-ui, -apple-system, "Segoe UI", sans-serif; }
+      button, input { font: inherit; color: inherit; }
+      #banner { position: sticky; top: 0; z-index: 20; background: #7c2d12; color: #fed7aa; text-align: center; padding: 6px; font-size: 12px; }
+      #app { max-width: 520px; margin: 0 auto; padding: 16px 16px calc(96px + env(safe-area-inset-bottom)); display: flex; flex-direction: column; gap: 12px; min-height: 100vh; }
+      h1, h2, h3, p { margin: 0; font-weight: 500; }
+      h1 { font-size: 20px; }
+      h2 { font-size: 12px; color: var(--mu); letter-spacing: .03em; margin-top: 6px; }
+      .sub { font-size: 13px; color: var(--mu); margin-top: 2px; }
+      .row { display: flex; align-items: center; gap: 10px; }
+      .sp { justify-content: space-between; }
+      .card { background: var(--s1); border: 1px solid var(--ln); border-radius: 14px; padding: 12px; }
+      .lbl { font-size: 12px; color: var(--mu); }
+      .bar { height: 6px; border-radius: 3px; background: var(--s2); overflow: hidden; }
+      .bar i { display: block; height: 100%; border-radius: 3px; }
+      .chip { display: inline-flex; align-items: center; font-size: 12px; padding: 3px 10px; border-radius: 99px; background: var(--s2); }
+      .chip.bad { background: #451a1a; color: #fecaca; }
+      .chip.am { background: #422f0a; color: #fde68a; }
+      .chip.ok { background: #0b3a2c; color: #a7f3d0; }
+      .av { width: 40px; height: 40px; border-radius: 50%; background: var(--s2); display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 500; color: var(--am); flex: none; overflow: hidden; }
+      .av.sm { width: 32px; height: 32px; font-size: 11px; }
+      .av.lg { width: 48px; height: 48px; font-size: 14px; }
+      .av img { width: 100%; height: 100%; object-fit: cover; display: block; }
+      .grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+      .tile { background: var(--s1); border: 1px solid var(--ln); border-radius: 12px; padding: 10px 0; text-align: center; }
+      .tile b { display: block; font-size: 20px; font-weight: 500; }
+      .tile span { font-size: 12px; color: var(--mu); }
+      details { background: var(--s1); border: 1px solid var(--ln); border-radius: 12px; }
+      summary { list-style: none; cursor: pointer; padding: 11px 12px; display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+      summary::-webkit-details-marker { display: none; }
+      summary::after { content: "›"; color: var(--mu); font-size: 18px; transition: transform .15s; }
+      details[open] > summary::after { transform: rotate(90deg); }
+      summary b { font-weight: 500; font-size: 14px; display: block; }
+      summary small { font-size: 12px; color: var(--mu); }
+      .body { padding: 0 12px 12px; font-size: 14px; line-height: 1.55; white-space: pre-wrap; color: #d6d3d1; }
+      .pill { font-size: 12px; font-weight: 500; padding: 4px 10px; border-radius: 99px; background: #422f0a; color: #fde68a; white-space: nowrap; margin-left: auto; margin-right: 6px; }
+      .pick { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 14px; background: var(--s1); border: 1px solid var(--ln); width: 100%; text-align: left; }
+      .pick:disabled { opacity: .4; }
+      .pick b { display: block; font-weight: 500; font-size: 15px; }
+      .pick small { font-size: 12px; color: var(--mu); }
+      .inp { width: 100%; height: 46px; border-radius: 12px; border: 1px solid var(--ln); background: var(--s1); padding: 0 12px; font-size: 16px; }
+      .inp.bad { border-color: var(--rd); }
+      .tabs { position: fixed; left: 0; right: 0; bottom: 0; display: flex; justify-content: center; background: var(--s1); border-top: 1px solid var(--ln); padding: 6px 6px calc(8px + env(safe-area-inset-bottom)); z-index: 10; }
+      .tabs div { display: flex; width: 100%; max-width: 520px; }
+      .tabs button { flex: 1; border: 0; background: transparent; color: var(--mu); display: flex; flex-direction: column; align-items: center; gap: 2px; font-size: 11px; padding: 6px 0; border-radius: 10px; }
+      .tabs button .ic { font-size: 18px; line-height: 1; }
+      .tabs button.on { color: var(--am); }
+      .init { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 12px; border: 1px solid transparent; }
+      .init.now { background: var(--s2); border-color: var(--am); }
+      .init.down { opacity: .45; }
+      .init .n { width: 22px; text-align: center; font-size: 12px; color: var(--mu); flex: none; }
+      .init .nm { flex: 1; font-size: 15px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      .init.me .nm { color: var(--am); }
+      .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; flex: none; }
+      .st { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--mu); }
+      .tg { display: flex; gap: 6px; }
+      .tg button { flex: 1; height: 38px; border-radius: 10px; font-size: 13px; background: var(--s1); border: 1px solid var(--ln); }
+      .tg button.used { opacity: .4; text-decoration: line-through; }
+      .turn { border-color: var(--am); background: #2a2008; }
+      .seg { display: flex; gap: 4px; margin-top: 8px; }
+      .seg i { flex: 1; height: 4px; border-radius: 2px; background: var(--s2); }
+      .seg i.on { background: var(--am); }
+      .dim { position: fixed; inset: 0; background: rgba(0,0,0,.66); display: flex; align-items: flex-end; justify-content: center; z-index: 30; }
+      .sheetc { width: 100%; max-width: 520px; background: var(--s1); border-top: 1px solid var(--ln); border-radius: 24px 24px 0 0; padding: 14px 16px calc(18px + env(safe-area-inset-bottom)); display: flex; flex-direction: column; gap: 10px; }
+      .big-img { width: 100%; aspect-ratio: 1 / 1; max-height: 52vh; border-radius: 14px; background: var(--s2); overflow: hidden; display: flex; align-items: center; justify-content: center; font-size: 40px; color: var(--mu); }
+      .big-img img { width: 100%; height: 100%; object-fit: cover; }
+      .gbtn { height: 44px; border-radius: 12px; background: var(--s2); border: 0; font-size: 15px; width: 100%; }
+      .death { display: flex; flex-direction: column; gap: 10px; }
+      .death.dying { background: #2a2008; border-color: var(--am); }
+      .death.stable { background: #0c1f2e; border-color: #38bdf8; }
+      .death.dead { background: #2a0d0d; border-color: var(--rd); }
+      .death .ttl { font-size: 20px; font-weight: 500; }
+      .death.dying .ttl { color: var(--am); }
+      .death.stable .ttl { color: #7dd3fc; }
+      .death.dead .ttl { color: #fca5a5; }
+      .death .hint { font-size: 13px; font-weight: 400; color: #d6d3d1; line-height: 1.5; }
+      .pips { display: flex; align-items: center; gap: 8px; }
+      .pips .lb { width: 86px; font-size: 12px; color: var(--mu); }
+      .pip { width: 20px; height: 20px; border-radius: 50%; border: 1.5px solid var(--ln); background: var(--s2); }
+      .pip.ok { background: var(--gr); border-color: var(--gr); }
+      .pip.bad { background: var(--rd); border-color: var(--rd); }
+      .mrow { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+      .mpips { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 10px; }
+      .mpip { width: 34px; height: 34px; border-radius: 50%; border: 1.5px solid var(--ln); background: var(--s2); padding: 0; }
+      .mpip.on { background: #38bdf8; border-color: #bae6fd; }
+      .stepper { display: flex; align-items: center; gap: 10px; }
+      .stepper button { width: 44px; height: 44px; border-radius: 12px; background: var(--s2); border: 1px solid var(--ln); font-size: 22px; line-height: 1; }
+      .stepper b { min-width: 52px; text-align: center; font-size: 18px; font-weight: 500; color: #c4b5fd; }
+      .note { font-size: 11px; color: var(--mu); }
+      .err { color: #fca5a5; font-size: 14px; }
+      .center { text-align: center; padding-top: 18vh; color: var(--mu); }
+    </style>
+  </head>
+  <body>
+    <div id="banner" hidden></div>
+    <div id="app"></div>
+    <div id="tabs"></div>
+    <div id="over"></div>
+    <script>
+      var SESSION = "__TOKEN__";
+      var IT = (navigator.language || "").toLowerCase().indexOf("it") === 0;
+      function t(en, it) { return IT ? it : en; }
+      var KEY = "vellum.player." + SESSION;
+      var NICK_KEY = "vellum.nickname";
+      var app = document.getElementById("app");
+      var tabsHost = document.getElementById("tabs");
+      var overHost = document.getElementById("over");
+      var banner = document.getElementById("banner");
+
+      var S = { me: null, sheet: null, combat: null, shown: null, tab: "over", used: {}, open: {}, dismissed: null, wasMine: false };
+
+      function el(tag, cls, text) {
+        var n = document.createElement(tag);
+        if (cls) n.className = cls;
+        if (text !== undefined && text !== null) n.textContent = String(text);
+        return n;
+      }
+      function add(parent) { for (var i = 1; i < arguments.length; i++) if (arguments[i]) parent.appendChild(arguments[i]); return parent; }
+      function clearNode(n) { while (n.firstChild) n.removeChild(n.firstChild); }
+      function store(v) { try { if (v) localStorage.setItem(KEY, v); else localStorage.removeItem(KEY); } catch (_) {} }
+      function stored() { try { return localStorage.getItem(KEY); } catch (_) { return null; } }
+      function savedNick() { try { return localStorage.getItem(NICK_KEY) || ""; } catch (_) { return ""; } }
+      function saveNick(v) { try { localStorage.setItem(NICK_KEY, v); } catch (_) {} }
+      function setBanner(msg) { banner.hidden = !msg; banner.textContent = msg || ""; }
+
+      function initials(name) {
+        var p = String(name || "?").trim().split(/\s+/);
+        return ((p[0] || "?").charAt(0) + (p.length > 1 ? p[p.length - 1].charAt(0) : "")).toUpperCase();
+      }
+      function iconUrl(id, v) {
+        return "/api/portrait/" + encodeURIComponent(id) + "?s=" + encodeURIComponent(SESSION) + "&v=" + encodeURIComponent(v);
+      }
+      // Portrait when the DM has one, otherwise initials. A failed image falls back to initials.
+      function avatar(name, id, version, size) {
+        var a = el("div", "av" + (size ? " " + size : ""), initials(name));
+        if (id && version) {
+          var img = document.createElement("img");
+          img.alt = "";
+          img.onload = function () { a.textContent = ""; a.appendChild(img); };
+          img.src = iconUrl(id, version);
+        }
+        return a;
+      }
+
+      /* ---------- picker ---------- */
+      var nickInput = null;
+      function showPicker(message) {
+        S.sheet = null; S.combat = null; S.shown = null; S.me = null;
+        clearNode(tabsHost); clearNode(overHost); clearNode(app);
+        add(app, el("h1", null, t("Join the table", "Unisciti al tavolo")));
+        if (message) add(app, el("p", "sub", message));
+        add(app, el("div", "lbl", t("Your nickname (shown to the DM)", "Il tuo nickname (lo vede il master)")));
+        nickInput = el("input", "inp");
+        nickInput.type = "text"; nickInput.maxLength = 30; nickInput.autocomplete = "nickname";
+        nickInput.placeholder = t("Nickname", "Nickname");
+        nickInput.value = savedNick();
+        nickInput.oninput = function () { nickInput.className = "inp"; saveNick(nickInput.value); };
+        add(app, nickInput, el("div", "lbl", t("Choose your character", "Scegli il tuo personaggio")));
+        var list = el("div"); list.style.display = "flex"; list.style.flexDirection = "column"; list.style.gap = "8px";
+        app.appendChild(list);
+        fetch("/api/roster?s=" + encodeURIComponent(SESSION))
+          .then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); })
+          .then(function (items) {
+            if (!items.length) {
+              list.appendChild(el("p", "sub", t("Waiting for the DM to add characters…", "In attesa che il master aggiunga i personaggi…")));
+              setTimeout(function () { if (!stored() && nickInput) showPicker(message); }, 3000);
+              return;
+            }
+            items.forEach(function (it) {
+              var b = el("button", "pick");
+              var info = el("span"); info.style.flex = "1";
+              add(info, el("b", null, it.name), el("small", null, it.claimed ? t("Already taken", "Già scelto") : it.subtitle));
+              add(b, el("div", "av", initials(it.name)), info);
+              b.disabled = it.claimed;
+              b.onclick = function () { claim(it.id); };
+              list.appendChild(b);
+            });
+          })
+          .catch(function () { list.appendChild(el("p", "err", t("Session not available.", "Sessione non disponibile."))); });
+      }
+      function claim(id) {
+        var nick = nickInput ? nickInput.value.trim() : "";
+        if (!nick) { if (nickInput) { nickInput.className = "inp bad"; nickInput.focus(); } return; }
+        saveNick(nick);
+        fetch("/api/claim", { method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ s: SESSION, characterId: id, nickname: nick }) })
+          .then(function (r) {
+            if (r.status === 409) { showPicker(t("Someone else just picked that character.", "Qualcuno ha appena scelto quel personaggio.")); return null; }
+            if (!r.ok) throw new Error(r.status);
+            return r.json();
+          })
+          .then(function (j) { if (j) { store(j.playerToken); S.me = j.characterId; connect(j.playerToken); } })
+          .catch(function () { showPicker(t("Could not pick the character, try again.", "Impossibile scegliere il personaggio, riprova.")); });
+      }
+
+      /* ---------- shared bits ---------- */
+      function tile(value, label) { var d = el("div", "tile"); add(d, el("b", null, value), el("span", null, label)); return d; }
+      function textCard(title, text) {
+        if (!text) return null;
+        var d = el("div", "card"), b = el("p", "body", text);
+        b.style.padding = "4px 0 0";
+        return add(d, el("div", "lbl", title), b);
+      }
+      // An expandable row. Open state survives re-renders so live updates don't collapse it.
+      function fold(key, title, sub, body, pill) {
+        var d = document.createElement("details");
+        d.open = !!S.open[key];
+        d.ontoggle = function () { S.open[key] = d.open; };
+        var s = document.createElement("summary");
+        var left = el("span"); left.style.flex = "1";
+        add(left, el("b", null, title)); if (sub) left.appendChild(el("small", null, sub));
+        add(s, left, pill ? el("span", "pill", pill) : null);
+        add(d, s, el("div", "body", body || t("No description.", "Nessuna descrizione.")));
+        return d;
+      }
+      function hpColor(c) { var r = c.hpMax > 0 ? c.hpCurrent / c.hpMax : 1; return r > 0.5 ? "var(--gr)" : r > 0.25 ? "var(--am)" : "var(--rd)"; }
+      function hpBar(c) {
+        var bar = el("div", "bar"), fill = document.createElement("i");
+        fill.style.width = Math.max(0, Math.min(100, c.hpMax > 0 ? (c.hpCurrent / c.hpMax) * 100 : 0)) + "%";
+        fill.style.background = hpColor(c);
+        return add(bar, fill);
+      }
+      function hpCard(c) {
+        var d = el("div", "card");
+        var top = el("div", "row sp");
+        add(top, el("span", "lbl", t("Hit points", "Punti ferita")), c.tempHp ? el("span", "chip ok", "+" + c.tempHp + " " + t("temp", "temp")) : null);
+        var big = el("div"); big.style.cssText = "font-size:30px;font-weight:500;margin:2px 0 8px";
+        big.textContent = String(c.hpCurrent);
+        var mx = el("span", null, " / " + c.hpMax); mx.style.cssText = "font-size:16px;color:var(--mu)"; big.appendChild(mx);
+        return add(d, top, big, hpBar(c));
+      }
+
+      function pipRow(label, n, cls) {
+        var r = el("div", "pips");
+        r.appendChild(el("span", "lb", label));
+        for (var i = 0; i < 3; i++) r.appendChild(el("span", "pip" + (i < n ? " " + cls : "")));
+        return r;
+      }
+      // Death saves: only the player's own tally, shown instead of the HP block at 0 HP.
+      function deathCard(c, compact) {
+        var d = c.death, card = el("div", "card death " + d.state);
+        var title = d.state === "dead" ? t("You have died", "Il tuo personaggio è morto")
+          : d.state === "stable" ? t("Stable at 0 HP", "Stabile a 0 PF") : t("You’re dying", "Stai morendo");
+        add(card, el("div", "ttl", title));
+        if (!compact) {
+          var hint = d.state === "dead" ? t("Ask your DM what comes next.", "Chiedi al master come proseguire.")
+            : d.state === "stable" ? t("You’re unconscious but no longer dying.", "Sei privo di sensi ma non stai più morendo.")
+            : t("At the start of your turn roll a d20: 10 or more is a success, 9 or less a failure. Three of either decides your fate.",
+                "All’inizio del tuo turno tira un d20: 10 o più è un successo, 9 o meno un fallimento. Tre dello stesso tipo decidono il tuo destino.");
+          card.appendChild(el("p", "hint", hint));
+        }
+        add(card, pipRow(t("Successes", "Successi"), d.successes, "ok"), pipRow(t("Failures", "Fallimenti"), d.failures, "bad"));
+        return card;
+      }
+
+      /* ---------- sheet tabs ---------- */
+      function viewOverview(c) {
+        var f = document.createDocumentFragment();
+        var head = el("div", "row sp");
+        var who = el("div");
+        add(who, el("h1", null, c.name), el("p", "sub", [c.classOrArchetype, c.levelOrCr].filter(Boolean).join(" · ")));
+        if (c.player) who.appendChild(el("p", "sub", c.player));
+        add(head, who, avatar(c.name, c.id, c.icon, "lg"));
+        f.appendChild(head);
+        f.appendChild(c.death ? deathCard(c) : hpCard(c));
+        var stats = el("div", "grid3");
+        add(stats, tile(c.ac, t("Armor", "CA")), tile(c.initiative, t("Initiative", "Iniziativa")), tile(c.speed || "—", t("Speed", "Velocità")));
+        f.appendChild(stats);
+        if ((c.conditions || []).length || c.inspiration) {
+          var chips = el("div", "row"); chips.style.flexWrap = "wrap"; chips.style.gap = "6px";
+          (c.conditions || []).forEach(function (k) { chips.appendChild(el("span", "chip bad", k)); });
+          if (c.inspiration) chips.appendChild(el("span", "chip am", t("Inspiration", "Ispirazione")));
+          f.appendChild(chips);
+        }
+        var ab = el("div", "grid3");
+        (c.abilities || []).forEach(function (a) { ab.appendChild(tile(a.mod, a.key.toUpperCase() + " " + a.score)); });
+        f.appendChild(ab);
+        var extra = [];
+        extra.push(t("Proficiency", "Competenza") + " " + c.proficiencyBonus + " · " + t("Passive Perception", "Percezione passiva") + " " + c.passivePerception);
+        if (c.savingThrows) extra.push(t("Saving throws", "Tiri salvezza") + ": " + c.savingThrows);
+        if (c.skills) extra.push(t("Skills", "Abilità") + ": " + c.skills);
+        f.appendChild(fold("skills", t("Saves and skills", "Tiri salvezza e abilità"), null, extra.join("\n\n")));
+        return f;
+      }
+      function viewActions(c) {
+        var f = document.createDocumentFragment();
+        f.appendChild(el("h1", null, t("Actions", "Azioni")));
+        (c.actions || []).forEach(function (a, i) {
+          var pill = typeof a.attackBonus === "number" ? (a.attackBonus >= 0 ? "+" : "") + a.attackBonus : null;
+          f.appendChild(fold("a" + i, a.name, a.damageFormula || "", a.description, pill));
+        });
+        if (!(c.actions || []).length) f.appendChild(el("p", "sub", t("No actions listed.", "Nessuna azione.")));
+        if ((c.traits || []).length) {
+          f.appendChild(el("h2", null, t("Features", "Capacità")));
+          c.traits.forEach(function (a, i) { f.appendChild(fold("t" + i, a.name, null, a.description)); });
+        }
+        if (c.spellsNotes && !c.magic) { f.appendChild(el("h2", null, t("Spells", "Incantesimi"))); f.appendChild(textCard(t("Notes", "Note"), c.spellsNotes)); }
+        return f;
+      }
+
+      /* ---------- magic: spell slots and class resources, ticked off by the player ---------- */
+      function sendAction(msg) {
+        try { if (current && current.readyState === 1) current.send(JSON.stringify(msg)); } catch (_) {}
+      }
+      function viewMagic(c) {
+        var f = document.createDocumentFragment(), m = c.magic;
+        f.appendChild(el("h1", null, t("Magic", "Magia")));
+        (m.slots || []).forEach(function (sl) {
+          var card = el("div", "card"), avail = sl.max - sl.used;
+          var head = el("div", "mrow");
+          add(head, el("span", null, t("Level ", "Livello ") + sl.level), el("span", "lbl", avail + " / " + sl.max));
+          var pips = el("div", "mpips");
+          for (var i = 0; i < sl.max; i++) {
+            (function (idx) {
+              var b = el("button", "mpip" + (idx < avail ? " on" : ""));
+              b.setAttribute("aria-label", t("Level ", "Livello ") + sl.level + " #" + (idx + 1));
+              b.onclick = function () {
+                // One slot per tap: a filled slot is spent, an empty one is recovered.
+                var delta = idx < avail ? 1 : -1;
+                sl.used += delta; render();
+                sendAction({ type: "slot", level: sl.level, delta: delta });
+              };
+              pips.appendChild(b);
+            })(i);
+          }
+          add(card, head, pips); f.appendChild(card);
+        });
+        if ((m.resources || []).length) {
+          f.appendChild(el("h2", null, t("Resources", "Risorse")));
+          m.resources.forEach(function (r) {
+            var card = el("div", "card mrow"), left = el("div");
+            var hint = r.recharge === "short" ? t("Recharges on a short rest", "Si ricarica con un riposo breve")
+              : r.recharge === "long" ? t("Recharges on a long rest", "Si ricarica con un riposo lungo") : t("Refilled by the DM", "Ripristinata dal master");
+            add(left, el("div", null, r.name), el("div", "note", hint));
+            var st = el("div", "stepper");
+            var minus = el("button", null, "−"), plus = el("button", null, "+");
+            minus.setAttribute("aria-label", t("Spend ", "Usa ") + r.name);
+            plus.setAttribute("aria-label", t("Recover ", "Recupera ") + r.name);
+            minus.onclick = function () { if (r.used < r.max) { r.used++; render(); sendAction({ type: "resource", id: r.id, delta: 1 }); } };
+            plus.onclick = function () { if (r.used > 0) { r.used--; render(); sendAction({ type: "resource", id: r.id, delta: -1 }); } };
+            add(st, minus, el("b", null, (r.max - r.used) + "/" + r.max), plus);
+            add(card, left, st); f.appendChild(card);
+          });
+        }
+        if (c.spellsNotes) { f.appendChild(el("h2", null, t("Spells", "Incantesimi"))); f.appendChild(textCard(t("Notes", "Note"), c.spellsNotes)); }
+        return f;
+      }
+      function viewGear(c) {
+        var f = document.createDocumentFragment();
+        f.appendChild(el("h1", null, t("Gear", "Equipaggiamento")));
+        var eq = textCard(t("Carried and worn", "Portato e indossato"), c.equipment);
+        f.appendChild(eq || el("p", "sub", t("No equipment listed.", "Nessun equipaggiamento.")));
+        [[t("Other proficiencies", "Altre competenze"), c.otherProficiencies], [t("Languages", "Linguaggi"), c.languages], [t("Senses", "Sensi"), c.senses]]
+          .forEach(function (x) { var n = textCard(x[0], x[1]); if (n) f.appendChild(n); });
+        return f;
+      }
+      function viewStory(c) {
+        var f = document.createDocumentFragment();
+        f.appendChild(el("h1", null, t("Story", "Storia")));
+        var sub = [c.background, c.alignment].filter(Boolean).join(" · ");
+        if (sub) f.appendChild(el("p", "sub", sub));
+        var p = c.personality || {};
+        [[t("Personality", "Personalità"), p.traits], [t("Ideals", "Ideali"), p.ideals], [t("Bonds", "Legami"), p.bonds], [t("Flaws", "Difetti"), p.flaws], [t("Biography", "Biografia"), c.biography]]
+          .forEach(function (x) { var n = textCard(x[0], x[1]); if (n) f.appendChild(n); });
+        return f;
+      }
+
+      /* ---------- combat ---------- */
+      var STATUS = {
+        unhurt: [t("Unhurt", "Illeso"), "var(--gr)"],
+        wounded: [t("Wounded", "Ferito"), "var(--am)"],
+        bloodied: [t("Bloodied", "Sanguinante"), "var(--rd)"],
+        down: [t("Down", "A terra"), "var(--mu)"],
+        dead: [t("Dead", "Morto"), "var(--rd)"]
+      };
+      function myIndex() {
+        var ps = (S.combat && S.combat.participants) || [];
+        for (var i = 0; i < ps.length; i++) if (ps[i].characterId && ps[i].characterId === S.me) return i;
+        return -1;
+      }
+      function viewCombat() {
+        var f = document.createDocumentFragment();
+        var cb = S.combat, ps = cb.participants || [], me = myIndex(), n = ps.length;
+        var dist = me >= 0 && n ? (me - cb.turn + n) % n : -1;
+        var head = el("div", "row sp");
+        var ttl = el("div");
+        add(ttl, el("h1", null, t("Round", "Round") + " " + cb.round), cb.title ? el("p", "sub", cb.title) : null);
+        add(head, ttl, el("span", "chip", n + " " + t("acting", "in scena")));
+        f.appendChild(head);
+
+        var card = el("div", "card" + (dist === 0 ? " turn" : ""));
+        if (dist === 0) {
+          var nxt = ps[(cb.turn + 1) % n];
+          var dying = S.sheet && S.sheet.death && S.sheet.death.state === "dying";
+          var yt = el("div", null, dying ? t("Death save time", "Tiro salvezza contro morte") : t("Your turn", "Tocca a te"));
+          yt.style.cssText = "font-size:18px;font-weight:500;color:var(--am)";
+          add(card, yt, dying ? el("p", "sub", t("Roll a d20: 10 or more succeeds.", "Tira un d20: 10 o più è un successo.")) : null,
+            !dying && nxt ? el("p", "sub", t("Next up", "Poi") + ": " + nxt.name) : null);
+        } else {
+          var cur = ps[cb.turn];
+          add(card, el("div", "lbl", cur ? cur.name + " " + t("is acting", "sta agendo") : ""));
+          var out = S.sheet && S.sheet.death && S.sheet.death.state === "dead";
+          var line = el("div", null, out ? t("Your character is out of the fight", "Il tuo personaggio è fuori dallo scontro") : dist > 0 ? (dist === 1 ? t("You’re up next", "Tocca a te dopo") : t("You’re up in ", "Tocchi tra ") + dist + t(" turns", " turni")) : t("You’re not in this fight", "Non sei in questo scontro"));
+          line.style.cssText = "font-size:17px;font-weight:500;margin-top:2px";
+          card.appendChild(line);
+          if (dist > 0 && !out) { var seg = el("div", "seg"); for (var k = 0; k < Math.min(dist, 5); k++) seg.appendChild(el("i", k === 0 ? "on" : "")); card.appendChild(seg); }
+        }
+        f.appendChild(card);
+
+        if (dist === 0 && !(S.sheet && S.sheet.death)) {
+          var tg = el("div", "tg");
+          [["Action", t("Action", "Azione")], ["Bonus", t("Bonus", "Bonus")], ["Reaction", t("Reaction", "Reazione")]].forEach(function (x) {
+            var b = el("button", S.used[x[0]] ? "used" : "", x[1]);
+            b.onclick = function () { S.used[x[0]] = !S.used[x[0]]; render(); };
+            tg.appendChild(b);
+          });
+          f.appendChild(tg);
+        }
+
+        var list = el("div");
+        ps.forEach(function (p, i) {
+          var isMe = p.characterId && p.characterId === S.me;
+          var row = el("div", "init" + (i === cb.turn ? " now" : "") + (isMe ? " me" : "") + ((p.kind === "foe" && p.status === "down") || p.status === "dead" ? " down" : ""));
+          var num = el("span", "n", i === cb.turn ? "▶" : p.initiative);
+          if (i === cb.turn) num.style.color = "var(--am)";
+          add(row, num, avatar(p.name, p.iconId, p.icon, "sm"), el("span", "nm", p.name));
+          if (p.status) {
+            var st = STATUS[p.status] || STATUS.unhurt, w = el("span", "st");
+            var dot = el("span", "dot"); dot.style.background = st[1];
+            add(w, dot, document.createTextNode(st[0])); row.appendChild(w);
+          } else {
+            row.appendChild(el("span", "chip" + (isMe ? " am" : ""), isMe ? t("You", "Tu") : t("Ally", "Alleato")));
+          }
+          list.appendChild(row);
+        });
+        f.appendChild(list);
+        if (S.sheet && S.sheet.death) {
+          f.appendChild(deathCard(S.sheet, true));
+        } else if (S.sheet) {
+          var c = S.sheet, m = el("div", "card");
+          var r2 = el("div", "row sp"); r2.style.marginBottom = "6px";
+          add(r2, el("span", null, c.name), el("span", "lbl", t("AC", "CA") + " " + c.ac + " · " + c.hpCurrent + " / " + c.hpMax));
+          add(m, r2, hpBar(c)); f.appendChild(m);
+        }
+        return f;
+      }
+
+      /* ---------- shell ---------- */
+      function tabList() {
+        var l = [];
+        if (S.combat && S.combat.active) l.push(["combat", "⚔", t("Combat", "Scontro")]);
+        l.push(["over", "◉", t("Overview", "Scheda")], ["act", "✦", t("Actions", "Azioni")]);
+        if (S.sheet && S.sheet.magic) l.push(["magic", "✧", t("Magic", "Magia")]);
+        l.push(["gear", "▣", t("Gear", "Oggetti")], ["story", "❡", t("Story", "Storia")]);
+        return l;
+      }
+      function render() {
+        if (!S.sheet) { clearNode(app); add(app, el("p", "center", t("Loading your character…", "Carico il tuo personaggio…"))); clearNode(tabsHost); return; }
+        var tabs = tabList();
+        if (!tabs.some(function (x) { return x[0] === S.tab; })) S.tab = "over";
+        var y = window.scrollY;
+        clearNode(app);
+        var c = S.sheet;
+        var view = S.tab === "combat" && S.combat && S.combat.active ? viewCombat()
+          : S.tab === "act" ? viewActions(c) : S.tab === "magic" && c.magic ? viewMagic(c) : S.tab === "gear" ? viewGear(c) : S.tab === "story" ? viewStory(c) : viewOverview(c);
+        app.appendChild(view);
+        clearNode(tabsHost);
+        var bar = el("div", "tabs"), inner = el("div");
+        tabs.forEach(function (x) {
+          var b = el("button", S.tab === x[0] ? "on" : ""); add(b, el("span", "ic", x[1]), el("span", null, x[2]));
+          b.onclick = function () { S.tab = x[0]; render(); window.scrollTo(0, 0); };
+          inner.appendChild(b);
+        });
+        bar.appendChild(inner); tabsHost.appendChild(bar);
+        renderShown();
+        window.scrollTo(0, y);
+      }
+      function renderShown() {
+        clearNode(overHost);
+        var it = S.shown;
+        if (!it || S.dismissed === JSON.stringify(it)) return;
+        var d = el("div", "dim"), sh = el("div", "sheetc");
+        add(sh, el("span", "chip am", t("Shown by the DM", "Mostrato dal master")));
+        var img = el("div", "big-img", initials(it.title));
+        if (it.icon) {
+          var im = document.createElement("img"); im.alt = "";
+          im.onload = function () { img.textContent = ""; img.appendChild(im); };
+          im.src = iconUrl("shown", it.icon);
+        }
+        var cap = el("div"); add(cap, el("h1", null, it.title), it.subtitle ? el("p", "sub", it.subtitle) : null);
+        var close = el("button", "gbtn", t("Close", "Chiudi"));
+        close.onclick = function () { S.dismissed = JSON.stringify(it); renderShown(); };
+        add(sh, img, cap, close); d.appendChild(sh); overHost.appendChild(d);
+      }
+      function onCombat(prev) {
+        var mine = false;
+        if (S.combat && S.combat.active) {
+          var me = myIndex(), n = (S.combat.participants || []).length;
+          mine = me >= 0 && n > 0 && S.combat.turn === me;
+          if (!(prev && prev.active)) S.tab = "combat";
+          if (mine && !S.wasMine) { S.tab = "combat"; S.used = {}; try { if (navigator.vibrate) navigator.vibrate([200, 100, 200]); } catch (_) {} }
+        }
+        S.wasMine = mine;
+      }
+
+      /* ---------- connection ---------- */
+      var delay = 1000, current = null;
+      function connect(playerToken) {
+        if (current) { try { current.onclose = null; current.close(); } catch (_) {} }
+        S.sheet = null; render();
+        openSocket(playerToken);
+      }
+      function openSocket(playerToken) {
+        var proto = location.protocol === "https:" ? "wss:" : "ws:";
+        var ws = new WebSocket(proto + "//" + location.host + "/ws?p=" + encodeURIComponent(playerToken));
+        current = ws;
+        ws.onopen = function () { delay = 1000; setBanner(null); };
+        ws.onmessage = function (e) {
+          var m; try { m = JSON.parse(e.data); } catch (_) { return; }
+          if (m.type === "sheet" && m.c) { S.sheet = m.c; render(); }
+          else if (m.type === "combat") { var prev = S.combat; S.combat = m; onCombat(prev); render(); }
+          else if (m.type === "shown") { S.shown = m.item; if (!m.item) S.dismissed = null; render(); }
+          else if (m.type === "released") { store(null); ws.onclose = null; setBanner(null); showPicker(t("The DM released your character.", "Il master ha liberato il tuo personaggio.")); }
+        };
+        ws.onclose = function () {
+          setBanner(t("Reconnecting…", "Riconnessione…"));
+          setTimeout(function () { verifyThenOpen(playerToken); }, delay);
+          delay = Math.min(delay * 2, 10000);
+        };
+      }
+      // A restarted or released session invalidates the stored token: fall back to the picker.
+      function verifyThenOpen(playerToken) {
+        fetch("/api/me?p=" + encodeURIComponent(playerToken)).then(function (r) {
+          if (r.status === 404) { store(null); setBanner(null); showPicker(t("The session was restarted: pick your character again.", "La sessione è stata riavviata: scegli di nuovo il personaggio.")); }
+          else openSocket(playerToken);
+        }).catch(function () { openSocket(playerToken); });
+      }
+
+      var saved = stored();
+      if (saved) {
+        fetch("/api/me?p=" + encodeURIComponent(saved)).then(function (r) {
+          if (!r.ok) { store(null); showPicker(); return null; }
+          return r.json();
+        }).then(function (j) { if (j) { S.me = j.characterId; connect(saved); } })
+          .catch(function () { showPicker(); });
+      } else {
+        showPicker();
+      }
+    </script>
+  </body>
+</html>
