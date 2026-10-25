@@ -6,6 +6,21 @@ use tauri::Manager;
 
 #[derive(serde::Serialize, serde::Deserialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
+pub struct DatabaseCheckResult {
+    pub has_changed: bool,
+    pub mtime_ms: u64,
+    pub payload: Option<String>,
+}
+
+#[derive(serde::Serialize, serde::Deserialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct SaveResult {
+    pub path: String,
+    pub mtime_ms: u64,
+}
+
+#[derive(serde::Serialize, serde::Deserialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
 pub struct BackupEntry {
     pub filename: String,
     pub path: String,
@@ -28,7 +43,21 @@ fn get_base_dir(app: &tauri::AppHandle) -> Result<PathBuf, String> {
 
 fn get_db_path(app: &tauri::AppHandle) -> Result<PathBuf, String> {
     let base_dir = get_base_dir(app)?;
-    Ok(base_dir.join("dnd5e-db.json"))
+    let new_db = base_dir.join("vellum-db.json");
+    let legacy_db = base_dir.join("dnd5e-db.json");
+
+    // Backward compatibility: if new database does not exist but legacy exists, migrate by renaming
+    if !new_db.exists() && legacy_db.exists() {
+        if let Err(e) = fs::rename(&legacy_db, &new_db) {
+            if fs::copy(&legacy_db, &new_db).is_ok() {
+                let _ = fs::remove_file(&legacy_db);
+            } else {
+                eprintln!("Failed to migrate legacy db {:?}: {}", legacy_db, e);
+            }
+        }
+    }
+
+    Ok(new_db)
 }
 
 fn get_backups_dir(app: &tauri::AppHandle) -> Result<PathBuf, String> {
@@ -266,7 +295,45 @@ fn load_local_database(app: tauri::AppHandle) -> Result<Option<String>, String> 
 }
 
 #[tauri::command]
-fn save_local_database(app: tauri::AppHandle, payload: String) -> Result<String, String> {
+fn check_database_update(
+    app: tauri::AppHandle,
+    known_mtime_ms: u64,
+) -> Result<DatabaseCheckResult, String> {
+    let db_path = get_db_path(&app)?;
+    if !db_path.exists() {
+        return Ok(DatabaseCheckResult {
+            has_changed: false,
+            mtime_ms: 0,
+            payload: None,
+        });
+    }
+
+    let meta = fs::metadata(&db_path).map_err(|e| format!("Failed to read db metadata: {}", e))?;
+    let modified = meta.modified().unwrap_or(UNIX_EPOCH);
+    let mtime_ms = modified
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_millis() as u64;
+
+    if mtime_ms > known_mtime_ms {
+        let content = fs::read_to_string(&db_path)
+            .map_err(|e| format!("Failed to read database file: {}", e))?;
+        Ok(DatabaseCheckResult {
+            has_changed: true,
+            mtime_ms,
+            payload: Some(content),
+        })
+    } else {
+        Ok(DatabaseCheckResult {
+            has_changed: false,
+            mtime_ms,
+            payload: None,
+        })
+    }
+}
+
+#[tauri::command]
+fn save_local_database(app: tauri::AppHandle, payload: String) -> Result<SaveResult, String> {
     let db_path = get_db_path(&app)?;
 
     if db_path.exists() {
@@ -305,7 +372,17 @@ fn save_local_database(app: tauri::AppHandle, payload: String) -> Result<String,
     }
 
     atomic_write_file(&db_path, &payload)?;
-    Ok(db_path.to_string_lossy().to_string())
+    let mtime_ms = fs::metadata(&db_path)
+        .ok()
+        .and_then(|m| m.modified().ok())
+        .and_then(|t| t.duration_since(UNIX_EPOCH).ok())
+        .map(|d| d.as_millis() as u64)
+        .unwrap_or(0);
+
+    Ok(SaveResult {
+        path: db_path.to_string_lossy().to_string(),
+        mtime_ms,
+    })
 }
 
 #[tauri::command]
@@ -462,6 +539,7 @@ pub fn run() {
         .plugin(tauri_plugin_process::init())
         .invoke_handler(tauri::generate_handler![
             load_local_database,
+            check_database_update,
             save_local_database,
             create_database_backup,
             list_database_backups,

@@ -42,7 +42,10 @@ export const App: React.FC = () => {
   const [lastSaveInfo, setLastSaveInfo] = useState<string>('');
   const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'error'>('saved');
   const [lastSavedTime, setLastSavedTime] = useState<string>('');
+  const [externalUpdateNotice, setExternalUpdateNotice] = useState<string | null>(null);
   const pendingSavesRef = useRef<number>(0);
+  const isSavingRef = useRef<boolean>(false);
+  const lastMtimeRef = useRef<number>(0);
   const [isBackupModalOpen, setIsBackupModalOpen] = useState<boolean>(false);
   const [activeTab, setActiveTab] = useState<ActiveTab>('dashboard');
 
@@ -64,9 +67,12 @@ export const App: React.FC = () => {
   const [, setAudioTick] = useState(0);
 
   useEffect(() => {
-    storageRepository.loadDatabase().then(({ db: loaded, source }) => {
+    storageRepository.loadDatabase().then(({ db: loaded, source, mtimeMs }) => {
       setDb(loaded);
       setStorageSource(source);
+      if (mtimeMs) {
+        lastMtimeRef.current = mtimeMs;
+      }
       if (loaded.lastSavedAt) {
         setLastSavedTime(new Date(loaded.lastSavedAt).toLocaleTimeString(lang === 'it' ? 'it-IT' : 'en-US'));
       }
@@ -79,16 +85,83 @@ export const App: React.FC = () => {
     return soundboardEngine.subscribe(() => setAudioTick((t) => t + 1));
   }, []);
 
+  // Clear external update toast after 4 seconds
+  useEffect(() => {
+    if (!externalUpdateNotice) return;
+    const t = setTimeout(() => {
+      setExternalUpdateNotice(null);
+    }, 4000);
+    return () => clearTimeout(t);
+  }, [externalUpdateNotice]);
+
+  // Live Auto-Sync: Poll for external disk modifications (CLI / Agent) and check on window focus
+  useEffect(() => {
+    let isChecking = false;
+
+    const checkUpdate = async () => {
+      if (isChecking || isSavingRef.current || pendingSavesRef.current > 0) return;
+      isChecking = true;
+      try {
+        const result = await storageRepository.checkExternalUpdate(lastMtimeRef.current);
+        if (result.hasChanged && result.db) {
+          lastMtimeRef.current = result.mtimeMs || Date.now();
+          setDb(result.db);
+          if (result.source) setStorageSource(result.source);
+          if (result.db.lastSavedAt) {
+            setLastSavedTime(
+              new Date(result.db.lastSavedAt).toLocaleTimeString(lang === 'it' ? 'it-IT' : 'en-US')
+            );
+          }
+          setExternalUpdateNotice(
+            tr(
+              'Database updated from external process (CLI / Agent)',
+              'Database aggiornato da processo esterno (CLI / Agente)'
+            )
+          );
+        } else if (result.mtimeMs) {
+          lastMtimeRef.current = Math.max(lastMtimeRef.current, result.mtimeMs);
+        }
+      } catch (err) {
+        console.warn('Live sync check error:', err);
+      } finally {
+        isChecking = false;
+      }
+    };
+
+    const onFocus = () => {
+      checkUpdate();
+    };
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        checkUpdate();
+      }
+    };
+
+    window.addEventListener('focus', onFocus);
+    document.addEventListener('visibilitychange', onVisibility);
+    const intervalId = setInterval(checkUpdate, 2500);
+
+    return () => {
+      window.removeEventListener('focus', onFocus);
+      document.removeEventListener('visibilitychange', onVisibility);
+      clearInterval(intervalId);
+    };
+  }, [lang, tr]);
+
   const persistDb = (nextDb: DndDatabase) => {
     setDb(nextDb);
     setSaveStatus('saving');
     pendingSavesRef.current += 1;
+    isSavingRef.current = true;
     storageRepository.saveDatabase(nextDb).then((res) => {
+      if (res.mtimeMs) {
+        lastMtimeRef.current = res.mtimeMs;
+      }
       const adapterLabel =
         res.adapter === 'tauri-fs'
           ? 'Tauri FS'
           : res.adapter === 'local-disk-api'
-          ? './data/dnd5e-db.json'
+          ? './data/vellum-db.json'
           : tr('Local Storage', 'Storage Locale');
       const timeLabel = new Date(res.savedAt).toLocaleTimeString(
         lang === 'it' ? 'it-IT' : 'en-US'
@@ -105,6 +178,8 @@ export const App: React.FC = () => {
       console.error('Failed to save database:', err);
       pendingSavesRef.current = Math.max(0, pendingSavesRef.current - 1);
       setSaveStatus('error');
+    }).finally(() => {
+      isSavingRef.current = false;
     });
   };
 
@@ -643,6 +718,17 @@ export const App: React.FC = () => {
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* External Update Live Notification Toast */}
+      {externalUpdateNotice && (
+        <div className="fixed bottom-12 right-6 z-50 flex items-center gap-2.5 bg-emerald-950/95 border border-emerald-500/60 text-emerald-200 px-4 py-2.5 rounded-lg shadow-2xl text-xs font-semibold backdrop-blur animate-fade-in">
+          <span className="relative flex h-2.5 w-2.5">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+            <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
+          </span>
+          <span>{externalUpdateNotice}</span>
         </div>
       )}
 

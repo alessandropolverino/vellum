@@ -21,7 +21,7 @@ node bin/vellum.mjs <command> [subcommand] [arguments] [options]
 
 ### Critical Rules for AI Agents
 1. **Always use `--json` (or `-j`)**: Produces strict, machine-readable JSON without terminal colors or decorative borders.
-2. **Database Auto-Discovery**: The CLI automatically locates `data/dnd5e-db.json` in the current folder, parent folders, or worktree roots. To specify a custom database: `--db <path>` or set `VELLUM_DB_PATH`.
+2. **Database Auto-Discovery**: The CLI automatically locates `data/vellum-db.json` in the current folder, parent folders, or worktree roots. If running outside the repository, it automatically discovers the desktop app database in OS AppData. It also transparently migrates any legacy `dnd5e-db.json` file. To specify a custom database: `--db <path>` or set `VELLUM_DB_PATH`.
 3. **Atomic Saves**: The CLI writes changes atomically to prevent file corruption.
 4. **Use `@filepath` syntax**: For large markdown texts or complex JSON blueprints, write a temporary file and pass `--data @file.json` or `--markdown @scene.md`.
 
