@@ -11,6 +11,14 @@ export interface StorageSaveResult {
   adapter: 'tauri-fs' | 'local-disk-api' | 'browser-storage';
   location: string;
   savedAt: string;
+  mtimeMs?: number;
+}
+
+export interface ExternalCheckResult {
+  hasChanged: boolean;
+  db?: DndDatabase;
+  source?: string;
+  mtimeMs?: number;
 }
 
 export interface BackupEntry {
@@ -22,8 +30,9 @@ export interface BackupEntry {
 }
 
 export interface IStorageRepository {
-  loadDatabase(): Promise<{ db: DndDatabase; source: string; migrated?: boolean }>;
+  loadDatabase(): Promise<{ db: DndDatabase; source: string; migrated?: boolean; mtimeMs?: number }>;
   saveDatabase(db: DndDatabase): Promise<StorageSaveResult>;
+  checkExternalUpdate(knownMtimeMs: number): Promise<ExternalCheckResult>;
   exportToJsonFile(db: DndDatabase): void;
   importFromJsonString(rawJson: string): DndDatabase;
   listBackups(): Promise<BackupEntry[]>;
@@ -57,21 +66,36 @@ export class LocalFirstRepository implements IStorageRepository {
     return this.isTauri() || typeof window !== 'undefined';
   }
 
-  async loadDatabase(): Promise<{ db: DndDatabase; source: string; migrated?: boolean }> {
+  async loadDatabase(): Promise<{ db: DndDatabase; source: string; migrated?: boolean; mtimeMs?: number }> {
     // 1. Try Tauri native file system first if running inside Tauri desktop shell
     if (this.isTauri()) {
       try {
-        const raw = (await window.__TAURI_INTERNALS__!.invoke('load_local_database')) as string | null;
-        if (raw) {
-          const parsed = JSON.parse(raw);
+        const updateCheck = (await window.__TAURI_INTERNALS__!.invoke('check_database_update', {
+          knownMtimeMs: 0,
+        })) as { hasChanged: boolean; mtimeMs: number; payload?: string | null };
+        if (updateCheck.hasChanged && updateCheck.payload) {
+          const parsed = JSON.parse(updateCheck.payload);
           const { db, migrated } = migrateDatabase(parsed);
           if (migrated) {
             await this.saveDatabase(db);
           }
-          return { db, source: 'Local Disk (Tauri AppData)', migrated };
+          return { db, source: 'Local Disk (Tauri AppData)', migrated, mtimeMs: updateCheck.mtimeMs };
         }
       } catch (err) {
-        console.warn('Tauri FS load error, checking fallbacks:', err);
+        console.warn('Tauri check_database_update error, checking fallbacks:', err);
+        try {
+          const raw = (await window.__TAURI_INTERNALS__!.invoke('load_local_database')) as string | null;
+          if (raw) {
+            const parsed = JSON.parse(raw);
+            const { db, migrated } = migrateDatabase(parsed);
+            if (migrated) {
+              await this.saveDatabase(db);
+            }
+            return { db, source: 'Local Disk (Tauri AppData)', migrated, mtimeMs: Date.now() };
+          }
+        } catch {
+          // ignore
+        }
       }
     }
 
@@ -79,6 +103,8 @@ export class LocalFirstRepository implements IStorageRepository {
     try {
       const res = await fetch('/api/local-db', { method: 'GET' });
       if (res.ok) {
+        const mtimeHeader = res.headers.get('x-mtime');
+        const mtimeMs = mtimeHeader ? Number(mtimeHeader) : Date.now();
         const parsed = await res.json();
         if (parsed && typeof parsed === 'object' && !parsed.empty) {
           const { db, migrated } = migrateDatabase(parsed);
@@ -86,7 +112,7 @@ export class LocalFirstRepository implements IStorageRepository {
           if (migrated) {
             await this.saveDatabase(db);
           }
-          return { db, source: 'Local Disk (./data/vellum-db.json)', migrated };
+          return { db, source: 'Local Disk (./data/vellum-db.json)', migrated, mtimeMs };
         }
       }
     } catch {
@@ -99,7 +125,7 @@ export class LocalFirstRepository implements IStorageRepository {
       if (cached) {
         const parsed = JSON.parse(cached);
         const { db, migrated } = migrateDatabase(parsed);
-        return { db, source: 'Browser LocalStorage', migrated };
+        return { db, source: 'Browser LocalStorage', migrated, mtimeMs: Date.now() };
       }
     } catch {
       // Ignore parse errors
@@ -108,7 +134,53 @@ export class LocalFirstRepository implements IStorageRepository {
     // 4. First launch: initialize with normalized SEED_DATABASE and persist immediately to disk
     const initialDb: DndDatabase = normalizeDatabase(structuredClone(SEED_DATABASE));
     await this.saveDatabase(initialDb);
-    return { db: initialDb, source: 'Initial Database (Saved to Disk)' };
+    return { db: initialDb, source: 'Initial Database (Saved to Disk)', mtimeMs: Date.now() };
+  }
+
+  async checkExternalUpdate(knownMtimeMs: number): Promise<ExternalCheckResult> {
+    if (this.isTauri()) {
+      try {
+        const res = (await window.__TAURI_INTERNALS__!.invoke('check_database_update', {
+          knownMtimeMs,
+        })) as { hasChanged: boolean; mtimeMs: number; payload?: string | null };
+        if (res.hasChanged && res.payload) {
+          const parsed = JSON.parse(res.payload);
+          const { db } = migrateDatabase(parsed);
+          return {
+            hasChanged: true,
+            db,
+            source: 'Local Disk (Tauri AppData)',
+            mtimeMs: res.mtimeMs,
+          };
+        }
+        return { hasChanged: false, mtimeMs: res.mtimeMs };
+      } catch (err) {
+        console.warn('Tauri checkExternalUpdate error:', err);
+        return { hasChanged: false };
+      }
+    }
+
+    try {
+      const res = await fetch(`/api/local-db/check?since=${knownMtimeMs}`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.hasChanged && data.payload) {
+          const parsed = JSON.parse(data.payload);
+          const { db } = migrateDatabase(parsed);
+          return {
+            hasChanged: true,
+            db,
+            source: 'Local Disk (./data/vellum-db.json)',
+            mtimeMs: data.mtimeMs,
+          };
+        }
+        return { hasChanged: false, mtimeMs: data.mtimeMs };
+      }
+    } catch {
+      // offline
+    }
+
+    return { hasChanged: false };
   }
 
   async saveDatabase(db: DndDatabase): Promise<StorageSaveResult> {
@@ -127,13 +199,23 @@ export class LocalFirstRepository implements IStorageRepository {
     // 1. Tauri native disk write (atomic + auto backup)
     if (this.isTauri()) {
       try {
-        const savedPath = (await window.__TAURI_INTERNALS__!.invoke('save_local_database', {
+        const rawRes = await window.__TAURI_INTERNALS__!.invoke('save_local_database', {
           payload,
-        })) as string;
+        });
+        const savedPath =
+          typeof rawRes === 'object' && rawRes !== null && 'path' in rawRes
+            ? (rawRes as any).path
+            : (rawRes as string);
+        const mtimeMs =
+          typeof rawRes === 'object' && rawRes !== null && 'mtimeMs' in rawRes
+            ? (rawRes as any).mtimeMs
+            : Date.now();
+
         return {
           adapter: 'tauri-fs',
           location: savedPath,
           savedAt: updated.lastSavedAt,
+          mtimeMs,
         };
       } catch (err) {
         console.warn('Tauri FS write error, falling back to local API:', err);
@@ -153,6 +235,7 @@ export class LocalFirstRepository implements IStorageRepository {
           adapter: 'local-disk-api',
           location: info.path || './data/vellum-db.json',
           savedAt: updated.lastSavedAt,
+          mtimeMs: info.mtimeMs || Date.now(),
         };
       }
     } catch {
@@ -163,6 +246,7 @@ export class LocalFirstRepository implements IStorageRepository {
       adapter: 'browser-storage',
       location: 'Browser Indexed/LocalStorage',
       savedAt: updated.lastSavedAt,
+      mtimeMs: Date.now(),
     };
   }
 
