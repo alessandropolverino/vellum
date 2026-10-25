@@ -18,6 +18,7 @@ import { useConfirmDelete } from './ConfirmDialog';
 import { HomebreweryRenderer } from './HomebreweryRenderer';
 import { StatblockCard } from './StatblockCard';
 import { LevelUpModal } from './LevelUpModal';
+import { LiveJoinModal } from './LiveJoinModal';
 import { soundboardEngine } from '../services/audioEngine';
 import { downloadOfficialCharacterPdf } from '../services/pdfExporter';
 import {
@@ -43,6 +44,7 @@ import {
   Flame,
   FileDown,
   TrendingUp,
+  QrCode,
 } from 'lucide-react';
 
 interface LiveSessionConsoleProps {
@@ -91,6 +93,7 @@ export const LiveSessionConsole: React.FC<LiveSessionConsoleProps> = ({
   const [hpDeltaInputs, setHpDeltaInputs] = useState<Record<string, string>>({});
 
   const [showRecapModal, setShowRecapModal] = useState(false);
+  const [showJoinModal, setShowJoinModal] = useState(false);
   const [copiedRecap, setCopiedRecap] = useState(false);
 
   // Modal to add an existing PC Blueprint or a custom Session-Only PC to this PlayInstance
@@ -722,6 +725,14 @@ export const LiveSessionConsole: React.FC<LiveSessionConsoleProps> = ({
             {hideDmNotes
               ? tr('Player view', 'Vista giocatori')
               : tr('DM view', 'Vista DM')}
+          </button>
+
+          <button
+            onClick={() => setShowJoinModal(true)}
+            className="px-3 py-1.5 rounded-lg bg-stone-900 hover:bg-stone-800 border border-stone-800 text-stone-200 font-medium text-xs flex items-center gap-1.5"
+          >
+            <QrCode className="w-4 h-4" />{' '}
+            {tr('Players (QR)', 'Giocatori (QR)')}
           </button>
 
           <button
@@ -1857,6 +1868,8 @@ export const LiveSessionConsole: React.FC<LiveSessionConsoleProps> = ({
       )}
 
       {/* Markdown Recap Modal */}
+      {showJoinModal && <LiveJoinModal onClose={() => setShowJoinModal(false)} />}
+
       {showRecapModal && (
         <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-stone-900 border border-stone-700 rounded-2xl max-w-2xl w-full p-6 space-y-4 shadow-2xl">

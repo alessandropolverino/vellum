@@ -4,6 +4,7 @@ All notable user-facing changes to Vellum are documented in this file.
 
 ## Unreleased
 
+- App: Add live session access for players: the new "Players (QR)" button in the Live Console starts a local server and shows a QR code. Phones scan it to connect, over the local Wi-Fi or from any network through a free Cloudflare tunnel (no account needed; the tunnel binary is bundled with the installer). This first step shows the connection status; player sheets and the combat screen follow.
 - Windows: Fix CLI bundling in installer by mapping resources directly to `bin/`, ensuring only `bin/` is in user PATH, providing dedicated `vellum-cli` aliases, and making `vellum.exe` CLI-aware so executing subcommands from a terminal runs the CLI instead of launching the GUI window.
 
 ## Windows 0.1.4 — 2026-10-25

@@ -22,3 +22,7 @@ Thumbs.db
 .vscode/*
 !.vscode/extensions.json
 .idea/
+
+# Downloaded cloudflared binary (see scripts/fetch-cloudflared.mjs)
+bin/cloudflared
+bin/cloudflared.exe
