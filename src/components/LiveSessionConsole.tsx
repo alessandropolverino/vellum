@@ -4,6 +4,7 @@ import {
   AdventureBlueprint,
   CharacterEntity,
   CombatParticipant,
+  DeathSaves,
   EncounterPreset,
   PartyGroup,
   PlayInstance,
@@ -19,6 +20,15 @@ import { HomebreweryRenderer } from './HomebreweryRenderer';
 import { StatblockCard } from './StatblockCard';
 import { LevelUpModal } from './LevelUpModal';
 import { InitiativeModal } from './InitiativeModal';
+import { DeathSavesPanel } from './DeathSavesPanel';
+import {
+  DEAD_SAVES,
+  applyDeathSave,
+  damageAtZero,
+  deathStateAtZero,
+  deathStateOf,
+  isInstantDeath,
+} from '../services/deathSaves';
 import { soundboardEngine } from '../services/audioEngine';
 import { downloadOfficialCharacterPdf } from '../services/pdfExporter';
 import {
@@ -463,10 +473,12 @@ export const LiveSessionConsole: React.FC<LiveSessionConsoleProps> = ({
   const applyHpChange = (participantId: string, delta: number) => {
     const combat = currentInstance.activeCombat;
     if (!combat) return;
+    const events: string[] = [];
     const nextParticipants = combat.participants.map((p) => {
       if (p.id !== participantId) return p;
       let nextHp = p.hpCurrent;
       let nextTemp = p.tempHp;
+      let saves = p.deathSaves;
 
       if (delta < 0) {
         let dmg = Math.abs(delta);
@@ -475,15 +487,94 @@ export const LiveSessionConsole: React.FC<LiveSessionConsoleProps> = ({
           nextTemp -= absorbed;
           dmg -= absorbed;
         }
-        nextHp = Math.max(0, nextHp - dmg);
+        const raw = p.hpCurrent - dmg;
+        nextHp = Math.max(0, raw);
+
+        // Player characters at 0 HP are dying rather than dead: damage feeds the death saves.
+        if (p.kind === 'pc' && dmg > 0) {
+          const before = deathStateOf(p.hpCurrent, p.deathSaves);
+          if (p.hpCurrent === 0) {
+            saves = isInstantDeath(dmg, p.hpMax) ? DEAD_SAVES : damageAtZero(p.deathSaves);
+          } else if (raw < 0 && isInstantDeath(-raw, p.hpMax)) {
+            saves = DEAD_SAVES;
+          }
+          const after = deathStateOf(nextHp, saves);
+          if (after === 'dead' && before !== 'dead') {
+            events.push(tr(`${p.name} dies`, `${p.name} muore`));
+          } else if (nextHp === 0 && p.hpCurrent > 0) {
+            events.push(tr(`${p.name} drops to 0 HP`, `${p.name} scende a 0 PF`));
+          }
+        }
       } else {
         nextHp = Math.min(p.hpMax, nextHp + delta);
+        if (p.kind === 'pc' && p.hpCurrent === 0 && nextHp > 0) {
+          saves = undefined;
+          events.push(tr(`${p.name} regains consciousness`, `${p.name} riprende i sensi`));
+        }
       }
 
-      return { ...p, hpCurrent: nextHp, tempHp: nextTemp };
+      return { ...p, hpCurrent: nextHp, tempHp: nextTemp, deathSaves: saves };
     });
 
-    updateCombat({ participants: nextParticipants });
+    updateCombat({
+      participants: nextParticipants,
+      ...(events.length > 0 ? { combatEvents: [...events, ...combat.combatEvents] } : {}),
+    });
+  };
+
+  const recordDeathSave = (participantId: string, roll: number) => {
+    const combat = currentInstance.activeCombat;
+    const target = combat?.participants.find((p) => p.id === participantId);
+    if (!combat || !target) return;
+    const { saves, outcome } = applyDeathSave(target.deathSaves, roll);
+    const hp = outcome === 'revived' ? 1 : target.hpCurrent;
+    const state = deathStateOf(hp, saves);
+    const base =
+      outcome === 'revived'
+        ? tr(
+            `${target.name} rolls a 20 on a death save and is back with 1 HP`,
+            `${target.name} fa 20 al tiro contro morte e torna con 1 PF`
+          )
+        : outcome === 'success'
+          ? tr(`${target.name} death save ${roll}: success`, `${target.name} tiro contro morte ${roll}: successo`)
+          : outcome === 'failure'
+            ? tr(`${target.name} death save ${roll}: failure`, `${target.name} tiro contro morte ${roll}: fallimento`)
+            : tr(
+                `${target.name} rolls a 1 on a death save: two failures`,
+                `${target.name} fa 1 al tiro contro morte: due fallimenti`
+              );
+    const suffix =
+      state === 'stable'
+        ? tr(' — stable', ' — stabile')
+        : state === 'dead'
+          ? tr(' — dead', ' — morto')
+          : '';
+    updateCombat({
+      participants: combat.participants.map((p) =>
+        p.id === participantId ? { ...p, hpCurrent: hp, deathSaves: saves } : p
+      ),
+      combatEvents: [base + suffix, ...combat.combatEvents],
+    });
+  };
+
+  const setDeathSaves = (participantId: string, saves: DeathSaves) => {
+    const combat = currentInstance.activeCombat;
+    const target = combat?.participants.find((p) => p.id === participantId);
+    if (!combat || !target) return;
+    const before = deathStateOf(target.hpCurrent, target.deathSaves);
+    const after = deathStateOf(target.hpCurrent, saves);
+    const events: string[] = [];
+    if (after !== before && after === 'stable') {
+      events.push(tr(`${target.name} is stable`, `${target.name} è stabile`));
+    } else if (after !== before && after === 'dead') {
+      events.push(tr(`${target.name} dies`, `${target.name} muore`));
+    }
+    updateCombat({
+      participants: combat.participants.map((p) =>
+        p.id === participantId ? { ...p, deathSaves: saves } : p
+      ),
+      ...(events.length > 0 ? { combatEvents: [...events, ...combat.combatEvents] } : {}),
+    });
   };
 
   const toggleParticipantCondition = (participantId: string, condition: string) => {
@@ -589,6 +680,22 @@ export const LiveSessionConsole: React.FC<LiveSessionConsoleProps> = ({
     const defeated = combat.participants
       .filter((p) => p.kind !== 'pc' && p.hpCurrent === 0)
       .map((p) => p.name);
+    const fallen = combat.participants
+      .filter((p) => p.kind === 'pc' && p.hpCurrent === 0)
+      .map((p) => {
+        const state = deathStateOf(0, p.deathSaves);
+        const label =
+          state === 'dead'
+            ? tr('dead', 'morto')
+            : state === 'stable'
+              ? tr('stable', 'stabile')
+              : tr('dying', 'morente');
+        return `${p.name} (${label})`;
+      });
+    const fallenNote =
+      fallen.length > 0
+        ? tr(` Fallen heroes: ${fallen.join(', ')}.`, ` Eroi caduti: ${fallen.join(', ')}.`)
+        : '';
 
     const logEntry: SessionLogEntry = {
       id: `log-combat-${Date.now()}`,
@@ -601,7 +708,7 @@ export const LiveSessionConsole: React.FC<LiveSessionConsoleProps> = ({
         `Vittoria: ${combat.encounterTitle} (${combat.round} round)`
       ),
       details:
-        defeated.length > 0
+        (defeated.length > 0
           ? tr(
               `Defeated enemies: ${defeated.join(', ')}. PC status synced.`,
               `Nemici sconfitti: ${defeated.join(', ')}. Stato PG sincronizzato.`
@@ -609,7 +716,7 @@ export const LiveSessionConsole: React.FC<LiveSessionConsoleProps> = ({
           : tr(
               `Encounter concluded after ${combat.round} rounds.`,
               `Scontro concluso dopo ${combat.round} round.`
-            ),
+            )) + fallenNote,
       pinnedForRecap: true,
     };
 
@@ -1001,7 +1108,9 @@ export const LiveSessionConsole: React.FC<LiveSessionConsoleProps> = ({
                   <div className="space-y-2 max-h-[42vh] overflow-y-auto pr-1">
                     {currentInstance.activeCombat.participants.map((p, idx) => {
                       const isTurn = idx === currentInstance.activeCombat!.turnIndex;
-                      const isDead = p.hpCurrent === 0;
+                      // A player character at 0 HP is dying (or stable) until the death saves say otherwise.
+                      const death = p.kind === 'pc' && p.hpCurrent === 0 ? deathStateAtZero(p.deathSaves) : null;
+                      const isDead = p.kind === 'pc' ? death === 'dead' : p.hpCurrent === 0;
                       const deltaVal = Number(hpDeltaInputs[p.id] || 5);
                       return (
                         <div
@@ -1115,6 +1224,16 @@ export const LiveSessionConsole: React.FC<LiveSessionConsoleProps> = ({
                               </button>
                             </div>
                           </div>
+
+                          {death && (
+                            <DeathSavesPanel
+                              state={death}
+                              saves={p.deathSaves}
+                              isTurn={isTurn}
+                              onRoll={(roll) => recordDeathSave(p.id, roll)}
+                              onChange={(saves) => setDeathSaves(p.id, saves)}
+                            />
+                          )}
 
                           {/* Conditions Bar */}
                           <div className="mt-2 pt-2 border-t border-stone-900 flex flex-wrap items-center gap-1.5">

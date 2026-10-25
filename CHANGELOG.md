@@ -4,6 +4,7 @@ All notable user-facing changes to Vellum are documented in this file.
 
 ## Unreleased
 
+- App: Death saving throws in combat. A player character at 0 HP now shows a panel with success and failure markers instead of being struck out: type a d20 result or let the app roll, tap the markers to correct them, or stabilize. Natural 20 brings them back with 1 HP, a natural 1 counts as two failures, damage at 0 HP adds a failure, massive damage kills outright, and healing clears the tally. Fallen heroes are listed in the combat log entry.
 - App: A combat started by mistake can now be cancelled from the combat header; it is discarded without adding anything to the timeline or changing anyone's hit points.
 - App: Starting a combat now opens a "Roll initiative" dialog. Type the result of each roll for every character, player or not, or tap the dice button next to a field to roll a d20 with that character's initiative modifier. Fields left empty are rolled automatically. The same dialog appears when adding creatures to a combat in progress, and the turn stays on whoever is acting.
 ## Windows 0.1.5 — 2026-10-25

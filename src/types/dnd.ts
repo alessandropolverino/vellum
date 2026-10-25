@@ -263,6 +263,14 @@ export interface SessionLogEntry {
   pinnedForRecap: boolean;
 }
 
+/** Death saving throw tally for a player character at 0 hit points. */
+export interface DeathSaves {
+  successes: number;
+  failures: number;
+  /** Stabilized (three successes, or by a Medicine check or spell) while still at 0 HP. */
+  stable?: boolean;
+}
+
 export interface CombatParticipant {
   id: string;
   sourceCharacterId?: string;
@@ -276,6 +284,7 @@ export interface CombatParticipant {
   conditions: string[];
   isConcentrating: boolean;
   notes: string;
+  deathSaves?: DeathSaves; // Only meaningful for PCs at 0 HP
 }
 
 export interface ActiveCombatState {
