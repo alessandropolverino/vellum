@@ -41,10 +41,10 @@
         "installerHooks": "windows/installer-hooks.nsh"
       }
     },
-    "resources": [
-      "../bin/**/*",
-      "../skills/**/*"
-    ]
+    "resources": {
+      "../bin/**/*": "bin/",
+      "../skills/**/*": "skills/"
+    }
   },
   "plugins": {
     "updater": {
