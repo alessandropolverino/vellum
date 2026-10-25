@@ -27,7 +27,7 @@ ${c.bold('COMMANDS:')}
 
 ${c.bold('GLOBAL OPTIONS:')}
   ${c.cyan('--json, -j')}         Output strict machine-readable JSON (ideal for AI parsing)
-  ${c.cyan('--db, -d <path>')}    Path to database JSON file (default: data/dnd5e-db.json)
+  ${c.cyan('--db, -d <path>')}    Path to database JSON file (default: data/vellum-db.json)
   ${c.cyan('--silent, -q')}       Suppress non-essential messages
   ${c.cyan('--help, -h')}         Show help for any command or subcommand
 

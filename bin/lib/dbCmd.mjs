@@ -204,7 +204,7 @@ ${c.bold('USAGE:')}
   vellum db seed [--force]
 
 ${c.bold('OPTIONS:')}
-  --db <path>           Custom path to database file (default: data/dnd5e-db.json)
+  --db <path>           Custom path to database file (default: data/vellum-db.json)
   --output <path>       Target output file path
   --merge               Merge entities by ID rather than replacing
   --json                Machine-readable JSON output

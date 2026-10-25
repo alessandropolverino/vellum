@@ -2,46 +2,117 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { c } from './output.mjs';
 
-const DEFAULT_DB_FILENAME = 'dnd5e-db.json';
+const DEFAULT_DB_FILENAME = 'vellum-db.json';
+const LEGACY_DB_FILENAME = 'dnd5e-db.json';
+
+/**
+ * Checks if a legacy database file exists in a target directory and migrates (renames) it
+ * to the new vellum-db.json name if the new file does not yet exist.
+ * Returns the resolved path to vellum-db.json if found/migrated, or null.
+ */
+function tryMigrateAndResolve(dirPath) {
+  const newPath = path.resolve(dirPath, DEFAULT_DB_FILENAME);
+  const legacyPath = path.resolve(dirPath, LEGACY_DB_FILENAME);
+
+  if (fs.existsSync(newPath)) {
+    return newPath;
+  }
+
+  if (fs.existsSync(legacyPath)) {
+    try {
+      fs.renameSync(legacyPath, newPath);
+      return newPath;
+    } catch {
+      try {
+        fs.copyFileSync(legacyPath, newPath);
+        fs.unlinkSync(legacyPath);
+        return newPath;
+      } catch {
+        return legacyPath;
+      }
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Returns the default Tauri AppData storage directory where desktop Vellum stores its database.
+ */
+function getTauriAppDataDir() {
+  const identifier = 'com.vellum.dmstudio';
+  if (process.platform === 'win32' && process.env.APPDATA) {
+    return path.join(process.env.APPDATA, identifier);
+  }
+  if (process.platform === 'darwin' && process.env.HOME) {
+    return path.join(process.env.HOME, 'Library', 'Application Support', identifier);
+  }
+  if (process.env.HOME) {
+    return path.join(process.env.HOME, '.config', identifier);
+  }
+  return null;
+}
 
 /**
  * Resolves the path to the Vellum database file.
  */
 export function resolveDbPath(options = {}) {
   if (options.db) {
-    return path.resolve(process.cwd(), options.db);
+    const customPath = path.resolve(process.cwd(), options.db);
+    if (fs.existsSync(customPath)) {
+      return customPath;
+    }
+    const customDir = path.dirname(customPath);
+    const migrated = tryMigrateAndResolve(customDir);
+    if (migrated) return migrated;
+    return customPath;
   }
 
   if (process.env.VELLUM_DB_PATH) {
-    return path.resolve(process.cwd(), process.env.VELLUM_DB_PATH);
+    const envPath = path.resolve(process.cwd(), process.env.VELLUM_DB_PATH);
+    if (fs.existsSync(envPath)) {
+      return envPath;
+    }
+    const envDir = path.dirname(envPath);
+    const migrated = tryMigrateAndResolve(envDir);
+    if (migrated) return migrated;
+    return envPath;
   }
 
-  // 1. Current working directory /data/dnd5e-db.json
-  const cwdDb = path.resolve(process.cwd(), 'data', DEFAULT_DB_FILENAME);
-  if (fs.existsSync(cwdDb)) {
-    return cwdDb;
-  }
+  // 1. Current working directory /data/vellum-db.json (or legacy dnd5e-db.json)
+  const cwdData = path.resolve(process.cwd(), 'data');
+  const cwdFound = tryMigrateAndResolve(cwdData);
+  if (cwdFound) return cwdFound;
 
   // 2. Check if we're in a worktree (e.g. .claude/worktrees/<name>)
-  const worktreeParentDb = path.resolve(process.cwd(), '..', '..', 'data', DEFAULT_DB_FILENAME);
-  if (fs.existsSync(worktreeParentDb)) {
-    return worktreeParentDb;
-  }
+  const worktreeParentData = path.resolve(process.cwd(), '..', '..', 'data');
+  const worktreeFound = tryMigrateAndResolve(worktreeParentData);
+  if (worktreeFound) return worktreeFound;
 
-  // 3. Search up directories for a data/dnd5e-db.json until root
+  // 3. Search up directories for a data/ folder until root
   let currentDir = process.cwd();
   for (let i = 0; i < 4; i++) {
-    const candidate = path.resolve(currentDir, 'data', DEFAULT_DB_FILENAME);
-    if (fs.existsSync(candidate)) {
-      return candidate;
+    const candidateData = path.resolve(currentDir, 'data');
+    const candidateFound = tryMigrateAndResolve(candidateData);
+    if (candidateFound) {
+      return candidateFound;
     }
     const parent = path.dirname(currentDir);
     if (parent === currentDir) break;
     currentDir = parent;
   }
 
-  // Fallback: default to cwd's data directory
-  return cwdDb;
+  // 4. Auto-discover desktop app database in OS AppData directory
+  const appDataDir = getTauriAppDataDir();
+  if (appDataDir && fs.existsSync(appDataDir)) {
+    const appDataFound = tryMigrateAndResolve(appDataDir);
+    if (appDataFound) {
+      return appDataFound;
+    }
+  }
+
+  // Fallback: default to cwd's data directory vellum-db.json
+  return path.resolve(process.cwd(), 'data', DEFAULT_DB_FILENAME);
 }
 
 /**
@@ -152,7 +223,7 @@ export function backupDb(options = {}) {
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
   const backupPath = options.output
     ? path.resolve(options.output)
-    : path.join(backupDir, `dnd5e-db-backup-${timestamp}.json`);
+    : path.join(backupDir, `vellum-db-backup-${timestamp}.json`);
 
   fs.writeFileSync(backupPath, JSON.stringify(db, null, 2), 'utf-8');
   return { backupPath, sourcePath: dbPath };

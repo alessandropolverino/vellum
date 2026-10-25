@@ -6,13 +6,27 @@ import { exec } from 'node:child_process';
 
 function localDiskDbPlugin() {
   const dataDir = path.resolve(process.cwd(), 'data');
-  const dbFile = path.join(dataDir, 'dnd5e-db.json');
+  const dbFile = path.join(dataDir, 'vellum-db.json');
+  const legacyDbFile = path.join(dataDir, 'dnd5e-db.json');
   const backupsDir = path.join(dataDir, 'backups');
   const mediaAudioDir = path.join(dataDir, 'media', 'audio');
 
   function ensureDirs() {
     if (!fs.existsSync(dataDir)) {
       fs.mkdirSync(dataDir, { recursive: true });
+    }
+    // Backward compatibility: migrate dnd5e-db.json to vellum-db.json if new file doesn't exist
+    if (!fs.existsSync(dbFile) && fs.existsSync(legacyDbFile)) {
+      try {
+        fs.renameSync(legacyDbFile, dbFile);
+      } catch {
+        fs.copyFileSync(legacyDbFile, dbFile);
+        try {
+          fs.unlinkSync(legacyDbFile);
+        } catch {
+          // ignore
+        }
+      }
     }
     if (!fs.existsSync(backupsDir)) {
       fs.mkdirSync(backupsDir, { recursive: true });
@@ -248,11 +262,35 @@ function localDiskDbPlugin() {
             return;
           }
 
+          // 4b. GET /api/local-db/check?since=<timestamp> -> check if modified on disk by external process
+          if (pathname === '/check' && req.method === 'GET') {
+            if (!fs.existsSync(dbFile)) {
+              res.setHeader('Content-Type', 'application/json');
+              res.end(JSON.stringify({ hasChanged: false, mtimeMs: 0 }));
+              return;
+            }
+            const stat = fs.statSync(dbFile);
+            const mtimeMs = Math.floor(stat.mtimeMs);
+            const since = Number(parsedUrl.searchParams.get('since') || 0);
+
+            if (mtimeMs > since) {
+              const raw = fs.readFileSync(dbFile, 'utf-8');
+              res.setHeader('Content-Type', 'application/json');
+              res.end(JSON.stringify({ hasChanged: true, mtimeMs, payload: raw }));
+              return;
+            }
+
+            res.setHeader('Content-Type', 'application/json');
+            res.end(JSON.stringify({ hasChanged: false, mtimeMs }));
+            return;
+          }
+
           // 5. GET /api/local-db -> load database
           if (pathname === '' || pathname === '/') {
             if (req.method === 'GET') {
               if (fs.existsSync(dbFile)) {
                 const stat = fs.statSync(dbFile);
+                res.setHeader('X-Mtime', Math.floor(stat.mtimeMs).toString());
                 if (stat.size === 0) {
                   // Fallback to latest backup if file corrupted to 0 bytes
                   const list = fs
@@ -307,8 +345,10 @@ function localDiskDbPlugin() {
                 }
 
                 atomicWrite(dbFile, body);
+                const afterStat = fs.existsSync(dbFile) ? fs.statSync(dbFile) : null;
+                const mtimeMs = afterStat ? Math.floor(afterStat.mtimeMs) : Date.now();
                 res.setHeader('Content-Type', 'application/json');
-                res.end(JSON.stringify({ ok: true, path: dbFile }));
+                res.end(JSON.stringify({ ok: true, path: dbFile, mtimeMs }));
               });
               return;
             }
