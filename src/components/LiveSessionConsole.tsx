@@ -23,6 +23,8 @@ import { LiveJoinModal } from './LiveJoinModal';
 import { useLiveSession } from '../services/useLiveSession';
 import { InitiativeModal } from './InitiativeModal';
 import { DeathSavesPanel } from './DeathSavesPanel';
+import { PcResourcesPanel } from './PcResourcesPanel';
+import { changeResource, changeSlots } from '../services/spellResources';
 import {
   DEAD_SAVES,
   applyDeathSave,
@@ -187,6 +189,35 @@ export const LiveSessionConsole: React.FC<LiveSessionConsoleProps> = ({
         pcStatus: { ...inst.pcStatus, [characterId]: { ...st, playerOverride: nickname } },
         lastPlayedAt: new Date().toISOString(),
       });
+    },
+    (inst, characterId, action) => {
+      const pc = characters.find((c) => c.id === characterId);
+      if (!pc || !inst.partyCharacterIds.includes(characterId)) return;
+      const delta = Math.max(-9, Math.min(9, Math.trunc(Number(action.delta) || 0)));
+      if (delta === 0) return;
+      const st = inst.pcStatus[characterId] || {
+        characterId,
+        hpCurrent: pc.hpMax,
+        tempHp: 0,
+        conditions: [],
+        inspiration: false,
+        sessionNotes: '',
+      };
+      let patch: Partial<typeof st>;
+      if (action.type === 'slot' && Number.isInteger(action.level)) {
+        patch = { slotsUsed: changeSlots(pc, st, action.level as number, delta) };
+      } else if (action.type === 'resource' && typeof action.id === 'string') {
+        patch = { resourcesUsed: changeResource(pc, st, action.id, delta) };
+      } else {
+        return;
+      }
+      const next = {
+        ...inst,
+        pcStatus: { ...inst.pcStatus, [characterId]: { ...st, ...patch } },
+        lastPlayedAt: new Date().toISOString(),
+      };
+      onSaveInstance(next);
+      return next;
     }
   );
 
@@ -1599,6 +1630,8 @@ export const LiveSessionConsole: React.FC<LiveSessionConsoleProps> = ({
                         </button>
                       </div>
                     </div>
+
+                    <PcResourcesPanel pc={pc} status={st} onChange={updatePc} />
 
                     <input
                       type="text"

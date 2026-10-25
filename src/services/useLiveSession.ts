@@ -10,6 +10,14 @@ import {
 import { portraitVersion, shrinkPortrait } from './livePortraits';
 import type { CharacterEntity, PlayInstance } from '../types/dnd';
 
+/** A request from a phone (already limited to the player's own character by the server). */
+export interface PlayerAction {
+  type: string;
+  level?: number;
+  id?: string;
+  delta?: number;
+}
+
 export interface ClaimInfo {
   characterId: string;
   nickname: string;
@@ -50,7 +58,13 @@ export function useLiveSession(
   instance: PlayInstance | undefined,
   characters: CharacterEntity[],
   /** Called when a player picks a character with a nickname that the instance doesn't have yet. */
-  onNickname?: (instance: PlayInstance, characterId: string, nickname: string) => void
+  onNickname?: (instance: PlayInstance, characterId: string, nickname: string) => void,
+  /** Apply a phone's request; return the updated instance so quick taps build on each other. */
+  onPlayerAction?: (
+    instance: PlayInstance,
+    characterId: string,
+    action: PlayerAction
+  ) => PlayInstance | void
 ) {
   const desktop = isDesktopApp();
   const [info, setInfo] = useState<LiveInfo | null>(null);
@@ -67,8 +81,10 @@ export function useLiveSession(
   const iconVersions = useRef<Map<string, string>>(new Map());
   const instanceRef = useRef(instance);
   const onNicknameRef = useRef(onNickname);
+  const onActionRef = useRef(onPlayerAction);
   instanceRef.current = instance;
   onNicknameRef.current = onNickname;
+  onActionRef.current = onPlayerAction;
 
   useEffect(() => {
     if (!desktop) return;
@@ -87,6 +103,13 @@ export function useLiveSession(
     const offs: Array<Promise<() => void>> = [
       listen<number>('live://clients', (e) => setClients(e.payload)),
       listen<ClaimInfo[]>('live://claims', (e) => setClaimed(e.payload)),
+      listen<{ characterId: string; action: PlayerAction }>('live://player-action', (e) => {
+        const inst = instanceRef.current;
+        const handler = onActionRef.current;
+        if (!inst || !handler) return;
+        const updated = handler(inst, e.payload.characterId, e.payload.action);
+        if (updated) instanceRef.current = updated;
+      }),
       listen<TunnelEvent>('live://tunnel', (e) => {
         setTunnelStatus(e.payload.status);
         setTunnelUrl(e.payload.url);

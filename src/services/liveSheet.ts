@@ -1,4 +1,5 @@
 import { deathStateAtZero } from './deathSaves';
+import { hasMagic, resourceStates, slotStates } from './spellResources';
 import {
   formatMod,
   formatSignedBonus,
@@ -75,6 +76,10 @@ export function buildPlayerSheet(
       otherProficiencies: pc.otherProficiencies || '',
       equipment: pc.equipment || '',
       spellsNotes: pc.spellsNotes || '',
+      // Spell slots and class resources the player can tick off themselves.
+      magic: hasMagic(pc)
+        ? { slots: slotStates(pc, runtime), resources: resourceStates(pc, runtime) }
+        : null,
       traits: pc.traits,
       actions: pc.actions,
       personality: {

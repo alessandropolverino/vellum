@@ -88,6 +88,14 @@
       .pip { width: 20px; height: 20px; border-radius: 50%; border: 1.5px solid var(--ln); background: var(--s2); }
       .pip.ok { background: var(--gr); border-color: var(--gr); }
       .pip.bad { background: var(--rd); border-color: var(--rd); }
+      .mrow { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+      .mpips { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 10px; }
+      .mpip { width: 34px; height: 34px; border-radius: 50%; border: 1.5px solid var(--ln); background: var(--s2); padding: 0; }
+      .mpip.on { background: #38bdf8; border-color: #bae6fd; }
+      .stepper { display: flex; align-items: center; gap: 10px; }
+      .stepper button { width: 44px; height: 44px; border-radius: 12px; background: var(--s2); border: 1px solid var(--ln); font-size: 22px; line-height: 1; }
+      .stepper b { min-width: 52px; text-align: center; font-size: 18px; font-weight: 500; color: #c4b5fd; }
+      .note { font-size: 11px; color: var(--mu); }
       .err { color: #fca5a5; font-size: 14px; }
       .center { text-align: center; padding-top: 18vh; color: var(--mu); }
     </style>
@@ -295,6 +303,54 @@
           f.appendChild(el("h2", null, t("Features", "Capacità")));
           c.traits.forEach(function (a, i) { f.appendChild(fold("t" + i, a.name, null, a.description)); });
         }
+        if (c.spellsNotes && !c.magic) { f.appendChild(el("h2", null, t("Spells", "Incantesimi"))); f.appendChild(textCard(t("Notes", "Note"), c.spellsNotes)); }
+        return f;
+      }
+
+      /* ---------- magic: spell slots and class resources, ticked off by the player ---------- */
+      function sendAction(msg) {
+        try { if (current && current.readyState === 1) current.send(JSON.stringify(msg)); } catch (_) {}
+      }
+      function viewMagic(c) {
+        var f = document.createDocumentFragment(), m = c.magic;
+        f.appendChild(el("h1", null, t("Magic", "Magia")));
+        (m.slots || []).forEach(function (sl) {
+          var card = el("div", "card"), avail = sl.max - sl.used;
+          var head = el("div", "mrow");
+          add(head, el("span", null, t("Level ", "Livello ") + sl.level), el("span", "lbl", avail + " / " + sl.max));
+          var pips = el("div", "mpips");
+          for (var i = 0; i < sl.max; i++) {
+            (function (idx) {
+              var b = el("button", "mpip" + (idx < avail ? " on" : ""));
+              b.setAttribute("aria-label", t("Level ", "Livello ") + sl.level + " #" + (idx + 1));
+              b.onclick = function () {
+                // One slot per tap: a filled slot is spent, an empty one is recovered.
+                var delta = idx < avail ? 1 : -1;
+                sl.used += delta; render();
+                sendAction({ type: "slot", level: sl.level, delta: delta });
+              };
+              pips.appendChild(b);
+            })(i);
+          }
+          add(card, head, pips); f.appendChild(card);
+        });
+        if ((m.resources || []).length) {
+          f.appendChild(el("h2", null, t("Resources", "Risorse")));
+          m.resources.forEach(function (r) {
+            var card = el("div", "card mrow"), left = el("div");
+            var hint = r.recharge === "short" ? t("Recharges on a short rest", "Si ricarica con un riposo breve")
+              : r.recharge === "long" ? t("Recharges on a long rest", "Si ricarica con un riposo lungo") : t("Refilled by the DM", "Ripristinata dal master");
+            add(left, el("div", null, r.name), el("div", "note", hint));
+            var st = el("div", "stepper");
+            var minus = el("button", null, "−"), plus = el("button", null, "+");
+            minus.setAttribute("aria-label", t("Spend ", "Usa ") + r.name);
+            plus.setAttribute("aria-label", t("Recover ", "Recupera ") + r.name);
+            minus.onclick = function () { if (r.used < r.max) { r.used++; render(); sendAction({ type: "resource", id: r.id, delta: 1 }); } };
+            plus.onclick = function () { if (r.used > 0) { r.used--; render(); sendAction({ type: "resource", id: r.id, delta: -1 }); } };
+            add(st, minus, el("b", null, (r.max - r.used) + "/" + r.max), plus);
+            add(card, left, st); f.appendChild(card);
+          });
+        }
         if (c.spellsNotes) { f.appendChild(el("h2", null, t("Spells", "Incantesimi"))); f.appendChild(textCard(t("Notes", "Note"), c.spellsNotes)); }
         return f;
       }
@@ -402,7 +458,9 @@
       function tabList() {
         var l = [];
         if (S.combat && S.combat.active) l.push(["combat", "⚔", t("Combat", "Scontro")]);
-        l.push(["over", "◉", t("Overview", "Scheda")], ["act", "✦", t("Actions", "Azioni")], ["gear", "▣", t("Gear", "Oggetti")], ["story", "❡", t("Story", "Storia")]);
+        l.push(["over", "◉", t("Overview", "Scheda")], ["act", "✦", t("Actions", "Azioni")]);
+        if (S.sheet && S.sheet.magic) l.push(["magic", "✧", t("Magic", "Magia")]);
+        l.push(["gear", "▣", t("Gear", "Oggetti")], ["story", "❡", t("Story", "Storia")]);
         return l;
       }
       function render() {
@@ -413,7 +471,7 @@
         clearNode(app);
         var c = S.sheet;
         var view = S.tab === "combat" && S.combat && S.combat.active ? viewCombat()
-          : S.tab === "act" ? viewActions(c) : S.tab === "gear" ? viewGear(c) : S.tab === "story" ? viewStory(c) : viewOverview(c);
+          : S.tab === "act" ? viewActions(c) : S.tab === "magic" && c.magic ? viewMagic(c) : S.tab === "gear" ? viewGear(c) : S.tab === "story" ? viewStory(c) : viewOverview(c);
         app.appendChild(view);
         clearNode(tabsHost);
         var bar = el("div", "tabs"), inner = el("div");

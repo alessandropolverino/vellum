@@ -11,6 +11,7 @@ use std::path::PathBuf;
 use std::process::Stdio;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex as StdMutex};
+use std::time::{Duration, Instant};
 
 use axum::extract::ws::{Message, WebSocket, WebSocketUpgrade};
 use axum::extract::{Path, Query, State};
@@ -322,6 +323,39 @@ async fn ws_handler(
         .into_response()
 }
 
+/// The only messages a phone may send: spend or recover a spell slot or a class resource.
+fn is_valid_player_action(value: &serde_json::Value) -> bool {
+    match value.get("type").and_then(|t| t.as_str()) {
+        Some("slot") => {
+            value.get("level").is_some_and(|v| v.is_i64())
+                && value.get("delta").is_some_and(|v| v.is_i64())
+        }
+        Some("resource") => {
+            value.get("id").is_some_and(|v| v.is_string())
+                && value.get("delta").is_some_and(|v| v.is_i64())
+        }
+        _ => false,
+    }
+}
+
+/// The character comes from the connection (its token), never from the message, so a player can
+/// only act on their own character; the desktop app validates the values again before applying.
+fn forward_player_action(s: &ServerShared, character_id: &str, text: &str) {
+    if text.len() > 512 {
+        return;
+    }
+    let Ok(value) = serde_json::from_str::<serde_json::Value>(text) else {
+        return;
+    };
+    if !is_valid_player_action(&value) {
+        return;
+    }
+    let _ = s.app.emit(
+        "live://player-action",
+        serde_json::json!({ "characterId": character_id, "action": value }),
+    );
+}
+
 fn emit_clients(s: &ServerShared) {
     let _ = s.app.emit("live://clients", s.clients.load(Ordering::SeqCst));
 }
@@ -345,6 +379,7 @@ async fn client_loop(socket: WebSocket, s: ServerShared, character_id: String) {
     for text in initial {
         let _ = sink.send(Message::Text(text)).await;
     }
+    let mut last_action = Instant::now() - Duration::from_secs(1);
 
     loop {
         tokio::select! {
@@ -363,7 +398,13 @@ async fn client_loop(socket: WebSocket, s: ServerShared, character_id: String) {
             },
             incoming = stream.next() => match incoming {
                 Some(Ok(Message::Close(_))) | None | Some(Err(_)) => break,
-                // Player -> DM messages arrive in a later phase; ignore for now.
+                Some(Ok(Message::Text(text))) => {
+                    // At most one message per 40 ms per phone; the rest is dropped.
+                    if last_action.elapsed() >= Duration::from_millis(40) {
+                        last_action = Instant::now();
+                        forward_player_action(&s, &character_id, &text);
+                    }
+                }
                 Some(Ok(_)) => {}
             },
         }
@@ -750,6 +791,17 @@ mod tests {
         assert!(parse_data_url("data:image/svg+xml;base64,aGVsbG8=").is_none());
         assert!(parse_data_url("data:image/png,hello").is_none());
         assert!(parse_data_url("https://example.com/a.png").is_none());
+    }
+
+    #[test]
+    fn player_actions_are_whitelisted() {
+        let ok = |t: &str| is_valid_player_action(&serde_json::from_str(t).unwrap());
+        assert!(ok(r#"{"type":"slot","level":2,"delta":1}"#));
+        assert!(ok(r#"{"type":"resource","id":"ki","delta":-1}"#));
+        assert!(!ok(r#"{"type":"slot","level":"2","delta":1}"#));
+        assert!(!ok(r#"{"type":"resource","delta":1}"#));
+        assert!(!ok(r#"{"type":"hp","delta":99}"#));
+        assert!(!ok(r#"[1,2]"#));
     }
 
     #[test]

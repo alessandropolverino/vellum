@@ -139,6 +139,19 @@ export function normalizeDatabase(raw: unknown): DndDatabase {
         biographyOrLore: String(ch?.biographyOrLore || ''),
         tags: Array.isArray(ch?.tags) ? ch.tags.map(String) : [],
         accentColor: ch?.accentColor ? String(ch.accentColor) : undefined,
+        spellSlots: Array.isArray(ch?.spellSlots)
+          ? Array.from({ length: 9 }, (_, i) => Math.max(0, Math.floor(Number(ch.spellSlots[i]) || 0)))
+          : undefined,
+        classResources: Array.isArray(ch?.classResources)
+          ? ch.classResources
+              .filter((r: any) => r && typeof r.id === 'string' && typeof r.name === 'string')
+              .map((r: any) => ({
+                id: String(r.id),
+                name: String(r.name),
+                max: Math.max(0, Math.floor(Number(r.max) || 0)),
+                recharge: r.recharge === 'short' || r.recharge === 'manual' ? r.recharge : 'long',
+              }))
+          : undefined,
       }))
     : [];
 
