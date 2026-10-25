@@ -93,6 +93,7 @@ export interface CharacterEntity {
   sourceBlueprintId?: string; // If this PC was instantiated from a pre-gen blueprint, stores the blueprint ID
   instanceOnlyId?: string; // If this PC was created strictly for a single PlayInstance without cluttering the global blueprint list
   portraitUrl?: string; // DataURL or image URL for PC, NPC, or Monster/Boss portrait
+  portraitOriginalUrl?: string; // Original uncropped image DataURL or URL for re-cropping
   background?: string; // D&D 5e Background (e.g. "Noble", "Sage", "Outlander")
   proficiencyBonus?: number; // Explicit override; otherwise auto-derived from levelOrCr
   savingThrowProficiencies?: Partial<Record<AbilityKey, boolean>>;

@@ -4,6 +4,13 @@ All notable user-facing changes to Vellum are documented in this file.
 
 ## Unreleased
 
+- App: Add interactive character portrait framing and cropping modal with real-time statblock and token previews:
+  - Automatic framing/crop dialog immediately after uploading an image file or via the new "Adjust Framing / Crop" action in the character sheet editor.
+  - Interactive pan and zoom controls (drag to pan, mouse wheel zoom, zoom slider with +/- buttons, reset button, and rule-of-thirds grid guides) ensuring character faces, monsters, or focal details are never cut off.
+  - Synchronized real-time live previews displaying both square statblock card framing and circular combat token avatar framing side-by-side.
+  - Relocated portrait in `StatblockCard` to the upper right corner to optimize space utilization and align with the official 5e statblock PDF layout, with an interactive hover crop trigger directly from the live preview.
+  - Preservation of original uncropped image source (`portraitOriginalUrl`) so users can re-adjust framing at any time without re-uploading.
+
 - App: Add real-time auto-save status indicator and manual save trigger in Adventure Studio:
   - Contextual status badges displaying real-time save state (`Saving...`, `Saved (HH:MM:SS)`, `Save Error`) in the Adventure Studio top bar and directly above the Homebrewery Markdown editor.
   - Interactive save trigger and keyboard shortcut (`Ctrl+S` / `Cmd+S`) allowing users and DMs to instantly verify or force persistence with visual feedback while authoring one-shots, campaign modules, and scenes.
