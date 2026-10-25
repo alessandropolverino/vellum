@@ -4,6 +4,7 @@ All notable user-facing changes to Vellum are documented in this file.
 
 ## Unreleased
 
+- App: Fix characters losing their equipment, personality traits, ideals, bonds, flaws, other proficiencies, immunities and spellcasting ability when the app saved or reloaded the database. Data already lost cannot be recovered, but automatic backups from before the loss still contain it.
 ## Windows 0.1.5 — 2026-10-25
 
 - Windows: Fix CLI bundling in installer by mapping resources directly to `bin/`, ensuring only `bin/` is in user PATH, providing dedicated `vellum-cli` aliases, and making `vellum.exe` CLI-aware so executing subcommands from a terminal runs the CLI instead of launching the GUI window.
