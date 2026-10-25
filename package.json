@@ -1,7 +1,7 @@
 {
   "name": "vellum",
   "private": true,
-  "version": "0.1.5",
+  "version": "0.2.0",
   "description": "Vellum — D&D 5e Campaign & One-Shot Manager with Homebrewery-style editor, Multi-instance runs, Combat Tracker & SFX Soundboard",
   "type": "module",
   "bin": {
@@ -13,7 +13,8 @@
     "preview": "vite preview",
     "tauri": "tauri",
     "cli": "node bin/vellum.mjs",
-    "release:bump": "node scripts/bump-version.mjs"
+    "release:bump": "node scripts/bump-version.mjs",
+    "fetch:cloudflared": "node scripts/fetch-cloudflared.mjs"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.12.4",
@@ -21,12 +22,14 @@
     "@tauri-apps/plugin-updater": "^2.14.0",
     "lucide-react": "^1.16.0",
     "pdf-lib": "^1.17.1",
+    "qrcode": "^1.5.4",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"
   },
   "devDependencies": {
     "@tauri-apps/cli": "^2.5.0",
     "@types/node": "^22.13.0",
+    "@types/qrcode": "^1.5.6",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
     "@vitejs/plugin-react": "^4.3.4",

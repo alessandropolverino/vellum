@@ -124,6 +124,7 @@ Installers are published on [GitHub Releases](https://github.com/alessandropolve
 | Version | Date | Platform | Notes |
 | :--- | :--- | :--- | :--- |
 | *Unreleased* | — | Windows / macOS | [CHANGELOG.md](./CHANGELOG.md) |
+| 0.2.0 | 2026-10-25 | Windows | [Release notes](https://github.com/alessandropolverino/vellum/releases/tag/windows-v0.2.0) |
 | 0.1.5 | 2026-10-25 | Windows | [Release notes](https://github.com/alessandropolverino/vellum/releases/tag/windows-v0.1.5) |
 | 0.1.4 | 2026-10-25 | Windows | [Release notes](https://github.com/alessandropolverino/vellum/releases/tag/windows-v0.1.4) |
 | 0.1.3 | 2026-10-25 | Windows | [Release notes](https://github.com/alessandropolverino/vellum/releases/tag/windows-v0.1.3) |

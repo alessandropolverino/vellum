@@ -130,8 +130,19 @@ export function normalizeDatabase(raw: unknown): DndDatabase {
         savingThrows: ch?.savingThrows ? String(ch.savingThrows) : undefined,
         skills: ch?.skills ? String(ch.skills) : undefined,
         damageResistances: ch?.damageResistances ? String(ch.damageResistances) : undefined,
+        damageImmunities: ch?.damageImmunities ? String(ch.damageImmunities) : undefined,
+        conditionImmunities: ch?.conditionImmunities ? String(ch.conditionImmunities) : undefined,
         senses: ch?.senses ? String(ch.senses) : undefined,
         languages: ch?.languages ? String(ch.languages) : undefined,
+        otherProficiencies: ch?.otherProficiencies ? String(ch.otherProficiencies) : undefined,
+        spellcastingAbility: ['str', 'dex', 'con', 'int', 'wis', 'cha'].includes(ch?.spellcastingAbility)
+          ? ch.spellcastingAbility
+          : undefined,
+        equipment: ch?.equipment ? String(ch.equipment) : undefined,
+        personalityTraits: ch?.personalityTraits ? String(ch.personalityTraits) : undefined,
+        ideals: ch?.ideals ? String(ch.ideals) : undefined,
+        bonds: ch?.bonds ? String(ch.bonds) : undefined,
+        flaws: ch?.flaws ? String(ch.flaws) : undefined,
         traits: Array.isArray(ch?.traits) ? ch.traits : [],
         actions: Array.isArray(ch?.actions) ? ch.actions : [],
         reactionsOrLegendary: Array.isArray(ch?.reactionsOrLegendary) ? ch.reactionsOrLegendary : undefined,
@@ -139,6 +150,19 @@ export function normalizeDatabase(raw: unknown): DndDatabase {
         biographyOrLore: String(ch?.biographyOrLore || ''),
         tags: Array.isArray(ch?.tags) ? ch.tags.map(String) : [],
         accentColor: ch?.accentColor ? String(ch.accentColor) : undefined,
+        spellSlots: Array.isArray(ch?.spellSlots)
+          ? Array.from({ length: 9 }, (_, i) => Math.max(0, Math.floor(Number(ch.spellSlots[i]) || 0)))
+          : undefined,
+        classResources: Array.isArray(ch?.classResources)
+          ? ch.classResources
+              .filter((r: any) => r && typeof r.id === 'string' && typeof r.name === 'string')
+              .map((r: any) => ({
+                id: String(r.id),
+                name: String(r.name),
+                max: Math.max(0, Math.floor(Number(r.max) || 0)),
+                recharge: r.recharge === 'short' || r.recharge === 'manual' ? r.recharge : 'long',
+              }))
+          : undefined,
       }))
     : [];
 

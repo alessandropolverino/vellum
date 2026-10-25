@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import {
   AbilityKey,
   CharacterEntity,
+  ClassResource,
   DND_ABILITY_META,
   DND_SKILLS,
   EntityKind,
@@ -56,6 +57,7 @@ import {
   presetCls,
 } from './sheetFields';
 import { downloadOfficialCharacterPdf } from '../services/pdfExporter';
+import { SPELL_LEVELS, newResourceId } from '../services/spellResources';
 import {
   ArrowLeft,
   Check,
@@ -1133,6 +1135,110 @@ export const FullPageCharacterEditor: React.FC<FullPageCharacterEditorProps> = (
                   onAdd={() => addListEntry('traits')}
                   onRemove={(idx) => removeListEntry('traits', idx)}
                 />
+              </div>
+              <div className={cardCls}>
+                <h3 className={cardTitleCls}>{tr('Spell slots', 'Slot incantesimo')}</h3>
+                <p className="text-xs text-stone-400 -mt-1">
+                  {tr(
+                    'Maximum slots per spell level. Leave at 0 for levels the character does not have; the live console and the phone track how many are spent.',
+                    'Slot massimi per livello di incantesimo. Lascia 0 per i livelli che il personaggio non ha; la console live e il telefono tengono il conto di quelli usati.'
+                  )}
+                </p>
+                <div className="grid grid-cols-[repeat(auto-fit,minmax(4.5rem,1fr))] gap-3">
+                  {SPELL_LEVELS.map((level) => (
+                    <Field key={level} label={tr(`Level ${level}`, `Livello ${level}`)}>
+                      <input
+                        type="number"
+                        min={0}
+                        max={9}
+                        value={editingChar.spellSlots?.[level - 1] ?? 0}
+                        onChange={(e) => {
+                          const next = SPELL_LEVELS.map((l) => editingChar.spellSlots?.[l - 1] ?? 0);
+                          next[level - 1] = Math.max(0, Math.min(9, Math.floor(Number(e.target.value) || 0)));
+                          patch({ spellSlots: next.some((n) => n > 0) ? next : undefined });
+                        }}
+                        className={numCls}
+                      />
+                    </Field>
+                  ))}
+                </div>
+              </div>
+              <div className={cardCls}>
+                <h3 className={cardTitleCls}>{tr('Class resources', 'Risorse di classe')}</h3>
+                <p className="text-xs text-stone-400 -mt-1">
+                  {tr(
+                    'Limited pools such as ki, sorcery points, bardic inspiration or rage uses.',
+                    'Riserve limitate come punti ki, punti stregoneria, ispirazione bardica o usi di ira.'
+                  )}
+                </p>
+                <div className="space-y-2">
+                  {(editingChar.classResources ?? []).map((res, idx) => {
+                    const update = (changes: Partial<ClassResource>) =>
+                      patch({
+                        classResources: (editingChar.classResources ?? []).map((r, i) =>
+                          i === idx ? { ...r, ...changes } : r
+                        ),
+                      });
+                    return (
+                      <div key={res.id} className="flex flex-wrap items-center gap-2">
+                        <input
+                          type="text"
+                          value={res.name}
+                          onChange={(e) => update({ name: e.target.value })}
+                          placeholder={tr('Name (e.g. Ki points)', 'Nome (es. Punti ki)')}
+                          aria-label={tr('Resource name', 'Nome risorsa')}
+                          className={`${inputCls} flex-1 min-w-[10rem]`}
+                        />
+                        <input
+                          type="number"
+                          min={0}
+                          value={res.max}
+                          onChange={(e) =>
+                            update({ max: Math.max(0, Math.floor(Number(e.target.value) || 0)) })
+                          }
+                          aria-label={tr('Maximum', 'Massimo')}
+                          className={`${numCls} w-20`}
+                        />
+                        <select
+                          value={res.recharge}
+                          onChange={(e) => update({ recharge: e.target.value as ClassResource['recharge'] })}
+                          aria-label={tr('Recharge', 'Ricarica')}
+                          className={`${inputCls} w-40`}
+                        >
+                          <option value="long">{tr('Long rest', 'Riposo lungo')}</option>
+                          <option value="short">{tr('Short rest', 'Riposo breve')}</option>
+                          <option value="manual">{tr('Manual only', 'Solo manuale')}</option>
+                        </select>
+                        <button
+                          onClick={() =>
+                            patch({
+                              classResources: (editingChar.classResources ?? []).filter((_, i) => i !== idx),
+                            })
+                          }
+                          aria-label={tr('Remove resource', 'Rimuovi risorsa')}
+                          className="px-2 py-1.5 rounded-lg bg-stone-800 hover:bg-red-900/70 text-stone-300 text-xs"
+                        >
+                          ×
+                        </button>
+                      </div>
+                    );
+                  })}
+                  <button
+                    onClick={() => {
+                      const existing = editingChar.classResources ?? [];
+                      const name = tr('New resource', 'Nuova risorsa');
+                      patch({
+                        classResources: [
+                          ...existing,
+                          { id: newResourceId(existing, name), name, max: 1, recharge: 'long' },
+                        ],
+                      });
+                    }}
+                    className="px-3 py-1.5 rounded-lg bg-stone-800 hover:bg-stone-700 text-amber-200 text-xs font-medium"
+                  >
+                    + {tr('Add resource', 'Aggiungi risorsa')}
+                  </button>
+                </div>
               </div>
               <div className={cardCls}>
                 <h3 className={cardTitleCls}>{tr('Spellcasting', 'Incantesimi')}</h3>

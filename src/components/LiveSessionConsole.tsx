@@ -4,6 +4,7 @@ import {
   AdventureBlueprint,
   CharacterEntity,
   CombatParticipant,
+  DeathSaves,
   EncounterPreset,
   PartyGroup,
   PlayInstance,
@@ -14,10 +15,24 @@ import {
   isPcBlueprint,
 } from '../types/dnd';
 import { useLanguage } from '../i18n/LanguageContext';
-import { useConfirmDelete } from './ConfirmDialog';
+import { useConfirmDelete, useDialogs } from './ConfirmDialog';
 import { HomebreweryRenderer } from './HomebreweryRenderer';
 import { StatblockCard } from './StatblockCard';
 import { LevelUpModal } from './LevelUpModal';
+import { LiveJoinModal } from './LiveJoinModal';
+import { useLiveSession } from '../services/useLiveSession';
+import { InitiativeModal } from './InitiativeModal';
+import { DeathSavesPanel } from './DeathSavesPanel';
+import { PcResourcesPanel } from './PcResourcesPanel';
+import { changeResource, changeSlots } from '../services/spellResources';
+import {
+  DEAD_SAVES,
+  applyDeathSave,
+  damageAtZero,
+  deathStateAtZero,
+  deathStateOf,
+  isInstantDeath,
+} from '../services/deathSaves';
 import { soundboardEngine } from '../services/audioEngine';
 import { downloadOfficialCharacterPdf } from '../services/pdfExporter';
 import {
@@ -43,6 +58,7 @@ import {
   Flame,
   FileDown,
   TrendingUp,
+  QrCode,
 } from 'lucide-react';
 
 interface LiveSessionConsoleProps {
@@ -73,6 +89,7 @@ export const LiveSessionConsole: React.FC<LiveSessionConsoleProps> = ({
 }) => {
   const { lang, tr } = useLanguage();
   const confirmDelete = useConfirmDelete();
+  const { confirm: confirmDialog } = useDialogs();
   const [, setAudioTick] = useState(0);
   const [centerTab, setCenterTab] = useState<'story' | 'combat'>('story');
   const [sideTab, setSideTab] = useState<'scenes' | 'party' | 'sounds' | 'log'>('scenes');
@@ -91,6 +108,17 @@ export const LiveSessionConsole: React.FC<LiveSessionConsoleProps> = ({
   const [hpDeltaInputs, setHpDeltaInputs] = useState<Record<string, string>>({});
 
   const [showRecapModal, setShowRecapModal] = useState(false);
+  const [showJoinModal, setShowJoinModal] = useState(false);
+  // Creatures joining a running combat, waiting for their initiative.
+  const [addDraft, setAddDraft] = useState<{ title: string; participants: CombatParticipant[] } | null>(null);
+  // Combat waiting for the DM to enter (or roll) everyone's initiative before it starts.
+  const [initiativeDraft, setInitiativeDraft] = useState<{
+    title: string;
+    sceneId: string;
+    autoSfxId?: string;
+    firstEvent: string;
+    participants: CombatParticipant[];
+  } | null>(null);
   const [copiedRecap, setCopiedRecap] = useState(false);
 
   // Modal to add an existing PC Blueprint or a custom Session-Only PC to this PlayInstance
@@ -142,6 +170,56 @@ export const LiveSessionConsole: React.FC<LiveSessionConsoleProps> = ({
 
   const currentInstance =
     instances.find((i) => i.id === activeInstanceId) || instances[0];
+
+  const live = useLiveSession(
+    currentInstance,
+    characters,
+    (inst, characterId, nickname) => {
+      const pc = characters.find((c) => c.id === characterId);
+      const st = inst.pcStatus[characterId] || {
+        characterId,
+        hpCurrent: pc?.hpMax ?? 0,
+        tempHp: 0,
+        conditions: [],
+        inspiration: false,
+        sessionNotes: '',
+      };
+      onSaveInstance({
+        ...inst,
+        pcStatus: { ...inst.pcStatus, [characterId]: { ...st, playerOverride: nickname } },
+        lastPlayedAt: new Date().toISOString(),
+      });
+    },
+    (inst, characterId, action) => {
+      const pc = characters.find((c) => c.id === characterId);
+      if (!pc || !inst.partyCharacterIds.includes(characterId)) return;
+      const delta = Math.max(-9, Math.min(9, Math.trunc(Number(action.delta) || 0)));
+      if (delta === 0) return;
+      const st = inst.pcStatus[characterId] || {
+        characterId,
+        hpCurrent: pc.hpMax,
+        tempHp: 0,
+        conditions: [],
+        inspiration: false,
+        sessionNotes: '',
+      };
+      let patch: Partial<typeof st>;
+      if (action.type === 'slot' && Number.isInteger(action.level)) {
+        patch = { slotsUsed: changeSlots(pc, st, action.level as number, delta) };
+      } else if (action.type === 'resource' && typeof action.id === 'string') {
+        patch = { resourcesUsed: changeResource(pc, st, action.id, delta) };
+      } else {
+        return;
+      }
+      const next = {
+        ...inst,
+        pcStatus: { ...inst.pcStatus, [characterId]: { ...st, ...patch } },
+        lastPlayedAt: new Date().toISOString(),
+      };
+      onSaveInstance(next);
+      return next;
+    }
+  );
 
   if (!currentInstance) {
     return (
@@ -325,7 +403,7 @@ export const LiveSessionConsole: React.FC<LiveSessionConsoleProps> = ({
           sourceCharacterId: ch.id,
           name: runtime?.customNameOverride || ch.name,
           kind: 'pc' as const,
-          initiative: rollD20(ch.initiativeBonus),
+          initiative: 0, // filled in by the initiative dialog
           ac: ch.ac,
           hpCurrent: runtime ? runtime.hpCurrent : ch.hpMax,
           hpMax: ch.hpMax,
@@ -352,7 +430,7 @@ export const LiveSessionConsole: React.FC<LiveSessionConsoleProps> = ({
           sourceCharacterId: monster.id,
           name: `${slot.customLabel || monster.name}${suffix}`,
           kind: monster.kind,
-          initiative: rollD20(monster.initiativeBonus),
+          initiative: 0, // filled in by the initiative dialog
           ac: monster.ac,
           hpCurrent: monster.hpMax,
           hpMax: monster.hpMax,
@@ -364,52 +442,54 @@ export const LiveSessionConsole: React.FC<LiveSessionConsoleProps> = ({
       }
     });
 
-    const all = [...partyParticipants, ...monsterParticipants].sort(
-      (a, b) => b.initiative - a.initiative
-    );
+    setInitiativeDraft({
+      title: preset.name,
+      sceneId: currentScene.id,
+      autoSfxId: preset.autoSfxId,
+      firstEvent: tr(`Round 1 started: ${preset.name}`, `Round 1 iniziato: ${preset.name}`),
+      participants: [...partyParticipants, ...monsterParticipants],
+    });
+  };
 
-    if (preset.autoSfxId) {
-      const sfx = sfxMap.get(preset.autoSfxId);
+  const startAdHocCombat = () => {
+    setInitiativeDraft({
+      title: tr(
+        `Unplanned Encounter (${currentScene.code})`,
+        `Scontro Imprevisto (${currentScene.code})`
+      ),
+      sceneId: currentScene.id,
+      firstEvent: tr(
+        `Ad-hoc encounter started in scene ${currentScene.title}`,
+        `Scontro improvviso avviato nella scena ${currentScene.title}`
+      ),
+      participants: buildPartyCombatants(),
+    });
+  };
+
+  const confirmInitiative = (initiatives: Record<string, number>) => {
+    if (!initiativeDraft) return;
+    const ordered = initiativeDraft.participants
+      .map((p) => ({ ...p, initiative: initiatives[p.id] ?? 0 }))
+      .sort((a, b) => b.initiative - a.initiative);
+
+    if (initiativeDraft.autoSfxId) {
+      const sfx = sfxMap.get(initiativeDraft.autoSfxId);
       if (sfx) soundboardEngine.play(sfx);
     }
 
     const combatState: ActiveCombatState = {
       isActive: true,
-      encounterTitle: preset.name,
-      sceneId: currentScene.id,
+      encounterTitle: initiativeDraft.title,
+      sceneId: initiativeDraft.sceneId,
       round: 1,
       turnIndex: 0,
       startedAt: new Date().toISOString(),
-      participants: all,
-      combatEvents: [tr(`Round 1 started: ${preset.name}`, `Round 1 iniziato: ${preset.name}`)],
+      participants: ordered,
+      combatEvents: [initiativeDraft.firstEvent],
     };
 
     updateInstance({ activeCombat: combatState });
-    setCenterTab('combat');
-  };
-
-  const startAdHocCombat = () => {
-    const partyParticipants = buildPartyCombatants();
-    const sorted = partyParticipants.sort((a, b) => b.initiative - a.initiative);
-    const combatState: ActiveCombatState = {
-      isActive: true,
-      encounterTitle: tr(
-        `Unplanned Encounter (${currentScene.code})`,
-        `Scontro Imprevisto (${currentScene.code})`
-      ),
-      sceneId: currentScene.id,
-      round: 1,
-      turnIndex: 0,
-      startedAt: new Date().toISOString(),
-      participants: sorted,
-      combatEvents: [
-        tr(
-          `Ad-hoc encounter started in scene ${currentScene.title}`,
-          `Scontro improvviso avviato nella scena ${currentScene.title}`
-        ),
-      ],
-    };
-    updateInstance({ activeCombat: combatState });
+    setInitiativeDraft(null);
     setCenterTab('combat');
   };
 
@@ -449,10 +529,12 @@ export const LiveSessionConsole: React.FC<LiveSessionConsoleProps> = ({
   const applyHpChange = (participantId: string, delta: number) => {
     const combat = currentInstance.activeCombat;
     if (!combat) return;
+    const events: string[] = [];
     const nextParticipants = combat.participants.map((p) => {
       if (p.id !== participantId) return p;
       let nextHp = p.hpCurrent;
       let nextTemp = p.tempHp;
+      let saves = p.deathSaves;
 
       if (delta < 0) {
         let dmg = Math.abs(delta);
@@ -461,15 +543,94 @@ export const LiveSessionConsole: React.FC<LiveSessionConsoleProps> = ({
           nextTemp -= absorbed;
           dmg -= absorbed;
         }
-        nextHp = Math.max(0, nextHp - dmg);
+        const raw = p.hpCurrent - dmg;
+        nextHp = Math.max(0, raw);
+
+        // Player characters at 0 HP are dying rather than dead: damage feeds the death saves.
+        if (p.kind === 'pc' && dmg > 0) {
+          const before = deathStateOf(p.hpCurrent, p.deathSaves);
+          if (p.hpCurrent === 0) {
+            saves = isInstantDeath(dmg, p.hpMax) ? DEAD_SAVES : damageAtZero(p.deathSaves);
+          } else if (raw < 0 && isInstantDeath(-raw, p.hpMax)) {
+            saves = DEAD_SAVES;
+          }
+          const after = deathStateOf(nextHp, saves);
+          if (after === 'dead' && before !== 'dead') {
+            events.push(tr(`${p.name} dies`, `${p.name} muore`));
+          } else if (nextHp === 0 && p.hpCurrent > 0) {
+            events.push(tr(`${p.name} drops to 0 HP`, `${p.name} scende a 0 PF`));
+          }
+        }
       } else {
         nextHp = Math.min(p.hpMax, nextHp + delta);
+        if (p.kind === 'pc' && p.hpCurrent === 0 && nextHp > 0) {
+          saves = undefined;
+          events.push(tr(`${p.name} regains consciousness`, `${p.name} riprende i sensi`));
+        }
       }
 
-      return { ...p, hpCurrent: nextHp, tempHp: nextTemp };
+      return { ...p, hpCurrent: nextHp, tempHp: nextTemp, deathSaves: saves };
     });
 
-    updateCombat({ participants: nextParticipants });
+    updateCombat({
+      participants: nextParticipants,
+      ...(events.length > 0 ? { combatEvents: [...events, ...combat.combatEvents] } : {}),
+    });
+  };
+
+  const recordDeathSave = (participantId: string, roll: number) => {
+    const combat = currentInstance.activeCombat;
+    const target = combat?.participants.find((p) => p.id === participantId);
+    if (!combat || !target) return;
+    const { saves, outcome } = applyDeathSave(target.deathSaves, roll);
+    const hp = outcome === 'revived' ? 1 : target.hpCurrent;
+    const state = deathStateOf(hp, saves);
+    const base =
+      outcome === 'revived'
+        ? tr(
+            `${target.name} rolls a 20 on a death save and is back with 1 HP`,
+            `${target.name} fa 20 al tiro contro morte e torna con 1 PF`
+          )
+        : outcome === 'success'
+          ? tr(`${target.name} death save ${roll}: success`, `${target.name} tiro contro morte ${roll}: successo`)
+          : outcome === 'failure'
+            ? tr(`${target.name} death save ${roll}: failure`, `${target.name} tiro contro morte ${roll}: fallimento`)
+            : tr(
+                `${target.name} rolls a 1 on a death save: two failures`,
+                `${target.name} fa 1 al tiro contro morte: due fallimenti`
+              );
+    const suffix =
+      state === 'stable'
+        ? tr(' — stable', ' — stabile')
+        : state === 'dead'
+          ? tr(' — dead', ' — morto')
+          : '';
+    updateCombat({
+      participants: combat.participants.map((p) =>
+        p.id === participantId ? { ...p, hpCurrent: hp, deathSaves: saves } : p
+      ),
+      combatEvents: [base + suffix, ...combat.combatEvents],
+    });
+  };
+
+  const setDeathSaves = (participantId: string, saves: DeathSaves) => {
+    const combat = currentInstance.activeCombat;
+    const target = combat?.participants.find((p) => p.id === participantId);
+    if (!combat || !target) return;
+    const before = deathStateOf(target.hpCurrent, target.deathSaves);
+    const after = deathStateOf(target.hpCurrent, saves);
+    const events: string[] = [];
+    if (after !== before && after === 'stable') {
+      events.push(tr(`${target.name} is stable`, `${target.name} è stabile`));
+    } else if (after !== before && after === 'dead') {
+      events.push(tr(`${target.name} dies`, `${target.name} muore`));
+    }
+    updateCombat({
+      participants: combat.participants.map((p) =>
+        p.id === participantId ? { ...p, deathSaves: saves } : p
+      ),
+      ...(events.length > 0 ? { combatEvents: [...events, ...combat.combatEvents] } : {}),
+    });
   };
 
   const toggleParticipantCondition = (participantId: string, condition: string) => {
@@ -500,7 +661,7 @@ export const LiveSessionConsole: React.FC<LiveSessionConsoleProps> = ({
         sourceCharacterId: char.id,
         name: `${char.name}${suffix}`,
         kind: char.kind,
-        initiative: rollD20(char.initiativeBonus),
+        initiative: 0, // filled in by the initiative dialog
         ac: char.ac,
         hpCurrent: char.hpMax,
         hpMax: char.hpMax,
@@ -510,20 +671,46 @@ export const LiveSessionConsole: React.FC<LiveSessionConsoleProps> = ({
         notes: char.levelOrCr,
       });
     }
-    const merged = [...combat.participants, ...added].sort(
-      (a, b) => b.initiative - a.initiative
-    );
+    setAddDraft({ title: combat.encounterTitle, participants: added });
+  };
+
+  const confirmAddedCreatures = (initiatives: Record<string, number>) => {
+    const combat = currentInstance.activeCombat;
+    if (!combat || !addDraft) return;
+    const added = addDraft.participants.map((p) => ({ ...p, initiative: initiatives[p.id] ?? 0 }));
+    // Keep the turn on whoever is acting now, wherever the newcomers land in the order.
+    const actingId = combat.participants[combat.turnIndex]?.id;
+    const merged = [...combat.participants, ...added].sort((a, b) => b.initiative - a.initiative);
+    const turnIndex = Math.max(0, merged.findIndex((p) => p.id === actingId));
+    const label =
+      added.length === 1 ? added[0].name : `${added.length}× ${added[0].name.replace(/ #\d+$/, '')}`;
     updateCombat({
       participants: merged,
+      turnIndex,
       combatEvents: [
-        tr(
-          `Added to encounter: ${count}× ${char.name}`,
-          `Aggiunti allo scontro: ${count}× ${char.name}`
-        ),
+        tr(`Added to encounter: ${label}`, `Aggiunti allo scontro: ${label}`),
         ...combat.combatEvents,
       ],
     });
+    setAddDraft(null);
     setCenterTab('combat');
+  };
+
+  // Drops the running combat as if it never started: nothing is logged and hit points are not
+  // synced back, so everyone keeps the values they had before the fight.
+  const cancelCombat = async () => {
+    if (!currentInstance.activeCombat) return;
+    const ok = await confirmDialog({
+      title: tr('Cancel this combat?', 'Annullare questo combattimento?'),
+      message: tr(
+        'Nothing is added to the timeline and hit points changed during the fight are discarded.',
+        'Non viene aggiunto nulla al diario e i punti ferita cambiati durante lo scontro vengono scartati.'
+      ),
+      confirmLabel: tr('Cancel combat', 'Annulla combattimento'),
+      cancelLabel: tr('Keep fighting', 'Continua'),
+      danger: true,
+    });
+    if (ok) updateInstance({ activeCombat: null });
   };
 
   const finishAndLogCombat = () => {
@@ -549,6 +736,22 @@ export const LiveSessionConsole: React.FC<LiveSessionConsoleProps> = ({
     const defeated = combat.participants
       .filter((p) => p.kind !== 'pc' && p.hpCurrent === 0)
       .map((p) => p.name);
+    const fallen = combat.participants
+      .filter((p) => p.kind === 'pc' && p.hpCurrent === 0)
+      .map((p) => {
+        const state = deathStateOf(0, p.deathSaves);
+        const label =
+          state === 'dead'
+            ? tr('dead', 'morto')
+            : state === 'stable'
+              ? tr('stable', 'stabile')
+              : tr('dying', 'morente');
+        return `${p.name} (${label})`;
+      });
+    const fallenNote =
+      fallen.length > 0
+        ? tr(` Fallen heroes: ${fallen.join(', ')}.`, ` Eroi caduti: ${fallen.join(', ')}.`)
+        : '';
 
     const logEntry: SessionLogEntry = {
       id: `log-combat-${Date.now()}`,
@@ -561,7 +764,7 @@ export const LiveSessionConsole: React.FC<LiveSessionConsoleProps> = ({
         `Vittoria: ${combat.encounterTitle} (${combat.round} round)`
       ),
       details:
-        defeated.length > 0
+        (defeated.length > 0
           ? tr(
               `Defeated enemies: ${defeated.join(', ')}. PC status synced.`,
               `Nemici sconfitti: ${defeated.join(', ')}. Stato PG sincronizzato.`
@@ -569,7 +772,7 @@ export const LiveSessionConsole: React.FC<LiveSessionConsoleProps> = ({
           : tr(
               `Encounter concluded after ${combat.round} rounds.`,
               `Scontro concluso dopo ${combat.round} round.`
-            ),
+            )) + fallenNote,
       pinnedForRecap: true,
     };
 
@@ -722,6 +925,14 @@ export const LiveSessionConsole: React.FC<LiveSessionConsoleProps> = ({
             {hideDmNotes
               ? tr('Player view', 'Vista giocatori')
               : tr('DM view', 'Vista DM')}
+          </button>
+
+          <button
+            onClick={() => setShowJoinModal(true)}
+            className="px-3 py-1.5 rounded-lg bg-stone-900 hover:bg-stone-800 border border-stone-800 text-stone-200 font-medium text-xs flex items-center gap-1.5"
+          >
+            <QrCode className="w-4 h-4" />{' '}
+            {tr('Players (QR)', 'Giocatori (QR)')}
           </button>
 
           <button
@@ -910,6 +1121,14 @@ export const LiveSessionConsole: React.FC<LiveSessionConsoleProps> = ({
                       >
                         🏁 {tr('End & Log to Timeline', 'Termina & Registra nel Diario')}
                       </button>
+                      <button
+                        onClick={cancelCombat}
+                        title={tr('Discard this combat without logging it', 'Scarta questo combattimento senza registrarlo')}
+                        className="px-3 py-2 rounded-lg bg-stone-800 hover:bg-red-900/70 text-stone-300 hover:text-red-100 font-bold text-xs flex items-center gap-1.5"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                        {tr('Cancel', 'Annulla')}
+                      </button>
                     </div>
                   </div>
 
@@ -953,7 +1172,9 @@ export const LiveSessionConsole: React.FC<LiveSessionConsoleProps> = ({
                   <div className="space-y-2 max-h-[42vh] overflow-y-auto pr-1">
                     {currentInstance.activeCombat.participants.map((p, idx) => {
                       const isTurn = idx === currentInstance.activeCombat!.turnIndex;
-                      const isDead = p.hpCurrent === 0;
+                      // A player character at 0 HP is dying (or stable) until the death saves say otherwise.
+                      const death = p.kind === 'pc' && p.hpCurrent === 0 ? deathStateAtZero(p.deathSaves) : null;
+                      const isDead = p.kind === 'pc' ? death === 'dead' : p.hpCurrent === 0;
                       const deltaVal = Number(hpDeltaInputs[p.id] || 5);
                       return (
                         <div
@@ -1067,6 +1288,16 @@ export const LiveSessionConsole: React.FC<LiveSessionConsoleProps> = ({
                               </button>
                             </div>
                           </div>
+
+                          {death && (
+                            <DeathSavesPanel
+                              state={death}
+                              saves={p.deathSaves}
+                              isTurn={isTurn}
+                              onRoll={(roll) => recordDeathSave(p.id, roll)}
+                              onChange={(saves) => setDeathSaves(p.id, saves)}
+                            />
+                          )}
 
                           {/* Conditions Bar */}
                           <div className="mt-2 pt-2 border-t border-stone-900 flex flex-wrap items-center gap-1.5">
@@ -1399,6 +1630,8 @@ export const LiveSessionConsole: React.FC<LiveSessionConsoleProps> = ({
                         </button>
                       </div>
                     </div>
+
+                    <PcResourcesPanel pc={pc} status={st} onChange={updatePc} />
 
                     <input
                       type="text"
@@ -1857,6 +2090,52 @@ export const LiveSessionConsole: React.FC<LiveSessionConsoleProps> = ({
       )}
 
       {/* Markdown Recap Modal */}
+      {showJoinModal && (
+        <LiveJoinModal
+          live={live}
+          showable={characters
+            .filter((c) => !c.isPreGenBlueprint)
+            .map((c) => ({ id: c.id, name: c.name, kind: c.kind }))}
+          players={currentInstance.partyCharacterIds
+            .map((id) => charMap.get(id))
+            .filter((c): c is CharacterEntity => Boolean(c))
+            .map((c) => ({
+              id: c.id,
+              name: currentInstance.pcStatus[c.id]?.customNameOverride || c.name,
+            }))}
+          onClose={() => setShowJoinModal(false)}
+        />
+      )}
+
+      {addDraft && (
+        <InitiativeModal
+          title={addDraft.title}
+          confirmLabel={tr('Add to combat', 'Aggiungi al combattimento')}
+          rows={addDraft.participants.map((p) => ({
+            id: p.id,
+            name: p.name,
+            kind: p.kind,
+            bonus: (p.sourceCharacterId && charMap.get(p.sourceCharacterId)?.initiativeBonus) || 0,
+          }))}
+          onConfirm={confirmAddedCreatures}
+          onCancel={() => setAddDraft(null)}
+        />
+      )}
+
+      {initiativeDraft && (
+        <InitiativeModal
+          title={initiativeDraft.title}
+          rows={initiativeDraft.participants.map((p) => ({
+            id: p.id,
+            name: p.name,
+            kind: p.kind,
+            bonus: (p.sourceCharacterId && charMap.get(p.sourceCharacterId)?.initiativeBonus) || 0,
+          }))}
+          onConfirm={confirmInitiative}
+          onCancel={() => setInitiativeDraft(null)}
+        />
+      )}
+
       {showRecapModal && (
         <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-stone-900 border border-stone-700 rounded-2xl max-w-2xl w-full p-6 space-y-4 shadow-2xl">
