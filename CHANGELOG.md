@@ -4,6 +4,8 @@ All notable user-facing changes to Vellum are documented in this file.
 
 ## Unreleased
 
+## Windows 0.1.5 — 2026-10-25
+
 - Windows: Fix CLI bundling in installer by mapping resources directly to `bin/`, ensuring only `bin/` is in user PATH, providing dedicated `vellum-cli` aliases, and making `vellum.exe` CLI-aware so executing subcommands from a terminal runs the CLI instead of launching the GUI window.
 
 ## Windows 0.1.4 — 2026-10-25
