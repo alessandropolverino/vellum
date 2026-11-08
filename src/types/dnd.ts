@@ -268,6 +268,7 @@ export interface AdventureBlueprint {
 }
 
 export type SessionLogCategory =
+  | 'general'
   | 'narrative'
   | 'choice'
   | 'combat'
