@@ -190,6 +190,16 @@ export interface SfxItem {
   tags: string[];
 }
 
+/** A taggable image with a caption (`@asset[id]`), e.g. a handout, map or illustration. */
+export interface Asset {
+  id: string;
+  name: string;
+  caption: string;
+  /** Image as a data URL (downscaled when uploaded). */
+  imageUrl: string;
+  tags: string[];
+}
+
 export interface EncounterSlot {
   characterId: string;
   count: number;
@@ -348,6 +358,7 @@ export interface DndDatabase {
   characters: CharacterEntity[];
   parties: PartyGroup[];
   sfxCatalog: SfxItem[];
+  assets: Asset[];
   playInstances: PlayInstance[];
 }
 

@@ -558,6 +558,7 @@ pub fn run() {
             live::live_set_view,
             live::live_release,
             live::live_set_shared,
+            live::live_set_shown_for,
             live::live_set_portrait
         ])
         .build(tauri::generate_context!())

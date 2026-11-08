@@ -152,6 +152,7 @@ export function loadDb(options = {}) {
       characters: [],
       parties: [],
       sfxCatalog: [],
+      assets: [],
       playInstances: [],
     };
   }
@@ -171,6 +172,7 @@ export function ensureDbArrays(db) {
   if (!Array.isArray(db.characters)) db.characters = [];
   if (!Array.isArray(db.parties)) db.parties = [];
   if (!Array.isArray(db.sfxCatalog)) db.sfxCatalog = [];
+  if (!Array.isArray(db.assets)) db.assets = [];
   if (!Array.isArray(db.playInstances)) db.playInstances = [];
   return db;
 }
@@ -240,6 +242,19 @@ export function validateDb(db) {
   const campaignIds = new Set(db.campaigns.map((c) => c.id));
   const adventureIds = new Set(db.adventures.map((a) => a.id));
   const sfxIds = new Set(db.sfxCatalog.map((s) => s.id));
+
+  // Check asset unique IDs and images
+  const seenAssetIds = new Set();
+  const seenAssetNames = new Set();
+  for (const asset of db.assets) {
+    if (!asset.id) errors.push(`Asset has missing id: "${asset.name || 'unnamed'}"`);
+    else if (seenAssetIds.has(asset.id)) errors.push(`Duplicate asset id: "${asset.id}"`);
+    seenAssetIds.add(asset.id);
+    if (seenAssetNames.has(String(asset.name).toLowerCase())) {
+      warnings.push(`Duplicate asset name "${asset.name}": @asset[name] tags are ambiguous.`);
+    }
+    seenAssetNames.add(String(asset.name).toLowerCase());
+  }
 
   // Check character unique IDs
   const seenCharIds = new Set();
@@ -345,6 +360,7 @@ export function getDbStats(db, dbPath) {
       monsters: monstersCount,
       parties: db.parties.length,
       sfx: db.sfxCatalog.length,
+      assets: db.assets.length,
       playInstances: db.playInstances.length,
     },
   };

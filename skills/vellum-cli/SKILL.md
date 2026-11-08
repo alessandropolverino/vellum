@@ -31,7 +31,7 @@ node bin/vellum.mjs <command> [subcommand] [arguments] [options]
 
 ### Database (`db`)
 - `npm run cli -- db stats --json`
-  Returns entity counts (campaigns, adventures, scenes, characters, parties, instances, sfx), file size, and timestamps.
+  Returns entity counts (campaigns, adventures, scenes, characters, parties, instances, sfx, assets), file size, and timestamps.
 - `npm run cli -- db validate --json`
   Validates database integrity: schema errors, duplicate IDs, and dangling foreign key references.
 - `npm run cli -- db backup [--output <path>] --json`
@@ -203,6 +203,25 @@ node bin/vellum.mjs <command> [subcommand] [arguments] [options]
   ```bash
   npm run cli -- parties add-member <partyId> <characterId> --json
   npm run cli -- parties remove-member <partyId> <characterId> --json
+  ```
+
+---
+
+### Assets (`assets`)
+Images with a caption, taggable in scene text as `@asset[<name>]` (case-insensitive; the id also works). The image is optional. In the Live Console a click on the tag opens the image and lets the DM show it to all connected players or only some of them.
+- **List / get** (image data is omitted unless `--full`):
+  ```bash
+  npm run cli -- assets list [--tag <tag>] [--search <query>] --json
+  npm run cli -- assets get <assetId> [--full] --json
+  ```
+- **Create** (names must be unique and without `[ ]`; optional `--image` takes a png/jpg/webp/gif file path or a data URL):
+  ```bash
+  npm run cli -- assets create --name "Tavern map" --image ./tavern.png --caption "The Silver Stag" --tags "map,tavern" --json
+  ```
+- **Update / delete**:
+  ```bash
+  npm run cli -- assets update <assetId> --caption "New caption" [--image ./new.png | --clear-image] --json
+  npm run cli -- assets delete <assetId> --json
   ```
 
 ---

@@ -1,5 +1,6 @@
 import {
   AdventureBlueprint,
+  Asset,
   AdventureScene,
   Campaign,
   CharacterEntity,
@@ -25,6 +26,7 @@ export interface IntegrationSummary {
   addedParties: number;
   addedInstances: number;
   addedSfx: number;
+  addedAssets: number;
   totalEntitiesAdded: number;
 }
 
@@ -193,6 +195,16 @@ export function normalizeDatabase(raw: unknown): DndDatabase {
       }))
     : [];
 
+  const assets: Asset[] = Array.isArray(candidate.assets)
+    ? candidate.assets.map((a: any): Asset => ({
+        id: String(a?.id || `asset-${Date.now()}`),
+        name: String(a?.name || 'Asset'),
+        caption: String(a?.caption || ''),
+        imageUrl: typeof a?.imageUrl === 'string' ? a.imageUrl : '',
+        tags: Array.isArray(a?.tags) ? a.tags.map(String) : [],
+      }))
+    : [];
+
   const playInstances: PlayInstance[] = Array.isArray(candidate.playInstances)
     ? candidate.playInstances.map((inst: any): PlayInstance => ({
         id: String(inst?.id || `inst-${Date.now()}`),
@@ -225,6 +237,7 @@ export function normalizeDatabase(raw: unknown): DndDatabase {
     characters,
     parties,
     sfxCatalog,
+    assets,
     playInstances,
   };
 }
@@ -342,6 +355,7 @@ export function integrateDatabaseBackup(
   let addedParties = 0;
   let addedInstances = 0;
   let addedSfx = 0;
+  let addedAssets = 0;
 
   const nextCampaigns = [...currentDb.campaigns];
   for (const c of incoming.campaigns) {
@@ -391,7 +405,16 @@ export function integrateDatabaseBackup(
     }
   }
 
+  const nextAssets = [...currentDb.assets];
+  for (const a of incoming.assets) {
+    if (!nextAssets.some((existing) => existing.id === a.id)) {
+      nextAssets.push(a);
+      addedAssets++;
+    }
+  }
+
   const totalEntitiesAdded =
+    addedAssets +
     addedCampaigns +
     addedAdventures +
     addedCharacters +
@@ -407,6 +430,7 @@ export function integrateDatabaseBackup(
     parties: nextParties,
     playInstances: nextInstances,
     sfxCatalog: nextSfx,
+    assets: nextAssets,
     lastSavedAt: new Date().toISOString(),
   };
 
@@ -419,6 +443,7 @@ export function integrateDatabaseBackup(
       addedParties,
       addedInstances,
       addedSfx,
+      addedAssets,
       totalEntitiesAdded,
     },
   };

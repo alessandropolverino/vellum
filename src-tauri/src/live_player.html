@@ -45,6 +45,13 @@
       .pill { font-size: 12px; font-weight: 500; padding: 4px 10px; border-radius: 99px; background: #422f0a; color: #fde68a; white-space: nowrap; margin-left: auto; margin-right: 6px; }
       .pick { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 14px; background: var(--s1); border: 1px solid var(--ln); width: 100%; text-align: left; }
       .pick:disabled { opacity: .4; }
+      .pickrow { display: flex; flex-direction: column; gap: 6px; }
+      .pickrow .pick { padding-right: 8px; }
+      .more { align-self: flex-start; font-size: 12px; color: var(--mu); padding: 2px 6px; }
+      .pdet { background: var(--s1); border: 1px solid var(--ln); border-radius: 12px; padding: 10px 12px; font-size: 13px; line-height: 1.45; display: flex; flex-direction: column; gap: 8px; }
+      .pdet .abs { display: grid; grid-template-columns: repeat(6, 1fr); gap: 4px; text-align: center; font-size: 11px; color: var(--mu); }
+      .pdet .abs b { display: block; font-size: 14px; color: inherit; font-weight: 600; }
+      .pdet .k { font-size: 11px; text-transform: uppercase; letter-spacing: .04em; color: var(--mu); }
       .pick b { display: block; font-weight: 500; font-size: 15px; }
       .pick small { font-size: 12px; color: var(--mu); }
       .inp { width: 100%; height: 46px; border-radius: 12px; border: 1px solid var(--ln); background: var(--s1); padding: 0 12px; font-size: 16px; }
@@ -73,6 +80,8 @@
       .sheetc { width: 100%; max-width: 520px; background: var(--s1); border-top: 1px solid var(--ln); border-radius: 24px 24px 0 0; padding: 14px 16px calc(18px + env(safe-area-inset-bottom)); display: flex; flex-direction: column; gap: 10px; }
       .big-img { width: 100%; aspect-ratio: 1 / 1; max-height: 52vh; border-radius: 14px; background: var(--s2); overflow: hidden; display: flex; align-items: center; justify-content: center; font-size: 40px; color: var(--mu); }
       .big-img img { width: 100%; height: 100%; object-fit: cover; }
+      .big-img.fit { aspect-ratio: auto; background: #000; }
+      .big-img.fit img { height: auto; max-height: 60vh; object-fit: contain; }
       .gbtn { height: 44px; border-radius: 12px; background: var(--s2); border: 0; font-size: 15px; width: 100%; }
       .death { display: flex; flex-direction: column; gap: 10px; }
       .death.dying { background: #2a2008; border-color: var(--am); }
@@ -176,16 +185,58 @@
               return;
             }
             items.forEach(function (it) {
+              var wrap = el("div", "pickrow");
               var b = el("button", "pick");
               var info = el("span"); info.style.flex = "1";
               add(info, el("b", null, it.name), el("small", null, it.claimed ? t("Already taken", "Già scelto") : it.subtitle));
-              add(b, el("div", "av", initials(it.name)), info);
+              add(b, avatar(it.name, it.id, it.icon), info);
               b.disabled = it.claimed;
               b.onclick = function () { claim(it.id); };
-              list.appendChild(b);
+              wrap.appendChild(b);
+              if (it.details) {
+                var open = false, det = null;
+                var more = el("button", "more", t("Show details ▾", "Mostra dettagli ▾"));
+                more.onclick = function () {
+                  open = !open;
+                  more.textContent = open ? t("Hide details ▴", "Nascondi dettagli ▴") : t("Show details ▾", "Mostra dettagli ▾");
+                  if (open) { det = pickerDetails(it.details); wrap.appendChild(det); }
+                  else if (det) { wrap.removeChild(det); det = null; }
+                };
+                wrap.insertBefore(more, null);
+              }
+              list.appendChild(wrap);
             });
           })
           .catch(function () { list.appendChild(el("p", "err", t("Session not available.", "Sessione non disponibile."))); });
+      }
+      // Read-only summary of a hero so a player can choose with some context.
+      function pickerDetails(d) {
+        var box = el("div", "pdet");
+        var line = [];
+        if (d.ac != null) line.push(t("AC", "CA") + " " + d.ac);
+        if (d.hpMax != null) line.push(t("HP", "PF") + " " + d.hpMax);
+        if (d.speed) line.push(d.speed);
+        if (line.length) add(box, el("div", null, line.join(" · ")));
+        if (d.abilities && d.abilities.length) {
+          var abs = el("div", "abs");
+          d.abilities.forEach(function (a) {
+            var c = el("div"); add(c, el("b", null, String(a.score)), el("span", null, a.key.toUpperCase() + " " + a.mod));
+            abs.appendChild(c);
+          });
+          box.appendChild(abs);
+        }
+        function sec(label, text) {
+          if (!text) return;
+          var s = el("div");
+          add(s, el("div", "k", label), el("div", null, text));
+          box.appendChild(s);
+        }
+        sec(t("Background", "Background"), d.background);
+        sec(t("Skills", "Abilità"), d.skills);
+        sec(t("Languages", "Linguaggi"), d.languages);
+        sec(t("Personality", "Personalità"), d.personality);
+        sec(t("Story", "Storia"), d.biography);
+        return box;
       }
       function claim(id) {
         var nick = nickInput ? nickInput.value.trim() : "";
@@ -490,16 +541,16 @@
         if (!it || S.dismissed === JSON.stringify(it)) return;
         var d = el("div", "dim"), sh = el("div", "sheetc");
         add(sh, el("span", "chip am", t("Shown by the DM", "Mostrato dal master")));
-        var img = el("div", "big-img", initials(it.title));
+        var img = el("div", "big-img" + (it.fit === "contain" ? " fit" : ""), it.fit === "contain" ? "" : initials(it.title));
         if (it.icon) {
           var im = document.createElement("img"); im.alt = "";
           im.onload = function () { img.textContent = ""; img.appendChild(im); };
-          im.src = iconUrl("shown", it.icon);
+          im.src = iconUrl(it.iconId || "shown", it.icon);
         }
         var cap = el("div"); add(cap, el("h1", null, it.title), it.subtitle ? el("p", "sub", it.subtitle) : null);
         var close = el("button", "gbtn", t("Close", "Chiudi"));
         close.onclick = function () { S.dismissed = JSON.stringify(it); renderShown(); };
-        add(sh, img, cap, close); d.appendChild(sh); overHost.appendChild(d);
+        add(sh, it.fit === "contain" && !it.icon ? null : img, cap, close); d.appendChild(sh); overHost.appendChild(d);
       }
       function onCombat(prev) {
         var mine = false;

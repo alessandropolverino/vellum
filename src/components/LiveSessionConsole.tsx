@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import {
   ActiveCombatState,
   AdventureBlueprint,
+  Asset,
   CharacterEntity,
   CombatParticipant,
   DeathSaves,
@@ -20,6 +21,7 @@ import { HomebreweryRenderer } from './HomebreweryRenderer';
 import { StatblockCard } from './StatblockCard';
 import { LevelUpModal } from './LevelUpModal';
 import { LiveJoinModal } from './LiveJoinModal';
+import { AssetPreviewCard, ShareToPlayersPanel } from './ShareToPlayersPanel';
 import { useLiveSession } from '../services/useLiveSession';
 import { InitiativeModal } from './InitiativeModal';
 import { DeathSavesPanel } from './DeathSavesPanel';
@@ -67,6 +69,7 @@ interface LiveSessionConsoleProps {
   characters: CharacterEntity[];
   parties: PartyGroup[];
   sfxCatalog: SfxItem[];
+  assets: Asset[];
   activeInstanceId: string;
   onSelectInstance: (id: string) => void;
   onSaveInstance: (inst: PlayInstance) => void;
@@ -80,6 +83,7 @@ export const LiveSessionConsole: React.FC<LiveSessionConsoleProps> = ({
   adventures,
   characters,
   sfxCatalog,
+  assets,
   activeInstanceId,
   onSelectInstance,
   onSaveInstance,
@@ -95,6 +99,7 @@ export const LiveSessionConsole: React.FC<LiveSessionConsoleProps> = ({
   const [sideTab, setSideTab] = useState<'scenes' | 'party' | 'sounds' | 'log'>('scenes');
   const [hideDmNotes, setHideDmNotes] = useState(false);
   const [inspectedChar, setInspectedChar] = useState<CharacterEntity | null>(null);
+  const [inspectedAsset, setInspectedAsset] = useState<Asset | null>(null);
   const [levelUpPc, setLevelUpPc] = useState<CharacterEntity | null>(null);
 
   const [logCategory, setLogCategory] = useState<SessionLogCategory>('choice');
@@ -218,8 +223,21 @@ export const LiveSessionConsole: React.FC<LiveSessionConsoleProps> = ({
       };
       onSaveInstance(next);
       return next;
-    }
+    },
+    assets
   );
+
+  const shareNames: Record<string, string> = Object.fromEntries(
+    (currentInstance?.partyCharacterIds ?? []).map((id) => [
+      id,
+      currentInstance?.pcStatus[id]?.customNameOverride || characters.find((c) => c.id === id)?.name || id,
+    ])
+  );
+  const shownName = live.share
+    ? live.share.ref.kind === 'asset'
+      ? assets.find((a) => a.id === live.share!.ref.id)?.name ?? null
+      : characters.find((c) => c.id === live.share!.ref.id)?.name ?? null
+    : null;
 
   if (!currentInstance) {
     return (
@@ -1034,6 +1052,8 @@ export const LiveSessionConsole: React.FC<LiveSessionConsoleProps> = ({
                   markdown={currentScene.homebreweryMarkdown}
                   characters={characters}
                   sfxCatalog={sfxCatalog}
+                  assets={assets}
+                  onSelectAsset={(a) => setInspectedAsset(a)}
                   encounters={currentScene.encounters}
                   hideDmNotes={hideDmNotes}
                   onSelectCharacter={(ch) => setInspectedChar(ch)}
@@ -2028,22 +2048,52 @@ export const LiveSessionConsole: React.FC<LiveSessionConsoleProps> = ({
 
       {/* Character Inspector Modal */}
       {inspectedChar && (
-        <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="max-w-2xl w-full max-h-[90vh] overflow-y-auto relative">
-            <button
-              onClick={() => setInspectedChar(null)}
-              className="absolute top-3 right-3 z-10 p-1.5 rounded-full bg-[#58180D] text-amber-100 hover:bg-red-800 shadow-lg"
-            >
-              <X className="w-4 h-4" />
-            </button>
-            <StatblockCard
-              character={inspectedChar}
-              runtimeOverrides={currentInstance.pcStatus[inspectedChar.id]}
-              onLevelUp={(ch) => setLevelUpPc(ch)}
-              onAddToCombat={(ch) => {
-                handleAddCreatureToActiveCombat(ch, 1);
-                setInspectedChar(null);
-              }}
+        <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
+          <div className="flex flex-col lg:flex-row items-start gap-4 w-full max-w-4xl max-h-[90vh]">
+            <div className="flex-1 min-w-0 w-full max-w-2xl max-h-[90vh] overflow-y-auto relative">
+              <button
+                onClick={() => setInspectedChar(null)}
+                className="absolute top-3 right-3 z-10 p-1.5 rounded-full bg-[#58180D] text-amber-100 hover:bg-red-800 shadow-lg"
+              >
+                <X className="w-4 h-4" />
+              </button>
+              <StatblockCard
+                character={inspectedChar}
+                runtimeOverrides={currentInstance.pcStatus[inspectedChar.id]}
+                onLevelUp={(ch) => setLevelUpPc(ch)}
+                onAddToCombat={(ch) => {
+                  handleAddCreatureToActiveCombat(ch, 1);
+                  setInspectedChar(null);
+                }}
+              />
+            </div>
+            <ShareToPlayersPanel
+              live={live}
+              target={{ kind: 'character', id: inspectedChar.id }}
+              characterNames={shareNames}
+              onOpenLive={() => setShowJoinModal(true)}
+            />
+          </div>
+        </div>
+      )}
+
+      {inspectedAsset && (
+        <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
+          <div className="flex flex-col lg:flex-row items-start gap-4 w-full max-w-4xl max-h-[90vh]">
+            <div className="flex-1 min-w-0 w-full max-w-2xl max-h-[90vh] overflow-y-auto relative">
+              <button
+                onClick={() => setInspectedAsset(null)}
+                className="absolute top-3 right-3 z-10 p-1.5 rounded-full bg-[#58180D] text-amber-100 hover:bg-red-800 shadow-lg"
+              >
+                <X className="w-4 h-4" />
+              </button>
+              <AssetPreviewCard asset={inspectedAsset} />
+            </div>
+            <ShareToPlayersPanel
+              live={live}
+              target={{ kind: 'asset', id: inspectedAsset.id }}
+              characterNames={shareNames}
+              onOpenLive={() => setShowJoinModal(true)}
             />
           </div>
         </div>
@@ -2093,9 +2143,7 @@ export const LiveSessionConsole: React.FC<LiveSessionConsoleProps> = ({
       {showJoinModal && (
         <LiveJoinModal
           live={live}
-          showable={characters
-            .filter((c) => !c.isPreGenBlueprint)
-            .map((c) => ({ id: c.id, name: c.name, kind: c.kind }))}
+          shownName={shownName}
           players={currentInstance.partyCharacterIds
             .map((id) => charMap.get(id))
             .filter((c): c is CharacterEntity => Boolean(c))

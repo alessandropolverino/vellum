@@ -22,6 +22,7 @@ ${c.bold('COMMANDS:')}
   ${c.bold('encounters')}    Manage battle encounters attached to scenes
   ${c.bold('instances')}     Manage live play sessions, timeline logs, and combat
   ${c.bold('sfx')}           Inspect ambient tracks and synth audio presets
+  ${c.bold('assets')}        Manage images with captions (taggable as @asset[id], showable to players)
   ${c.bold('db')}            Database statistics, integrity validation, backup, import/export
   ${c.bold('agent-guide')}   Print specialized protocol & instructions for AI Agents
 

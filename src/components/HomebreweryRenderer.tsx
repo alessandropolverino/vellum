@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import {
+  Asset,
   CharacterEntity,
   EncounterPreset,
   SfxItem,
@@ -12,6 +13,7 @@ import {
   Swords,
   UserCheck,
   Skull,
+  ImageIcon,
   BookOpen,
   EyeOff,
   Square,
@@ -21,6 +23,9 @@ interface HomebreweryRendererProps {
   markdown: string;
   characters: CharacterEntity[];
   sfxCatalog: SfxItem[];
+  /** Stored assets referenced as @asset[id]. */
+  assets?: Asset[];
+  onSelectAsset?: (asset: Asset) => void;
   encounters: EncounterPreset[];
   twoColumns?: boolean;
   hideDmNotes?: boolean;
@@ -33,6 +38,8 @@ export const HomebreweryRenderer: React.FC<HomebreweryRendererProps> = ({
   markdown,
   characters,
   sfxCatalog,
+  assets = [],
+  onSelectAsset,
   encounters,
   twoColumns = false,
   hideDmNotes = false,
@@ -49,11 +56,18 @@ export const HomebreweryRenderer: React.FC<HomebreweryRendererProps> = ({
 
   const charMap = new Map(characters.map((c) => [c.id, c]));
   const sfxMap = new Map(sfxCatalog.map((s) => [s.id, s]));
+  // Tags use the asset name (case-insensitive); the id still works as a fallback.
+  const findAsset = (ref: string) => {
+    const wanted = ref.toLowerCase();
+    return (
+      assets.find((a) => a.name.trim().toLowerCase() === wanted) ?? assets.find((a) => a.id === ref)
+    );
+  };
   const encMap = new Map(encounters.map((e) => [e.id, e]));
 
   // Render inline formatting: **bold**, *italic*, `code`, @sfx[id], @npc[id]
   const renderInline = (text: string, keyPrefix: string): React.ReactNode[] => {
-    const tokenRegex = /(@sfx\[[^\]]+\]|@npc\[[^\]]+\]|\*\*[^*]+\*\*|\*[^*]+\*|`[^`]+`)/g;
+    const tokenRegex = /(@sfx\[[^\]]+\]|@asset\[[^\]]+\]|@npc\[[^\]]+\]|\*\*[^*]+\*\*|\*[^*]+\*|`[^`]+`)/g;
     const parts = text.split(tokenRegex);
 
     return parts.map((part, idx) => {
@@ -86,6 +100,30 @@ export const HomebreweryRenderer: React.FC<HomebreweryRendererProps> = ({
             {playing ? <Square className="w-3 h-3 fill-current" /> : <Volume2 className="w-3.5 h-3.5" />}
             <span>{sfx.name}</span>
             {sfx.loop && <span className="text-[10px] opacity-75 uppercase">[Loop]</span>}
+          </button>
+        );
+      }
+
+      if (part.startsWith('@asset[') && part.endsWith(']')) {
+        const assetId = part.slice(7, -1).trim();
+        const asset = findAsset(assetId);
+        if (!asset) {
+          return (
+            <span key={key} className="inline-flex items-center px-2 py-0.5 text-xs bg-red-200 text-red-900 rounded">
+              [{tr('Asset not found', 'Asset non trovato')}: {assetId}]
+            </span>
+          );
+        }
+        return (
+          <button
+            key={key}
+            type="button"
+            onClick={() => onSelectAsset?.(asset)}
+            className="inline-flex items-center gap-1 mx-0.5 px-2 py-0.5 rounded text-xs font-sans font-bold border transition align-baseline bg-emerald-900/15 text-emerald-900 border-emerald-800/40 hover:bg-emerald-900 hover:text-amber-100"
+            title={asset.caption || asset.name}
+          >
+            <ImageIcon className="w-3 h-3" />
+            <span className="underline decoration-dotted underline-offset-2">{asset.name}</span>
           </button>
         );
       }
@@ -486,7 +524,7 @@ export const HomebreweryRenderer: React.FC<HomebreweryRendererProps> = ({
 
     // 7. Standard Paragraph (with D&D drop-cap on the first narrative paragraph)
     const isPureTokenLine =
-      (trimmed.startsWith('@sfx[') || trimmed.startsWith('@npc[')) && trimmed.length < 60;
+      (trimmed.startsWith('@sfx[') || trimmed.startsWith('@asset[') || trimmed.startsWith('@npc[')) && trimmed.length < 60;
     const useDropCap = !firstParagraphRendered && !isPureTokenLine && trimmed.length > 50;
     if (useDropCap) {
       firstParagraphRendered = true;

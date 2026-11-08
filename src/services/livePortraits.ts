@@ -36,3 +36,30 @@ export function portraitVersion(dataUrl: string): string {
   for (let i = 0; i < dataUrl.length; i += step) h = ((h << 5) + h + dataUrl.charCodeAt(i)) | 0;
   return `${dataUrl.length.toString(36)}${(h >>> 0).toString(36)}`;
 }
+
+/**
+ * Downscales an image (keeping its aspect ratio) so its longest side is at most `maxSide`.
+ * Used for assets shown on phones: the original never leaves the DM's machine.
+ */
+export async function shrinkImage(dataUrl: string, maxSide: number): Promise<string | null> {
+  if (!dataUrl.startsWith('data:image/')) return null;
+  const img = new Image();
+  img.decoding = 'async';
+  const loaded = new Promise<boolean>((resolve) => {
+    img.onload = () => resolve(true);
+    img.onerror = () => resolve(false);
+  });
+  img.src = dataUrl;
+  if (!(await loaded) || !img.naturalWidth || !img.naturalHeight) return null;
+
+  const scale = Math.min(1, maxSide / Math.max(img.naturalWidth, img.naturalHeight));
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.max(1, Math.round(img.naturalWidth * scale));
+  canvas.height = Math.max(1, Math.round(img.naturalHeight * scale));
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return null;
+  ctx.fillStyle = '#1c1917';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+  return canvas.toDataURL('image/jpeg', 0.85);
+}

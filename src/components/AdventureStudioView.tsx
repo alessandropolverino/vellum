@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import {
   AdventureBlueprint,
   AdventureScene,
+  Asset,
   Campaign,
   CharacterEntity,
   EncounterPreset,
@@ -11,6 +12,7 @@ import { useLanguage } from '../i18n/LanguageContext';
 import { useConfirmDelete } from './ConfirmDialog';
 import { HomebreweryRenderer } from './HomebreweryRenderer';
 import { StatblockCard } from './StatblockCard';
+import { AssetPreviewCard } from './ShareToPlayersPanel';
 import {
   BookOpen,
   Plus,
@@ -39,6 +41,7 @@ interface AdventureStudioViewProps {
   campaigns: Campaign[];
   characters: CharacterEntity[];
   sfxCatalog: SfxItem[];
+  assets: Asset[];
   selectedAdventureId: string;
   onSelectAdventure: (id: string) => void;
   onSaveAdventure: (adv: AdventureBlueprint) => void;
@@ -55,6 +58,7 @@ export const AdventureStudioView: React.FC<AdventureStudioViewProps> = ({
   campaigns,
   characters,
   sfxCatalog,
+  assets,
   selectedAdventureId,
   onSelectAdventure,
   onSaveAdventure,
@@ -79,6 +83,7 @@ export const AdventureStudioView: React.FC<AdventureStudioViewProps> = ({
   const [showDetails, setShowDetails] = useState(false);
   const [detailsTab, setDetailsTab] = useState<'sounds' | 'encounters' | 'npcs'>('sounds');
   const [inspectedChar, setInspectedChar] = useState<CharacterEntity | null>(null);
+  const [inspectedAsset, setInspectedAsset] = useState<Asset | null>(null);
   const [editingEncounter, setEditingEncounter] = useState<EncounterPreset | null>(null);
   const [showNewCampaignModal, setShowNewCampaignModal] = useState(false);
   const [newCampTitle, setNewCampTitle] = useState('');
@@ -961,6 +966,24 @@ export const AdventureStudioView: React.FC<AdventureStudioViewProps> = ({
                     </option>
                   ))}
                 </select>
+
+                {/* Quick Insert @asset */}
+                <select
+                  defaultValue=""
+                  onChange={(e) => {
+                    if (!e.target.value) return;
+                    insertSnippet(`@asset[${assets.find((a) => a.id === e.target.value)?.name ?? e.target.value}] `);
+                    e.target.value = '';
+                  }}
+                  className="px-2 py-1 rounded bg-stone-950 border border-stone-700 text-stone-300"
+                >
+                  <option value="">{tr('+ Insert @asset...', '+ Inserisci @asset...')}</option>
+                  {assets.map((a) => (
+                    <option key={a.id} value={a.id}>
+                      🖼 {a.name}
+                    </option>
+                  ))}
+                </select>
               </div>
             )}
 
@@ -978,7 +1001,7 @@ export const AdventureStudioView: React.FC<AdventureStudioViewProps> = ({
                     </span>
                     <span
                       className="hidden 2xl:inline text-stone-600"
-                      title="Supports :::read-aloud, :::dm-note, @sfx[id], @npc[id], @encounter[id]"
+                      title="Supports :::read-aloud, :::dm-note, @sfx[id], @asset[name], @npc[id], @encounter[id]"
                     >
                       :::read-aloud · :::dm-note · @sfx · @npc · @encounter
                     </span>
@@ -998,6 +1021,8 @@ export const AdventureStudioView: React.FC<AdventureStudioViewProps> = ({
                     markdown={currentScene.homebreweryMarkdown}
                     characters={characters}
                     sfxCatalog={sfxCatalog}
+                    assets={assets}
+                    onSelectAsset={(a) => setInspectedAsset(a)}
                     encounters={currentScene.encounters}
                     twoColumns={twoColumns}
                     onSelectCharacter={(ch) => setInspectedChar(ch)}
@@ -1022,6 +1047,20 @@ export const AdventureStudioView: React.FC<AdventureStudioViewProps> = ({
               <X className="w-4 h-4" />
             </button>
             <StatblockCard character={inspectedChar} />
+          </div>
+        </div>
+      )}
+
+      {inspectedAsset && (
+        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="max-w-2xl w-full max-h-[90vh] overflow-y-auto relative">
+            <button
+              onClick={() => setInspectedAsset(null)}
+              className="absolute top-3 right-3 z-10 p-1.5 rounded-full bg-[#58180D] text-amber-100 hover:bg-red-800 shadow-lg"
+            >
+              <X className="w-4 h-4" />
+            </button>
+            <AssetPreviewCard asset={inspectedAsset} />
           </div>
         </div>
       )}
