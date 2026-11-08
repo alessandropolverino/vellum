@@ -8,6 +8,8 @@ import {
 import { useLanguage } from '../i18n/LanguageContext';
 import { useConfirmDelete } from './ConfirmDialog';
 import { StatblockCard } from './StatblockCard';
+import { LabelChips, LabelFilter, LabelOption } from './Labels';
+import { addLabelFilter, hasAllLabels } from '../services/labels';
 import { SupervisedPgCreateView } from './SupervisedPgCreateView';
 import { FullPageCharacterEditor } from './FullPageCharacterEditor';
 import { LevelUpModal } from './LevelUpModal';
@@ -32,6 +34,7 @@ import {
 interface CharactersViewProps {
   characters: CharacterEntity[];
   parties: PartyGroup[];
+  labelOptions: LabelOption[];
   onSaveCharacter: (char: CharacterEntity) => void;
   onDeleteCharacter: (id: string) => void;
   onSaveParty: (party: PartyGroup) => void;
@@ -41,6 +44,7 @@ interface CharactersViewProps {
 export const CharactersView: React.FC<CharactersViewProps> = ({
   characters,
   parties,
+  labelOptions,
   onSaveCharacter,
   onDeleteCharacter,
   onSaveParty,
@@ -52,6 +56,7 @@ export const CharactersView: React.FC<CharactersViewProps> = ({
     'all' | 'pc' | 'pc_blueprints' | 'npc' | 'monster' | 'parties'
   >('all');
   const [searchQuery, setSearchQuery] = useState('');
+  const [labelFilter, setLabelFilter] = useState<string[]>([]);
   const [newMenuOpen, setNewMenuOpen] = useState(false);
   const [selectedId, setSelectedId] = useState<string>(characters[0]?.id || '');
   const [editingChar, setEditingChar] = useState<CharacterEntity | null>(null);
@@ -83,6 +88,7 @@ export const CharactersView: React.FC<CharactersViewProps> = ({
     } else if (filterKind === 'npc' || filterKind === 'monster') {
       if (c.kind !== filterKind) return false;
     }
+    if (!hasAllLabels(c.tags, labelFilter)) return false;
     if (!searchQuery.trim()) return true;
     const q = searchQuery.toLowerCase();
     return (
@@ -239,6 +245,7 @@ export const CharactersView: React.FC<CharactersViewProps> = ({
       <>
         <FullPageCharacterEditor
           character={editingChar}
+          labelOptions={labelOptions}
           onSave={(savedChar) => {
             onSaveCharacter(savedChar);
             setSelectedId(savedChar.id);
@@ -308,7 +315,10 @@ export const CharactersView: React.FC<CharactersViewProps> = ({
           ))}
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          {filterKind !== 'parties' && (
+            <LabelFilter options={labelOptions} selected={labelFilter} onChange={setLabelFilter} />
+          )}
           <div className="relative w-56">
             <Search className="w-4 h-4 text-stone-500 absolute left-3 top-1/2 -translate-y-1/2" />
             <input
@@ -539,6 +549,15 @@ export const CharactersView: React.FC<CharactersViewProps> = ({
                         {[c.classOrArchetype, c.levelOrCr].filter(Boolean).join(' · ')}
                         {c.playerOrRole && !isBp ? ` · ${c.playerOrRole}` : ''}
                       </div>
+                      {c.tags.length > 0 && (
+                        <div className="pt-1">
+                          <LabelChips
+                            labels={c.tags}
+                            max={4}
+                            onPick={(l) => setLabelFilter((f) => addLabelFilter(f, l))}
+                          />
+                        </div>
+                      )}
                     </div>
 
                     <div className="text-xs text-stone-500 shrink-0 text-right">

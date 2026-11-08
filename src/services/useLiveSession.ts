@@ -3,12 +3,17 @@ import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 import {
   buildCombatPayload,
+  buildRosterDetails,
   buildPlayerSheet,
   buildShownPayload,
+  buildAssetShownPayload,
+  EMPTY_SHOWN_PAYLOAD,
   type PlayerRosterEntry,
+  type ShareRef,
+  type ShareState,
 } from './liveSheet';
-import { portraitVersion, shrinkPortrait } from './livePortraits';
-import type { CharacterEntity, PlayInstance } from '../types/dnd';
+import { portraitVersion, shrinkImage, shrinkPortrait } from './livePortraits';
+import type { Asset, CharacterEntity, PlayInstance } from '../types/dnd';
 
 /** A request from a phone (already limited to the player's own character by the server). */
 export interface PlayerAction {
@@ -64,7 +69,9 @@ export function useLiveSession(
     instance: PlayInstance,
     characterId: string,
     action: PlayerAction
-  ) => PlayInstance | void
+  ) => PlayInstance | void,
+  /** Stored assets the DM can show to players. */
+  assets: Asset[] = []
 ) {
   const desktop = isDesktopApp();
   const [info, setInfo] = useState<LiveInfo | null>(null);
@@ -75,7 +82,7 @@ export function useLiveSession(
   const [claimed, setClaimed] = useState<ClaimInfo[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const [shownId, setShownId] = useState<string | null>(null);
+  const [share, setShare] = useState<ShareState | null>(null);
   const sentPayloads = useRef<Map<string, string>>(new Map());
   const portraitSources = useRef<Map<string, string>>(new Map());
   const iconVersions = useRef<Map<string, string>>(new Map());
@@ -140,13 +147,8 @@ export function useLiveSession(
     const pcs = instance.partyCharacterIds
       .map((id) => charMap.get(id))
       .filter((c): c is CharacterEntity => Boolean(c));
-    const roster: PlayerRosterEntry[] = pcs.map((pc) => ({
-      id: pc.id,
-      name: instance.pcStatus[pc.id]?.customNameOverride || pc.name,
-      subtitle: [pc.classOrArchetype, pc.levelOrCr].filter(Boolean).join(' · '),
-    }));
     const combat = instance.activeCombat?.isActive ? instance.activeCombat : null;
-    const shown = shownId ? charMap.get(shownId) ?? null : null;
+    const assetMap = new Map(assets.map((a) => [a.id, a]));
     let cancelled = false;
 
     // Downscales and uploads a portrait once per image; returns its version, or null if none.
@@ -171,8 +173,6 @@ export function useLiveSession(
 
     (async () => {
       try {
-        await invoke('live_set_roster', { entries: roster });
-
         const icons = new Map<string, string>();
         const wanted = new Set<string>(pcs.map((p) => p.id));
         combat?.participants.forEach((p) => p.sourceCharacterId && wanted.add(p.sourceCharacterId));
@@ -181,6 +181,16 @@ export function useLiveSession(
           if (v) icons.set(id, v);
           if (cancelled) return;
         }
+
+        // The roster comes after the icons so the phone's picker can show each hero's portrait.
+        const roster: PlayerRosterEntry[] = pcs.map((pc) => ({
+          id: pc.id,
+          name: instance.pcStatus[pc.id]?.customNameOverride || pc.name,
+          subtitle: [pc.classOrArchetype, pc.levelOrCr].filter(Boolean).join(' · '),
+          icon: icons.get(pc.id) ?? null,
+          details: buildRosterDetails(pc),
+        }));
+        await invoke('live_set_roster', { entries: roster });
 
         for (const pc of pcs) {
           const fighting = combat?.participants.find(
@@ -200,11 +210,47 @@ export function useLiveSession(
           invoke('live_set_shared', { kind: 'combat', payload: combatPayload })
         );
 
-        const shownIcon = shown ? await ensureIcon(shown.id, 'shown', 480) : null;
-        const shownPayload = JSON.stringify(buildShownPayload(shown, shownIcon));
-        await push('shown', shownPayload, () =>
-          invoke('live_set_shared', { kind: 'shown', payload: shownPayload })
+        // What the DM is showing: built only from stored entities, to everyone or to chosen phones.
+        let shownPayload = EMPTY_SHOWN_PAYLOAD;
+        if (share?.ref.kind === 'character') {
+          const shown = charMap.get(share.ref.id);
+          if (shown) {
+            const icon = await ensureIcon(shown.id, 'shown', 480);
+            shownPayload = JSON.stringify(buildShownPayload(shown, icon));
+          }
+        } else if (share?.ref.kind === 'asset') {
+          const asset = assetMap.get(share.ref.id);
+          if (asset) {
+            const key = `asset:${asset.id}`;
+            if (asset.imageUrl && portraitSources.current.get(key) !== asset.imageUrl) {
+              const small = await shrinkImage(asset.imageUrl, 1280);
+              if (small) {
+                await invoke('live_set_portrait', { characterId: key, dataUrl: small });
+                portraitSources.current.set(key, asset.imageUrl);
+                iconVersions.current.set(key, portraitVersion(small));
+              }
+            }
+            const version = iconVersions.current.get(key) ?? null;
+            shownPayload = JSON.stringify(
+              buildAssetShownPayload(asset, asset.imageUrl ? version : null, key)
+            );
+          }
+        }
+        if (cancelled) return;
+        const everyone = !share || share.targets === null;
+        await push('shown', everyone ? shownPayload : EMPTY_SHOWN_PAYLOAD, () =>
+          invoke('live_set_shared', {
+            kind: 'shown',
+            payload: everyone ? shownPayload : EMPTY_SHOWN_PAYLOAD,
+          })
         );
+        for (const pc of pcs) {
+          const mine = !everyone && (share?.targets ?? []).includes(pc.id);
+          const payload = mine ? shownPayload : EMPTY_SHOWN_PAYLOAD;
+          await push(`shownFor:${pc.id}`, payload, () =>
+            invoke('live_set_shown_for', { characterId: pc.id, payload })
+          );
+        }
       } catch (e) {
         if (!cancelled) setError(String(e));
       }
@@ -212,7 +258,7 @@ export function useLiveSession(
     return () => {
       cancelled = true;
     };
-  }, [desktop, info, instance, characters, shownId]);
+  }, [desktop, info, instance, characters, assets, share]);
 
   const start = useCallback(async (useTunnel: boolean) => {
     setBusy(true);
@@ -223,7 +269,7 @@ export function useLiveSession(
     sentPayloads.current.clear();
     portraitSources.current.clear();
     iconVersions.current.clear();
-    setShownId(null);
+    setShare(null);
     try {
       const started = await invoke<LiveInfo>('live_start', { useTunnel });
       setInfo(started);
@@ -247,7 +293,7 @@ export function useLiveSession(
       sentPayloads.current.clear();
       portraitSources.current.clear();
       iconVersions.current.clear();
-      setShownId(null);
+      setShare(null);
     } catch (e) {
       setError(String(e));
     } finally {
@@ -280,8 +326,10 @@ export function useLiveSession(
     claimed,
     error,
     busy,
-    shownId,
-    show: setShownId,
+    share,
+    /** Show a stored character or asset to everyone (`targets` null) or to some players. */
+    show: (ref: ShareRef, targets: string[] | null) => setShare({ ref, targets }),
+    stopShowing: () => setShare(null),
     start,
     stop,
     release,

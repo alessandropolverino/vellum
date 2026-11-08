@@ -53,6 +53,7 @@ function showDbStats(options) {
   console.log(`   Parties:           ${c.bold(c.green(String(stats.counts.parties)))}`);
   console.log(`   Play Instances:    ${c.bold(c.green(String(stats.counts.playInstances)))}`);
   console.log(`   SFX Presets:       ${c.bold(c.green(String(stats.counts.sfx)))}`);
+  console.log(`   Assets:            ${c.bold(c.green(String(stats.counts.assets)))}`);
   console.log(c.yellow('═'.repeat(60)));
 }
 

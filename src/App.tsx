@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   AdventureBlueprint,
   Campaign,
@@ -7,17 +7,20 @@ import {
   PartyGroup,
   PlayInstance,
   SfxItem,
+  Asset,
 } from './types/dnd';
 import { SEED_DATABASE } from './data/seedData';
 import { getBuiltInSfxCatalog } from './data/sfxCatalog';
 import { storageRepository } from './services/storageRepository';
 import { soundboardEngine } from './services/audioEngine';
 import { useLanguage } from './i18n/LanguageContext';
+import { collectLabels } from './services/labels';
 import { DashboardView } from './components/DashboardView';
 import { AdventureStudioView } from './components/AdventureStudioView';
 import { LiveSessionConsole } from './components/LiveSessionConsole';
 import { CharactersView } from './components/CharactersView';
 import { SfxManagerView } from './components/SfxManagerView';
+import { AssetsView } from './components/AssetsView';
 import { DataBackupModal } from './components/DataBackupModal';
 import { UpdateControl } from './components/UpdateModal';
 import {
@@ -25,6 +28,7 @@ import {
   Compass,
   Users,
   Volume2,
+  Image as ImageIcon,
   VolumeX,
   Flame,
   ShieldCheck,
@@ -33,11 +37,21 @@ import {
   X,
 } from 'lucide-react';
 
-type ActiveTab = 'dashboard' | 'studio' | 'console' | 'characters' | 'sfx';
+type ActiveTab = 'dashboard' | 'studio' | 'console' | 'characters' | 'sfx' | 'assets';
 
 export const App: React.FC = () => {
   const { lang, setLang, tr } = useLanguage();
   const [db, setDb] = useState<DndDatabase>(SEED_DATABASE);
+  // Labels used anywhere (assets, characters, sounds): feeds autocomplete and the list filters.
+  const labelOptions = useMemo(
+    () =>
+      collectLabels(
+        db.assets,
+        db.characters.filter((c) => !c.instanceOnlyId),
+        db.sfxCatalog
+      ),
+    [db.assets, db.characters, db.sfxCatalog]
+  );
   const [storageSource, setStorageSource] = useState<string>('Loading...');
   const [lastSaveInfo, setLastSaveInfo] = useState<string>('');
   const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'error'>('saved');
@@ -252,6 +266,18 @@ export const App: React.FC = () => {
     });
   };
 
+  const handleSaveAsset = (asset: Asset) => {
+    const exists = db.assets.some((a) => a.id === asset.id);
+    const nextAssets = exists
+      ? db.assets.map((a) => (a.id === asset.id ? asset : a))
+      : [...db.assets, asset];
+    persistDb({ ...db, assets: nextAssets });
+  };
+
+  const handleDeleteAsset = (id: string) => {
+    persistDb({ ...db, assets: db.assets.filter((a) => a.id !== id) });
+  };
+
   const handleSaveInstance = (inst: PlayInstance) => {
     const exists = db.playInstances.some((i) => i.id === inst.id);
     const nextInstances = exists
@@ -410,6 +436,7 @@ export const App: React.FC = () => {
                 ['console', Flame, tr('Live Session', 'Partita Live')],
                 ['characters', Users, tr('Characters', 'Personaggi')],
                 ['sfx', Volume2, tr('SFX', 'SFX')],
+                ['assets', ImageIcon, tr('Assets', 'Asset')],
               ] as const
             ).map(([id, Icon, label]) => (
               <button
@@ -486,6 +513,7 @@ export const App: React.FC = () => {
             campaigns={db.campaigns}
             characters={db.characters}
             sfxCatalog={db.sfxCatalog}
+            assets={db.assets}
             selectedAdventureId={selectedAdventureId}
             onSelectAdventure={setSelectedAdventureId}
             onSaveAdventure={handleSaveAdventure}
@@ -505,6 +533,7 @@ export const App: React.FC = () => {
             characters={db.characters}
             parties={db.parties}
             sfxCatalog={db.sfxCatalog}
+            assets={db.assets}
             activeInstanceId={activeInstanceId}
             onSelectInstance={setActiveInstanceId}
             onSaveInstance={handleSaveInstance}
@@ -518,6 +547,7 @@ export const App: React.FC = () => {
           <CharactersView
             characters={db.characters}
             parties={db.parties}
+            labelOptions={labelOptions}
             onSaveCharacter={handleSaveCharacter}
             onDeleteCharacter={handleDeleteCharacter}
             onSaveParty={handleSaveParty}
@@ -528,8 +558,18 @@ export const App: React.FC = () => {
         {activeTab === 'sfx' && (
           <SfxManagerView
             sfxCatalog={db.sfxCatalog}
+            labelOptions={labelOptions}
             onSaveSfx={handleSaveSfx}
             onDeleteSfx={handleDeleteSfx}
+          />
+        )}
+
+        {activeTab === 'assets' && (
+          <AssetsView
+            assets={db.assets}
+            labelOptions={labelOptions}
+            onSaveAsset={handleSaveAsset}
+            onDeleteAsset={handleDeleteAsset}
           />
         )}
       </main>

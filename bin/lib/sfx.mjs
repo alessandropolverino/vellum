@@ -1,4 +1,5 @@
-import { loadDb } from './db.mjs';
+import { loadDb, saveDb } from './db.mjs';
+import { applyLabelOptions, filterByLabels } from './labels.mjs';
 import { printJson, printTable, error, c } from './output.mjs';
 
 export function handleSfx(action, positionals, options) {
@@ -9,6 +10,8 @@ export function handleSfx(action, positionals, options) {
       return listSfx(db, options);
     case 'get':
       return getSfx(positionals[0], db, options);
+    case 'update':
+      return updateSfx(positionals[0], db, options);
     default:
       if (!action || action === 'help') {
         printSfxHelp();
@@ -25,6 +28,7 @@ function listSfx(db, options) {
     const cat = String(options.category).toLowerCase();
     list = list.filter((s) => s.category.toLowerCase() === cat);
   }
+  list = filterByLabels(list, options);
   if (options.search) {
     const q = String(options.search).toLowerCase();
     list = list.filter(
@@ -48,9 +52,10 @@ function listSfx(db, options) {
       { key: 'name', label: 'Name', maxWidth: 24, color: (s) => c.bold(s) },
       { key: 'synthPreset', label: 'Synth Preset', maxWidth: 18 },
       { key: 'loop', label: 'Loop', maxWidth: 6, color: (s) => (s ? c.yellow('yes') : c.dim('no')) },
+      { key: 'labelList', label: 'Labels', maxWidth: 20, color: (s) => c.green(s) },
       { key: 'description', label: 'Description', maxWidth: 36, color: (s) => c.dim(s) },
     ],
-    list
+    list.map((s) => ({ ...s, labelList: (s.tags || []).join(', ') }))
   );
   console.log('');
 }
@@ -78,6 +83,18 @@ function getSfx(id, db, options) {
   console.log(c.yellow('═'.repeat(60)));
 }
 
+function updateSfx(id, db, options) {
+  if (!id) error('Usage: vellum sfx update <id> [--labels a,b | --add-label a,b | --remove-label a,b]');
+  const sfx = db.sfxCatalog.find((s) => s.id === id || s.name.toLowerCase() === id.toLowerCase());
+  if (!sfx) error(`SFX preset "${id}" not found.`);
+  const labels = applyLabelOptions(sfx.tags, options);
+  if (labels === undefined) error('Nothing to update: pass --labels, --add-label or --remove-label.');
+  sfx.tags = labels;
+  saveDb(db, options);
+  if (options.json) printJson(sfx);
+  else success(`SFX "${sfx.name}" labels: ${sfx.tags.join(', ') || 'none'}.`, options);
+}
+
 function printSfxHelp() {
   console.log(`
 ${c.bold('vellum sfx')} — Inspect ambient tracks, synth sound presets, and SFX cues
@@ -85,9 +102,11 @@ ${c.bold('vellum sfx')} — Inspect ambient tracks, synth sound presets, and SFX
 ${c.bold('USAGE:')}
   vellum sfx list [options]
   vellum sfx get <id> [--json]
+  vellum sfx update <id> [--labels a,b | --add-label a,b | --remove-label a,b] [--json]
 
 ${c.bold('OPTIONS:')}
   --category <cat>      Filter by category (ambience, combat_music, sfx_environment, sfx_creature, sfx_magic, sfx_ui)
+  --label a,b           Keep only sounds carrying ALL these labels
   --search <text>       Search query
   --json                Machine-readable JSON output
 `);

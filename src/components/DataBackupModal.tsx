@@ -133,8 +133,8 @@ export const DataBackupModal: React.FC<DataBackupModalProps> = ({
       onDatabaseReplaced(integratedDb);
       setStatusMessage({
         text: tr(
-          `Integration complete! Added: +${summary.addedCharacters} characters/monsters, +${summary.addedAdventures} stories, +${summary.addedCampaigns} campaigns, +${summary.addedInstances} runs, +${summary.addedSfx} audio tracks. Existing data preserved.`,
-          `Integrazione completata! Aggiunti: +${summary.addedCharacters} PG/mostri, +${summary.addedAdventures} avventure, +${summary.addedCampaigns} campagne, +${summary.addedInstances} sessioni, +${summary.addedSfx} tracce audio. Tutti i dati esistenti sono stati preservati.`
+          `Integration complete! Added: +${summary.addedCharacters} characters/monsters, +${summary.addedAdventures} stories, +${summary.addedCampaigns} campaigns, +${summary.addedInstances} runs, +${summary.addedSfx} audio tracks, +${summary.addedAssets} assets. Existing data preserved.`,
+          `Integrazione completata! Aggiunti: +${summary.addedCharacters} PG/mostri, +${summary.addedAdventures} avventure, +${summary.addedCampaigns} campagne, +${summary.addedInstances} sessioni, +${summary.addedSfx} tracce audio, +${summary.addedAssets} asset. Tutti i dati esistenti sono stati preservati.`
         ),
         type: 'success',
       });
@@ -250,8 +250,8 @@ export const DataBackupModal: React.FC<DataBackupModalProps> = ({
         onDatabaseReplaced(integratedDb);
         setStatusMessage({
           text: tr(
-            `Integrated file successfully! Added: +${summary.addedCharacters} characters/monsters, +${summary.addedAdventures} stories, +${summary.addedCampaigns} campaigns, +${summary.addedInstances} runs, +${summary.addedSfx} audio tracks. Current data preserved.`,
-            `File integrato con successo! Aggiunti: +${summary.addedCharacters} PG/mostri, +${summary.addedAdventures} avventure, +${summary.addedCampaigns} campagne, +${summary.addedInstances} sessioni, +${summary.addedSfx} tracce audio. Tutti i dati correnti sono stati preservati.`
+            `Integrated file successfully! Added: +${summary.addedCharacters} characters/monsters, +${summary.addedAdventures} stories, +${summary.addedCampaigns} campaigns, +${summary.addedInstances} runs, +${summary.addedSfx} audio tracks, +${summary.addedAssets} assets. Current data preserved.`,
+            `File integrato con successo! Aggiunti: +${summary.addedCharacters} PG/mostri, +${summary.addedAdventures} avventure, +${summary.addedCampaigns} campagne, +${summary.addedInstances} sessioni, +${summary.addedSfx} tracce audio, +${summary.addedAssets} asset. Tutti i dati correnti sono stati preservati.`
           ),
           type: 'success',
         });

@@ -4,6 +4,15 @@ All notable user-facing changes to Vellum are documented in this file.
 
 ## Unreleased
 
+## Windows 0.3.0 — 2026-11-08
+
+- App: Labels for assets, characters (PCs, NPCs, monsters) and sounds. Add free-text labels in each editor (with autocomplete from labels you already use), see them as chips in the lists, and filter any list by one or more labels from the new "Labels" menu (click a chip to filter by it). In the CLI use `--labels`, `--add-label`, `--remove-label` and `--label`, plus `vellum labels list|rename` and `vellum sfx update`. Labels reuse the existing tags of each entity, so nothing is migrated.
+- App: New "Assets" entity: images with a caption and tags, managed in the new Assets tab (and via `vellum assets` in the CLI). The image is optional and can be framed (pan, zoom, 16:9 / 4:3 / 1:1 / 3:4) in an editor like the portrait one. Tag one in scene text with `@asset[Name]` (or the new "Insert @asset" menu in the Story Editor); clicking it opens the image.
+- App: Showing content to players is now done from the entity itself. Click a tagged character, NPC, monster or asset in the Live Console and use the new "Show to players" panel next to its window: show it to everyone or only to selected connected players. Only stored entities can be shown; the old character picker in the QR dialog is replaced by a status line with a Stop button.
+- App: On the players' phones, the character picker now shows each hero's portrait and an expandable "Show details" section (stats, background, personality, story) to help choose.
+- Windows: CI now runs only on pull requests into `main`, release tags and manual runs, not on every PR into `dev` (contributor workflow only; no change for users).
+- App: Markdown rendering now supports 4th-level headings (`#### Title`), e.g. `#### 1. Captain Vane (Marquisate)`, in adventure and scene text.
+
 ## Windows 0.2.0 — 2026-10-25
 
 - App: Spell slots and class resources (ki, sorcery points, bardic inspiration, rage...). Set the slots per level and any named resources in the character editor (Features & Spells tab); the Live Console's party panel shows tappable slot markers, resource counters and Short rest / Long rest buttons, and players can tick their own slots and resources off from the new Magic tab on their phone. A rest restores slots and resources only, not hit points.
