@@ -102,6 +102,9 @@ The desktop installer puts `vellum-cli` on your `PATH`; it never opens the app w
 # General help and command overview
 vellum-cli --help
 
+# Install/update the Vellum instructions for your coding agents (claude, codex, gemini)
+npm run cli -- skill install
+
 # AI Agent protocol and usage guide
 vellum-cli agent-guide
 

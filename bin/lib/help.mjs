@@ -26,6 +26,7 @@ ${c.bold('COMMANDS:')}
   ${c.bold('assets')}        Manage images with captions (taggable as @asset[id], showable to players)
   ${c.bold('labels')}        List/rename the free-text labels shared by characters, sfx and assets (filter with --label)
   ${c.bold('db')}            Database statistics, integrity validation, backup, import/export
+  ${c.bold('skill')}         Install/update the Vellum instructions for your coding agents (claude, codex, gemini, cursor, antigravity)
   ${c.bold('agent-guide')}   Print specialized protocol & instructions for AI Agents
 
 ${c.bold('GLOBAL OPTIONS:')}
