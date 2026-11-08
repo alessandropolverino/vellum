@@ -4,6 +4,8 @@ All notable user-facing changes to Vellum are documented in this file.
 
 ## Unreleased
 
+## Windows 0.3.0 — 2026-11-08
+
 - App: The Story Editor now leaves much more room to write. Scenes are a slim numbered column that expands on hover, the three toolbars are replaced by a floating insert bar (type `/` at the start of a line for the full menu), and sounds, NPCs, assets and encounters live in a collapsible dock at the bottom with quick chips for what is pinned to the scene. Typing inside `@npc[`, `@statblock[`, `@sfx[`, `@asset[` or `@encounter[` opens a picker with text search and label filters (use the arrow keys and Enter); the expanded dock has the same search and label filter. The duplicate "Saved" indicator is gone.
 - Windows: New `vellum-cli skill install` command installs (and later updates) the Vellum skill for your coding agents in the folders they read by default: Claude Code (`~/.claude/skills`), Codex, Gemini CLI and Cursor (`~/.agents/skills`) and Antigravity (`~/.gemini/config/skills`), so agents use `vellum-cli` from any folder. Use `--agent`, `--scope project` and `--dry-run`; `vellum-cli skill status` shows whether they are up to date. Re-run it after updating Vellum.
 - App: Scene encounters can now have labels, like characters, assets and sounds: add them in the encounter editor (with autocomplete), see them as chips in the scene's encounter list, and reuse them across the app. Also fixed the encounter editor layout, where a long creature name pushed the label field and delete button outside the creature row.
