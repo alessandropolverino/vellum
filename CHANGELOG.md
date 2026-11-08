@@ -4,6 +4,8 @@ All notable user-facing changes to Vellum are documented in this file.
 
 ## Unreleased
 
+- App: Markdown rendering now supports 4th-level headings (`#### Title`), e.g. `#### 1. Captain Vane (Marquisate)`, in adventure and scene text.
+
 ## Windows 0.2.0 — 2026-10-25
 
 - App: Spell slots and class resources (ki, sorcery points, bardic inspiration, rage...). Set the slots per level and any named resources in the character editor (Features & Spells tab); the Live Console's party panel shows tappable slot markers, resource counters and Short rest / Long rest buttons, and players can tick their own slots and resources off from the new Magic tab on their phone. A rest restores slots and resources only, not hit points.

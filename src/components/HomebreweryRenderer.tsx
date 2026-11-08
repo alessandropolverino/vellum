@@ -414,7 +414,7 @@ export const HomebreweryRenderer: React.FC<HomebreweryRendererProps> = ({
       }
     }
 
-    // 5. Headings (#, ##, ###)
+    // 5. Headings (#, ##, ###, ####)
     if (trimmed.startsWith('# ')) {
       elements.push(
         <h1
@@ -449,6 +449,19 @@ export const HomebreweryRenderer: React.FC<HomebreweryRendererProps> = ({
         >
           {trimmed.slice(4)}
         </h3>
+      );
+      i++;
+      continue;
+    }
+
+    if (trimmed.startsWith('#### ')) {
+      elements.push(
+        <h4
+          key={`h4-${i}`}
+          className="font-header text-base font-bold text-[#58180D] mt-3 mb-1.5"
+        >
+          {trimmed.slice(5)}
+        </h4>
       );
       i++;
       continue;
