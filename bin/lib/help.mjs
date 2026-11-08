@@ -72,7 +72,15 @@ ${c.bold('3. ID CONVENTIONS:')}
    - Party:      ${c.cyan('party-<slug>')}
    - Instance:   ${c.cyan('inst-<slug>')}
 
-${c.bold('4. ADDING ENTITIES TO A SCENE (mentions are not labels/tags):')}
+${c.bold('4. SCENE MARKDOWN IS NOT STANDARD MARKDOWN (line-by-line custom renderer):')}
+   - Every non-empty line is its own paragraph: do not hard-wrap sentences.
+   - Headings: ${c.dim('# ')} to ${c.dim('#### ')} only, plain text (no bold, no mentions). Lists: only ${c.dim('- item')}, one level.
+   - Tables: ${c.dim('| a | b |')} rows; the 2nd row is always dropped as separator. Inline: only ${c.dim('**bold**')}, ${c.dim('*italic*')}, ${c.dim('\`code\`')}, no nesting.
+   - Blocks: ${c.dim(':::read-aloud')} (auto-italic, blank line between paragraphs) and ${c.dim(':::dm-note')}, each closed by ${c.dim(':::')}.
+   - NOT supported: links, images, _underscores_, ~~strike~~, '>' quotes, '---' rules, ordered/nested lists, HTML, \\page.
+   Full table and a safe skeleton: skills/vellum-cli/SKILL.md section 3.
+
+${c.bold('5. ADDING ENTITIES TO A SCENE (mentions are not labels/tags):')}
    a) Inline mentions in --markdown (rendered as badges/buttons/cards):
       ${c.cyan('@npc[id]')} character or monster badge (inline)    ${c.cyan('@sfx[id]')} sound button (inline)
       ${c.cyan('@asset[name]')} image button (inline, id also works)  ${c.cyan('@statblock[id]')} full statblock (own line)
@@ -80,9 +88,9 @@ ${c.bold('4. ADDING ENTITIES TO A SCENE (mentions are not labels/tags):')}
       ${c.bold('Never wrap a mention in bold, italic or backticks')}: ${c.dim('**@npc[x]**')} is parsed as bold text and the badge is lost.
    b) Scene links for the Live Console panels: ${c.dim('stories scene add|update ... --characters id,id --sfx id,id')} (each replaces the list).
    c) Monsters fight via encounters: ${c.dim('encounters add <adv> <scene> --name ... --slots "<json>"')}
-   Ids/names exactly as printed by the list commands. Full details: skills/vellum-cli/SKILL.md section 3.
+   Ids/names exactly as printed by the list commands. Full details: skills/vellum-cli/SKILL.md sections 3-4.
 
-${c.bold('5. TYPICAL AGENT WORKFLOWS:')}
+${c.bold('6. TYPICAL AGENT WORKFLOWS:')}
 
    ${c.bold('A. Creating a Complete One-Shot Adventure:')}
    1. Create the adventure blueprint:

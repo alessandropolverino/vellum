@@ -219,7 +219,7 @@ node bin/vellum.mjs <command> ...
 ---
 
 ### Assets (`assets`)
-Images with a caption, mentioned in scene text as `@asset[<name>]` (case-insensitive; the id also works; see section 3). The image is optional. In the Live Console a click on the mention opens the image and lets the DM show it to all connected players or only some of them.
+Images with a caption, mentioned in scene text as `@asset[<name>]` (case-insensitive; the id also works; see section 4). The image is optional. In the Live Console a click on the mention opens the image and lets the DM show it to all connected players or only some of them.
 - **List / get** (image data is omitted unless `--full`):
   ```bash
   vellum-cli assets list [--label a,b] [--search <query>] --json
@@ -327,11 +327,58 @@ Labels are free-text tags stored in the `tags` array of **characters (PCs, NPCs,
 
 ---
 
-## 3. Adding NPCs, Monsters, Sounds, Assets and Encounters to a Scene
+## 3. Formatting Rules for Scene Markdown
+
+Scene text (`--markdown`, stored as `homebreweryMarkdown`) is **not** CommonMark/GitHub markdown. Vellum parses it **line by line** with its own small renderer, so anything outside the list below shows up as literal text. Write only what is listed.
+
+**Blocks** (each decided by how the line starts, after trimming spaces):
+| You write | Result | Gotchas |
+|---|---|---|
+| `# `, `## `, `### `, `#### ` + text | Heading levels 1-4 | A space after the `#`s is required; `#####` is not a heading. Heading text is **plain**: no bold/italic/code and no mentions inside it. |
+| `- item` (one per line) | Bullet list | Only `- `. One level only: indentation is ignored, so nested lists flatten. `* item`, `+ item` and `1. item` are **not** lists. |
+| `\| a \| b \|` rows | Table | First row = header, the **second row is always discarded** as the separator (write `\|---\|---\|`), at least 2 rows. No column alignment. Cells may contain inline formatting and mentions. |
+| `:::read-aloud` ... `:::` | Boxed text for the players, rendered in italics automatically | Do not add `*italics*` yourself. Paragraphs are separated by a **blank line**. Inline formatting and mentions work; `- ` lists, headings, tables and statblocks do not. |
+| `:::dm-note` ... `:::` | Secret DM note (hidden in Player View) | Each line is its own paragraph; `- ` bullets work. Inline formatting and mentions work; no headings, tables or statblocks. |
+| `@statblock[id]`, `@encounter[id]` | Statblock card, combat card | Must be alone on the line (see section 4). |
+| anything else | Paragraph | See below. |
+
+**Paragraphs**: every non-empty line becomes **its own paragraph**; consecutive lines are NOT joined, and blank lines are only skipped. So write one paragraph per line and do not hard-wrap sentences at 80 columns. The first long paragraph automatically gets a decorative drop cap: do not fake one.
+
+**Inline formatting** (paragraphs, list items, table cells, read-aloud and DM notes):
+- `**bold**`, `*italic*` and `` `code` `` only.
+- **No nesting**: `***both***`, bold containing italic, or a mention inside bold/italic/code all fail. The text between the markers cannot contain `*`.
+- Mentions (`@npc[...]`, `@sfx[...]`, `@asset[...]`) are inline tokens: see section 4, never format them.
+
+**Not supported** (rendered as literal characters): links `[text](url)`, images `![](...)`, `_underscore_` emphasis, `~~strike~~`, blockquotes `>`, horizontal rules `---`, ordered or nested lists, HTML, and Homebrewery extras such as `\page`, `\column` or `{{...}}` blocks. Two-column layout is a viewer toggle, not markup. Use headings and `:::` blocks for structure.
+
+Safe skeleton:
+```markdown
+## The Cellar
+
+The innkeeper @npc[npc-locandiere] leads you down the stairs. It smells of damp stone.
+
+:::read-aloud
+The torchlight trembles. Somewhere below, bones scrape against the floor.
+:::
+
+:::dm-note
+- DC 14 Perception to notice the trapdoor.
+- The skeletons wake if the party makes noise.
+:::
+
+| Roll | Event |
+|---|---|
+| 1-3 | Nothing |
+| 4-6 | @sfx[sfx-door-creak] A skeleton appears |
+```
+
+---
+
+## 4. Adding NPCs, Monsters, Sounds, Assets and Encounters to a Scene
 
 There are three independent ways to attach entities to a scene. Combine them: a good scene usually mentions its entities inline **and** links them.
 
-### 3.1 Inline mentions in the scene text (`--markdown`)
+### 4.1 Inline mentions in the scene text (`--markdown`)
 A **mention** is a token in the story text that the app turns into a clickable badge, button or card. Not to be confused with **labels** (the free-text `tags` on entities, see "Labels").
 
 | Mention | Refers to | Renders as | Placement |
@@ -359,7 +406,7 @@ Rules:
 3. `encounters add` does **not** insert `@encounter[id]` in the text: add that line yourself with `stories scene update ... --markdown`.
 4. After deleting an entity, remove its mentions from the text.
 
-### 3.2 Scene links (quick-access panels in the Live Console)
+### 4.2 Scene links (quick-access panels in the Live Console)
 Independent of the text, a scene keeps two lists shown while running a session:
 ```bash
 vellum-cli stories scene add <adventureId> --title "..." --characters "npc-locandiere,mon-scheletro" --sfx "sfx-door-creak" --json
@@ -367,8 +414,8 @@ vellum-cli stories scene update <adventureId> <sceneId> --characters "npc-locand
 ```
 `--characters` takes NPC and monster ids; `--sfx` takes sfx ids. Each option **replaces** the whole list, so pass every id you want to keep. Assets have no scene link: they are only reachable through `@asset[...]` in the text.
 
-### 3.3 Encounters (combat setups)
-Monsters fight through an encounter, not through mentions. Create it on the scene with `slots` listing monster ids and counts, then mention it with `@encounter[id]` (see 3.1):
+### 4.3 Encounters (combat setups)
+Monsters fight through an encounter, not through mentions. Create it on the scene with `slots` listing monster ids and counts, then mention it with `@encounter[id]` (see 4.1):
 ```bash
 vellum-cli encounters add <adventureId> <sceneId> --name "Cellar Ambush" --difficulty "Media"   --slots '[{"characterId":"mon-scheletro","count":3}]' [--sfx <sfxId>] --json
 ```
@@ -376,14 +423,14 @@ vellum-cli encounters add <adventureId> <sceneId> --name "Cellar Ambush" --diffi
 
 ---
 
-## 4. Standard AI Agent Recipes
+## 5. Standard AI Agent Recipes
 
 ### Recipe A: Generating a New 3-Scene One-Shot Adventure
 1. Check available PCs/NPCs/Monsters:
    `vellum-cli characters list --json`
 2. Create the adventure blueprint:
    `vellum-cli stories create --title "Whispers of the Frost Peak" --type oneshot --level "Level 3" --json`
-3. Add Scene 1, Scene 2, and Scene 3 with Homebrewery markdown and linked characters. Add mentions as plain `@npc[id]`, `@sfx[id]`, `@asset[name]` (never inside bold/italic/backticks) and link them with `--characters` / `--sfx`: see section 3.
+3. Add Scene 1, Scene 2, and Scene 3 with Homebrewery markdown and linked characters. Add mentions as plain `@npc[id]`, `@sfx[id]`, `@asset[name]` (never inside bold/italic/backticks) and link them with `--characters` / `--sfx`: see section 4.
 4. Run integrity check:
    `vellum-cli db validate --json`
 

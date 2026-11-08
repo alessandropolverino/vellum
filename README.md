@@ -11,6 +11,7 @@ Web & Desktop application (**Tauri v2 + React 19 + TypeScript + Tailwind CSS**) 
      - `:::dm-note` ... `:::` → Secret Dungeon Master notes (hidden with 1 click in *Player View*).
      - `@sfx[id]` → Embeds an interactive audio trigger button right inside your story text.
      - `@npc[id]` → Embeds a clickable badge that opens the character or monster's 5e sheet/statblock in a modal.
+     - `@asset[name]` → Embeds a button that opens a stored image (handout, map, illustration), which the DM can show to players.
      - `@statblock[id]` → Renders the full D&D 5e statblock card inline on the page.
      - `@encounter[id]` → Embeds a prepared combat encounter card with a **"⚔️ Start Combat"** button.
 
