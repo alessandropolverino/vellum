@@ -4,6 +4,8 @@ All notable user-facing changes to Vellum are documented in this file.
 
 ## Unreleased
 
+## Windows 0.3.0 — 2026-11-08
+
 - App: Labels for assets, characters (PCs, NPCs, monsters) and sounds. Add free-text labels in each editor (with autocomplete from labels you already use), see them as chips in the lists, and filter any list by one or more labels from the new "Labels" menu (click a chip to filter by it). In the CLI use `--labels`, `--add-label`, `--remove-label` and `--label`, plus `vellum labels list|rename` and `vellum sfx update`. Labels reuse the existing tags of each entity, so nothing is migrated.
 - App: New "Assets" entity: images with a caption and tags, managed in the new Assets tab (and via `vellum assets` in the CLI). The image is optional and can be framed (pan, zoom, 16:9 / 4:3 / 1:1 / 3:4) in an editor like the portrait one. Tag one in scene text with `@asset[Name]` (or the new "Insert @asset" menu in the Story Editor); clicking it opens the image.
 - App: Showing content to players is now done from the entity itself. Click a tagged character, NPC, monster or asset in the Live Console and use the new "Show to players" panel next to its window: show it to everyone or only to selected connected players. Only stored entities can be shown; the old character picker in the QR dialog is replaced by a status line with a Stop button.
