@@ -219,7 +219,7 @@ node bin/vellum.mjs <command> ...
 ---
 
 ### Assets (`assets`)
-Images with a caption, mentioned in scene text as `@asset[<name>]` (case-insensitive; the id also works; see "Mentions in Story Text"). The image is optional. In the Live Console a click on the mention opens the image and lets the DM show it to all connected players or only some of them.
+Images with a caption, mentioned in scene text as `@asset[<name>]` (case-insensitive; the id also works; see section 3). The image is optional. In the Live Console a click on the mention opens the image and lets the DM show it to all connected players or only some of them.
 - **List / get** (image data is omitted unless `--full`):
   ```bash
   vellum-cli assets list [--label a,b] [--search <query>] --json
@@ -327,21 +327,52 @@ Labels are free-text tags stored in the `tags` array of **characters (PCs, NPCs,
 
 ---
 
-## 3. Mentions in Story Text (`@npc[...]`, `@sfx[...]`, `@asset[...]`, `@encounter[...]`)
+## 3. Adding NPCs, Monsters, Sounds, Assets and Encounters to a Scene
 
-Scene text (`--markdown`) can **mention** stored entities. The app turns each mention into a clickable badge or button, so it already stands out and needs no extra formatting. Not to be confused with **labels** (the free-text `tags` on entities, see "Labels").
+There are three independent ways to attach entities to a scene. Combine them: a good scene usually mentions its entities inline **and** links them.
 
-| Mention | Refers to | Notes |
-|---|---|---|
-| `@npc[<characterId>]` | PC, NPC or monster | Opens the statblock. Use the character **id** (e.g. `npc-locandiere`). |
-| `@sfx[<sfxId>]` | Sound effect | Play/stop button. Use the sfx **id**. |
-| `@asset[<name>]` | Asset (image) | Name is case-insensitive; the id also works. |
-| `@encounter[<encounterId>]` | Battle encounter | Must sit **alone on its own line**. |
+### 3.1 Inline mentions in the scene text (`--markdown`)
+A **mention** is a token in the story text that the app turns into a clickable badge, button or card. Not to be confused with **labels** (the free-text `tags` on entities, see "Labels").
+
+| Mention | Refers to | Renders as | Placement |
+|---|---|---|---|
+| `@npc[<characterId>]` | PC, NPC **or monster** | Badge opening the sheet (monsters get a red skull badge) | Inline, inside a sentence |
+| `@statblock[<characterId>]` | PC, NPC or monster | Full 5e statblock card | **Alone on its own line** |
+| `@sfx[<sfxId>]` | Sound effect | Play/stop button | Inline |
+| `@asset[<name>]` | Asset (image); name is case-insensitive, the id also works | Button opening the image | Inline |
+| `@encounter[<encounterId>]` | Battle encounter of this scene | Card with a "Start Combat" button | **Alone on its own line** |
+
+Example scene markdown:
+```markdown
+The innkeeper @npc[npc-locandiere] points at the cellar door. Two @npc[mon-scheletro] rattle below.
+
+@statblock[mon-scheletro]
+
+@sfx[sfx-door-creak] The trapdoor opens onto the @asset[Cellar map].
+
+@encounter[enc-cellar-ambush-1a2b]
+```
 
 Rules:
-1. **Never wrap a mention in formatting**: no `**bold**`, `*italic*` or backticks. `**@npc[npc-locandiere]**` is parsed as bold text first, so the badge is not rendered and the raw text shows up. Write `@npc[npc-locandiere]` plain; put emphasis on the surrounding words instead.
-2. Copy the id/name exactly from `characters list`, `sfx list`, `assets list` or `encounters list`. A wrong one renders a red "not found" chip.
-3. After deleting an entity, remove its mentions from the text.
+1. **Never wrap a mention in formatting**: no `**bold**`, `*italic*` or backticks. `**@npc[npc-locandiere]**` is parsed as bold text first, so the badge is not rendered and the raw text shows up. Write it plain and put emphasis on the surrounding words.
+2. Ids come from the CLI: `characters list`, `sfx list`, `encounters list`; assets by name from `assets list`. A wrong one renders a red "not found" chip.
+3. `encounters add` does **not** insert `@encounter[id]` in the text: add that line yourself with `stories scene update ... --markdown`.
+4. After deleting an entity, remove its mentions from the text.
+
+### 3.2 Scene links (quick-access panels in the Live Console)
+Independent of the text, a scene keeps two lists shown while running a session:
+```bash
+vellum-cli stories scene add <adventureId> --title "..." --characters "npc-locandiere,mon-scheletro" --sfx "sfx-door-creak" --json
+vellum-cli stories scene update <adventureId> <sceneId> --characters "npc-locandiere" --sfx "sfx-door-creak" --json
+```
+`--characters` takes NPC and monster ids; `--sfx` takes sfx ids. Each option **replaces** the whole list, so pass every id you want to keep. Assets have no scene link: they are only reachable through `@asset[...]` in the text.
+
+### 3.3 Encounters (combat setups)
+Monsters fight through an encounter, not through mentions. Create it on the scene with `slots` listing monster ids and counts, then mention it with `@encounter[id]` (see 3.1):
+```bash
+vellum-cli encounters add <adventureId> <sceneId> --name "Cellar Ambush" --difficulty "Media"   --slots '[{"characterId":"mon-scheletro","count":3}]' [--sfx <sfxId>] --json
+```
+`--sfx` plays automatically when combat starts.
 
 ---
 
@@ -352,7 +383,7 @@ Rules:
    `vellum-cli characters list --json`
 2. Create the adventure blueprint:
    `vellum-cli stories create --title "Whispers of the Frost Peak" --type oneshot --level "Level 3" --json`
-3. Add Scene 1, Scene 2, and Scene 3 with Homebrewery markdown and linked characters. Mention characters, sounds and assets as plain `@npc[id]`, `@sfx[id]`, `@asset[name]` (never inside bold/italic/backticks).
+3. Add Scene 1, Scene 2, and Scene 3 with Homebrewery markdown and linked characters. Add mentions as plain `@npc[id]`, `@sfx[id]`, `@asset[name]` (never inside bold/italic/backticks) and link them with `--characters` / `--sfx`: see section 3.
 4. Run integrity check:
    `vellum-cli db validate --json`
 

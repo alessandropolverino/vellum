@@ -72,11 +72,15 @@ ${c.bold('3. ID CONVENTIONS:')}
    - Party:      ${c.cyan('party-<slug>')}
    - Instance:   ${c.cyan('inst-<slug>')}
 
-${c.bold('4. MENTIONS IN STORY TEXT (not to be confused with labels/tags):')}
-   Scene markdown can mention stored entities: ${c.cyan('@npc[id]')} (character/monster), ${c.cyan('@sfx[id]')},
-   ${c.cyan('@asset[name]')}, and ${c.cyan('@encounter[id]')} (alone on its own line). The app renders each as a badge.
-   ${c.bold('Never wrap a mention in bold, italic or backticks')}: ${c.dim('**@npc[x]**')} is parsed as bold text and the badge is lost.
-   Write ${c.dim('@npc[npc-locandiere]')} plain and emphasise the words around it. Use ids/names exactly as listed by the CLI.
+${c.bold('4. ADDING ENTITIES TO A SCENE (mentions are not labels/tags):')}
+   a) Inline mentions in --markdown (rendered as badges/buttons/cards):
+      ${c.cyan('@npc[id]')} character or monster badge (inline)    ${c.cyan('@sfx[id]')} sound button (inline)
+      ${c.cyan('@asset[name]')} image button (inline, id also works)  ${c.cyan('@statblock[id]')} full statblock (own line)
+      ${c.cyan('@encounter[id]')} combat card (own line; encounters add does NOT insert it, add the line yourself)
+      ${c.bold('Never wrap a mention in bold, italic or backticks')}: ${c.dim('**@npc[x]**')} is parsed as bold text and the badge is lost.
+   b) Scene links for the Live Console panels: ${c.dim('stories scene add|update ... --characters id,id --sfx id,id')} (each replaces the list).
+   c) Monsters fight via encounters: ${c.dim('encounters add <adv> <scene> --name ... --slots "<json>"')}
+   Ids/names exactly as printed by the list commands. Full details: skills/vellum-cli/SKILL.md section 3.
 
 ${c.bold('5. TYPICAL AGENT WORKFLOWS:')}
 
