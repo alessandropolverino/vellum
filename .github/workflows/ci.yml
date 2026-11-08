@@ -1,8 +1,15 @@
 name: CI
 
+# CI runs only for release work: PRs into `main` (the dev -> main release PR),
+# release tags (including -rc.N pre-releases) and manual runs. Feature PRs into `dev` are not checked.
 on:
   pull_request:
-    branches: [dev, main]
+    branches: [main]
+  push:
+    tags:
+      - 'v[0-9]*'
+      - 'windows-v[0-9]*'
+  workflow_dispatch:
 
 jobs:
   check:

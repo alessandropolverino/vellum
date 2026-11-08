@@ -4,6 +4,7 @@ All notable user-facing changes to Vellum are documented in this file.
 
 ## Unreleased
 
+- Windows: CI now runs only on pull requests into `main`, release tags and manual runs, not on every PR into `dev` (contributor workflow only; no change for users).
 - App: Markdown rendering now supports 4th-level headings (`#### Title`), e.g. `#### 1. Captain Vane (Marquisate)`, in adventure and scene text.
 
 ## Windows 0.2.0 — 2026-10-25
