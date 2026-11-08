@@ -48,9 +48,10 @@ export const App: React.FC = () => {
       collectLabels(
         db.assets,
         db.characters.filter((c) => !c.instanceOnlyId),
-        db.sfxCatalog
+        db.sfxCatalog,
+        db.adventures.flatMap((a) => a.scenes.flatMap((s) => s.encounters))
       ),
-    [db.assets, db.characters, db.sfxCatalog]
+    [db.assets, db.characters, db.sfxCatalog, db.adventures]
   );
   const [storageSource, setStorageSource] = useState<string>('Loading...');
   const [lastSaveInfo, setLastSaveInfo] = useState<string>('');
@@ -514,6 +515,7 @@ export const App: React.FC = () => {
             characters={db.characters}
             sfxCatalog={db.sfxCatalog}
             assets={db.assets}
+            labelOptions={labelOptions}
             selectedAdventureId={selectedAdventureId}
             onSelectAdventure={setSelectedAdventureId}
             onSaveAdventure={handleSaveAdventure}

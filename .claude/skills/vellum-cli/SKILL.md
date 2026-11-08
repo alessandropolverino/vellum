@@ -9,38 +9,48 @@ This skill guides AI agents (Claude, Gemini, Codex, Antigravity, etc.) to progra
 
 ## 1. Running the CLI
 
-From the project root (or inside any worktree):
+**Use `vellum-cli`.** It is installed globally by the Vellum desktop installer (the `bin` folder is on the user's `PATH`), so it works from any directory. Every example below uses it.
 
 ```bash
-# Recommended command via npm:
-npm run cli -- <command> [subcommand] [arguments] [options]
+vellum-cli <command> [subcommand] [arguments] [options]
+```
 
-# Or direct invocation:
-node bin/vellum.mjs <command> [subcommand] [arguments] [options]
+`vellum-cli` vs `vellum`:
+- `vellum-cli` **never opens the app window**. It is a pure CLI wrapper (Node.js required) and the only name agents should use.
+- `vellum` with no arguments **launches the desktop app**. With a subcommand (`vellum stories list`) it behaves like `vellum-cli`, but don't rely on that: a typo or a missing argument can start the GUI instead.
+- Both read and write the database **file** directly. Neither talks to a running app window.
+
+Fallbacks, only when `vellum-cli` is not on `PATH` (e.g. an unbuilt checkout of the repo):
+
+```bash
+npm run cli -- <command> ...          # from the repo root or any worktree
+node bin/vellum.mjs <command> ...
 ```
 
 ### Critical Rules for AI Agents
 1. **Always use `--json` (or `-j`)**: Produces strict, machine-readable JSON without terminal colors or decorative borders.
-2. **Database Auto-Discovery**: The CLI automatically locates `data/dnd5e-db.json` in the current folder, parent folders, or worktree roots. To specify a custom database: `--db <path>` or set `VELLUM_DB_PATH`.
+2. **Database Auto-Discovery**: The CLI looks for `data/vellum-db.json` in the current folder, then parent folders and worktree roots (this is the dev database of a repo checkout). If none is found it uses the desktop app database in OS AppData. It also transparently migrates any legacy `dnd5e-db.json`. So **the working directory decides which database you touch**: run from a repo checkout and you edit the dev DB, run from anywhere else and you edit the installed app's DB. To force one: `--db <path>` or set `VELLUM_DB_PATH`. Run `vellum-cli db stats --json` first if unsure which one you got.
 3. **Atomic Saves**: The CLI writes changes atomically to prevent file corruption.
 4. **Use `@filepath` syntax**: For large markdown texts or complex JSON blueprints, write a temporary file and pass `--data @file.json` or `--markdown @scene.md`.
+5. **Validate after changes**: run `vellum-cli db validate --json` after creating or modifying adventures, scenes or characters.
+6. **Start with the guide**: `vellum-cli agent-guide` prints schemas, patterns and recipes.
 
 ---
 
 ## 2. Command Reference
 
 ### Database (`db`)
-- `npm run cli -- db stats --json`
-  Returns entity counts (campaigns, adventures, scenes, characters, parties, instances, sfx), file size, and timestamps.
-- `npm run cli -- db validate --json`
+- `vellum-cli db stats --json`
+  Returns entity counts (campaigns, adventures, scenes, characters, parties, instances, sfx, assets), file size, and timestamps.
+- `vellum-cli db validate --json`
   Validates database integrity: schema errors, duplicate IDs, and dangling foreign key references.
-- `npm run cli -- db backup [--output <path>] --json`
+- `vellum-cli db backup [--output <path>] --json`
   Creates a timestamped snapshot in `data/backups/`.
-- `npm run cli -- db export [--output <path>]`
+- `vellum-cli db export [--output <path>]`
   Exports full database JSON.
-- `npm run cli -- db import <file> [--merge | --replace] [--force] --json`
+- `vellum-cli db import <file> [--merge | --replace] [--force] --json`
   Imports an external database snapshot.
-- `npm run cli -- db seed [--force] --json`
+- `vellum-cli db seed [--force] --json`
   Re-seeds the database with default 5e content.
 
 ---
@@ -48,39 +58,39 @@ node bin/vellum.mjs <command> [subcommand] [arguments] [options]
 ### Stories & Adventures (`stories` / `adventures`)
 - **List stories**:
   ```bash
-  npm run cli -- stories list [--campaign <id>] [--type <oneshot|campaign_module>] [--tag <tag>] [--search <query>] --json
+  vellum-cli stories list [--campaign <id>] [--type <oneshot|campaign_module>] [--tag <tag>] [--search <query>] --json
   ```
 - **Get story**:
   ```bash
-  npm run cli -- stories get <adventureId> --json
+  vellum-cli stories get <adventureId> --json
   # To extract full Homebrewery markdown of all scenes:
-  npm run cli -- stories get <adventureId> --markdown
+  vellum-cli stories get <adventureId> --markdown
   ```
 - **Create story**:
   ```bash
-  npm run cli -- stories create --title "The Sunken Vault" --type oneshot --level "Level 3-4" --duration "3 hours" --tags "dungeon,undead" --json
+  vellum-cli stories create --title "The Sunken Vault" --type oneshot --level "Level 3-4" --duration "3 hours" --tags "dungeon,undead" --json
   ```
 - **Update story**:
   ```bash
-  npm run cli -- stories update <adventureId> --title "New Title" --level "Level 5" --json
+  vellum-cli stories update <adventureId> --title "New Title" --level "Level 5" --json
   ```
 - **Delete story**:
   ```bash
-  npm run cli -- stories delete <adventureId> [--force] --json
+  vellum-cli stories delete <adventureId> [--force] --json
   ```
 
 #### Story Scenes (`stories scene`)
 - **List scenes**:
   ```bash
-  npm run cli -- stories scene list <adventureId> --json
+  vellum-cli stories scene list <adventureId> --json
   ```
 - **Get scene**:
   ```bash
-  npm run cli -- stories scene get <adventureId> <sceneId> --json
+  vellum-cli stories scene get <adventureId> <sceneId> --json
   ```
 - **Add scene**:
   ```bash
-  npm run cli -- stories scene add <adventureId> \
+  vellum-cli stories scene add <adventureId> \
     --title "The Ancient Portcullis" \
     --code "Act I - Scene 1" \
     --location "Sunken Caverns" \
@@ -91,11 +101,11 @@ node bin/vellum.mjs <command> [subcommand] [arguments] [options]
   ```
 - **Update scene**:
   ```bash
-  npm run cli -- stories scene update <adventureId> <sceneId> --summary "New summary" --markdown @updated_scene.md --json
+  vellum-cli stories scene update <adventureId> <sceneId> --summary "New summary" --markdown @updated_scene.md --json
   ```
 - **Delete scene**:
   ```bash
-  npm run cli -- stories scene delete <adventureId> <sceneId> --json
+  vellum-cli stories scene delete <adventureId> <sceneId> --json
   ```
 
 ---
@@ -103,17 +113,18 @@ node bin/vellum.mjs <command> [subcommand] [arguments] [options]
 ### Characters, PGs, NPCs & Monsters (`characters` / `pgs` / `chars`)
 - **List characters**:
   ```bash
-  npm run cli -- characters list [--kind <pc|npc|monster>] [--search <query>] [--tag <tag>] --json
+  vellum-cli characters list [--kind <pc|npc|monster>] [--search <query>] [--label a,b] --json
+  # Labels (see "Labels" below): --labels a,b on create/update, or --add-label / --remove-label on update
   ```
 - **Get character**:
   ```bash
-  npm run cli -- characters get <characterId> --json
+  vellum-cli characters get <characterId> --json
   # Or print ASCII statblock card:
-  npm run cli -- characters get <characterId>
+  vellum-cli characters get <characterId>
   ```
 - **Create character**:
   ```bash
-  npm run cli -- characters create \
+  vellum-cli characters create \
     --name "Valerius Dawnstrider" \
     --kind pc \
     --role "Player: Alex" \
@@ -128,31 +139,31 @@ node bin/vellum.mjs <command> [subcommand] [arguments] [options]
   ```
 - **Update character**:
   ```bash
-  npm run cli -- characters update <characterId> --hp 45 --ac 19 --json
+  vellum-cli characters update <characterId> --hp 45 --ac 19 --json
   ```
 - **Level up character (in-place or save as new blueprint)**:
   ```bash
   # In-place level-up (advances level, recalculates HP max and hit dice formula)
-  npm run cli -- characters level-up <characterId> --to-level 5 --json
+  vellum-cli characters level-up <characterId> --to-level 5 --json
 
   # Level up and save as new blueprint template (preserves lower-level original)
-  npm run cli -- characters level-up <characterId> --to-level 5 --save-as-new --name "Valerius (Level 5)" --json
+  vellum-cli characters level-up <characterId> --to-level 5 --save-as-new --name "Valerius (Level 5)" --json
   ```
 - **Delete character**:
   ```bash
-  npm run cli -- characters delete <characterId> [--force] --json
+  vellum-cli characters delete <characterId> [--force] --json
   ```
 - **Manage actions & traits**:
   ```bash
   # Add action
-  npm run cli -- characters action add <characterId> \
+  vellum-cli characters action add <characterId> \
     --name "Smite" \
     --desc "Deals extra 2d8 radiant damage on melee hit" \
     --damage "2d8" \
     --json
 
   # Remove action
-  npm run cli -- characters action remove <characterId> "Smite" --json
+  vellum-cli characters action remove <characterId> "Smite" --json
   ```
 
 ---
@@ -160,15 +171,15 @@ node bin/vellum.mjs <command> [subcommand] [arguments] [options]
 ### Campaigns (`campaigns`)
 - **List campaigns**:
   ```bash
-  npm run cli -- campaigns list [--status <status>] --json
+  vellum-cli campaigns list [--status <status>] --json
   ```
 - **Get campaign**:
   ```bash
-  npm run cli -- campaigns get <campaignId> --json
+  vellum-cli campaigns get <campaignId> --json
   ```
 - **Create campaign**:
   ```bash
-  npm run cli -- campaigns create \
+  vellum-cli campaigns create \
     --title "Shadows over Neverwinter" \
     --setting "Sword Coast" \
     --desc "An investigative and heroic arc against the Cult of the Dragon." \
@@ -177,11 +188,11 @@ node bin/vellum.mjs <command> [subcommand] [arguments] [options]
   ```
 - **Update campaign**:
   ```bash
-  npm run cli -- campaigns update <campaignId> --status "Concluded" --json
+  vellum-cli campaigns update <campaignId> --status "Concluded" --json
   ```
 - **Delete campaign**:
   ```bash
-  npm run cli -- campaigns delete <campaignId> [--force] --json
+  vellum-cli campaigns delete <campaignId> [--force] --json
   ```
 
 ---
@@ -189,20 +200,61 @@ node bin/vellum.mjs <command> [subcommand] [arguments] [options]
 ### Adventuring Parties (`parties`)
 - **List parties**:
   ```bash
-  npm run cli -- parties list --json
+  vellum-cli parties list --json
   ```
 - **Get party**:
   ```bash
-  npm run cli -- parties get <partyId> --json
+  vellum-cli parties get <partyId> --json
   ```
 - **Create party**:
   ```bash
-  npm run cli -- parties create --name "The Silver Ravens" --members "pc-tharion,pc-lyra" --json
+  vellum-cli parties create --name "The Silver Ravens" --members "pc-tharion,pc-lyra" --json
   ```
 - **Add / Remove party member**:
   ```bash
-  npm run cli -- parties add-member <partyId> <characterId> --json
-  npm run cli -- parties remove-member <partyId> <characterId> --json
+  vellum-cli parties add-member <partyId> <characterId> --json
+  vellum-cli parties remove-member <partyId> <characterId> --json
+  ```
+
+---
+
+### Assets (`assets`)
+Images with a caption, mentioned in scene text as `@asset[<name>]` (case-insensitive; the id also works; see section 4). The image is optional. In the Live Console a click on the mention opens the image and lets the DM show it to all connected players or only some of them.
+- **List / get** (image data is omitted unless `--full`):
+  ```bash
+  vellum-cli assets list [--label a,b] [--search <query>] --json
+  vellum-cli assets get <assetId> [--full] --json
+  ```
+- **Create** (names must be unique and without `[ ]`; optional `--image` takes a png/jpg/webp/gif file path or a data URL):
+  ```bash
+  vellum-cli assets create --name "Tavern map" --image ./tavern.png --caption "The Silver Stag" --labels "map,tavern" --json
+  ```
+- **Update / delete**:
+  ```bash
+  vellum-cli assets update <assetId> --caption "New caption" [--image ./new.png | --clear-image] --json
+  vellum-cli assets delete <assetId> --json
+  ```
+
+---
+
+### Sound effects (`sfx`)
+- **List / get / label**:
+  ```bash
+  vellum-cli sfx list [--category <cat>] [--label a,b] [--search <query>] --json
+  vellum-cli sfx get <sfxId> --json
+  vellum-cli sfx update <sfxId> --add-label "tavern" --json
+  ```
+
+---
+
+### Labels (`labels`)
+Labels are free-text tags stored in the `tags` array of **characters (PCs, NPCs, monsters), sound effects and assets**. The app lets the DM edit them in each entity's editor and filter every list by them. They are **not** the `@npc[...]` / `@asset[...]` mentions used inside story text.
+- **Set on an entity** (`characters`, `assets`, `sfx`): `--labels "a,b"` replaces them (`--tags` is a legacy alias), `--add-label "a,b"` and `--remove-label "a,b"` adjust them. Matching is case-insensitive and duplicates are dropped.
+- **Filter a list**: `--label "a,b"` (alias `--tag`) keeps only entities carrying **all** the given labels.
+- **Inspect / rename across entities**:
+  ```bash
+  vellum-cli labels list --json
+  vellum-cli labels rename "tavern" "inn" --json
   ```
 
 ---
@@ -210,11 +262,11 @@ node bin/vellum.mjs <command> [subcommand] [arguments] [options]
 ### Battle Encounters (`encounters`)
 - **List encounters**:
   ```bash
-  npm run cli -- encounters list <adventureId> [sceneId] --json
+  vellum-cli encounters list <adventureId> [sceneId] --json
   ```
 - **Add encounter**:
   ```bash
-  npm run cli -- encounters add <adventureId> <sceneId> \
+  vellum-cli encounters add <adventureId> <sceneId> \
     --name "Crypt Ambush" \
     --difficulty "Media" \
     --slots '[{"characterId":"mon-skeleton-guard","count":3}]' \
@@ -222,7 +274,7 @@ node bin/vellum.mjs <command> [subcommand] [arguments] [options]
   ```
 - **Delete encounter**:
   ```bash
-  npm run cli -- encounters delete <adventureId> <sceneId> <encounterId> --json
+  vellum-cli encounters delete <adventureId> <sceneId> <encounterId> --json
   ```
 
 ---
@@ -230,23 +282,23 @@ node bin/vellum.mjs <command> [subcommand] [arguments] [options]
 ### Live Play Instances & Combat Tracker (`instances`)
 - **List active instances**:
   ```bash
-  npm run cli -- instances list [--status <active|paused|completed>] --json
+  vellum-cli instances list [--status <active|paused|completed>] --json
   ```
 - **Get instance details & timeline**:
   ```bash
-  npm run cli -- instances get <instanceId> --json
+  vellum-cli instances get <instanceId> --json
   ```
 - **Create session instance**:
   ```bash
-  npm run cli -- instances create --adventure <adventureId> --name "Thursday Night Campaign" --party <partyId> --json
+  vellum-cli instances create --adventure <adventureId> --name "Thursday Night Campaign" --party <partyId> --json
   ```
 - **Transition scene**:
   ```bash
-  npm run cli -- instances set-scene <instanceId> <sceneId> --json
+  vellum-cli instances set-scene <instanceId> <sceneId> --json
   ```
 - **Log timeline event**:
   ```bash
-  npm run cli -- instances log <instanceId> \
+  vellum-cli instances log <instanceId> \
     --category choice \
     --title "Bribed the Gate Guard" \
     --details "Paid 25gp to avoid raising the alarm" \
@@ -254,7 +306,7 @@ node bin/vellum.mjs <command> [subcommand] [arguments] [options]
   ```
 - **Update PC runtime status**:
   ```bash
-  npm run cli -- instances pc-status <instanceId> <characterId> \
+  vellum-cli instances pc-status <instanceId> <characterId> \
     --hp 12 \
     --temp-hp 5 \
     --condition "Avvelenato" \
@@ -264,30 +316,126 @@ node bin/vellum.mjs <command> [subcommand] [arguments] [options]
 - **Combat management**:
   ```bash
   # Start combat encounter
-  npm run cli -- instances combat start <instanceId> --title "Ambush in the Catacombs" --json
+  vellum-cli instances combat start <instanceId> --title "Ambush in the Catacombs" --json
 
   # Advance initiative turn
-  npm run cli -- instances combat next <instanceId> --json
+  vellum-cli instances combat next <instanceId> --json
 
   # End combat
-  npm run cli -- instances combat end <instanceId> --json
+  vellum-cli instances combat end <instanceId> --json
   ```
 
 ---
 
-## 3. Standard AI Agent Recipes
+## 3. Formatting Rules for Scene Markdown
+
+Scene text (`--markdown`, stored as `homebreweryMarkdown`) is **not** CommonMark/GitHub markdown. Vellum parses it **line by line** with its own small renderer, so anything outside the list below shows up as literal text. Write only what is listed.
+
+**Blocks** (each decided by how the line starts, after trimming spaces):
+| You write | Result | Gotchas |
+|---|---|---|
+| `# `, `## `, `### `, `#### ` + text | Heading levels 1-4 | A space after the `#`s is required; `#####` is not a heading. Heading text is **plain**: no bold/italic/code and no mentions inside it. |
+| `- item` (one per line) | Bullet list | Only `- `. One level only: indentation is ignored, so nested lists flatten. `* item`, `+ item` and `1. item` are **not** lists. |
+| `\| a \| b \|` rows | Table | First row = header, the **second row is always discarded** as the separator (write `\|---\|---\|`), at least 2 rows. No column alignment. Cells may contain inline formatting and mentions. |
+| `:::read-aloud` ... `:::` | Boxed text for the players, rendered in italics automatically | Do not add `*italics*` yourself. Paragraphs are separated by a **blank line**. Inline formatting and mentions work; `- ` lists, headings, tables and statblocks do not. |
+| `:::dm-note` ... `:::` | Secret DM note (hidden in Player View) | Each line is its own paragraph; `- ` bullets work. Inline formatting and mentions work; no headings, tables or statblocks. |
+| `@statblock[id]`, `@encounter[id]` | Statblock card, combat card | Must be alone on the line (see section 4). |
+| anything else | Paragraph | See below. |
+
+**Paragraphs**: every non-empty line becomes **its own paragraph**; consecutive lines are NOT joined, and blank lines are only skipped. So write one paragraph per line and do not hard-wrap sentences at 80 columns. The first long paragraph automatically gets a decorative drop cap: do not fake one.
+
+**Inline formatting** (paragraphs, list items, table cells, read-aloud and DM notes):
+- `**bold**`, `*italic*` and `` `code` `` only.
+- **No nesting**: `***both***`, bold containing italic, or a mention inside bold/italic/code all fail. The text between the markers cannot contain `*`.
+- Mentions (`@npc[...]`, `@sfx[...]`, `@asset[...]`) are inline tokens: see section 4, never format them.
+
+**Not supported** (rendered as literal characters): links `[text](url)`, images `![](...)`, `_underscore_` emphasis, `~~strike~~`, blockquotes `>`, horizontal rules `---`, ordered or nested lists, HTML, and Homebrewery extras such as `\page`, `\column` or `{{...}}` blocks. Two-column layout is a viewer toggle, not markup. Use headings and `:::` blocks for structure.
+
+Safe skeleton:
+```markdown
+## The Cellar
+
+The innkeeper @npc[npc-locandiere] leads you down the stairs. It smells of damp stone.
+
+:::read-aloud
+The torchlight trembles. Somewhere below, bones scrape against the floor.
+:::
+
+:::dm-note
+- DC 14 Perception to notice the trapdoor.
+- The skeletons wake if the party makes noise.
+:::
+
+| Roll | Event |
+|---|---|
+| 1-3 | Nothing |
+| 4-6 | @sfx[sfx-door-creak] A skeleton appears |
+```
+
+---
+
+## 4. Adding NPCs, Monsters, Sounds, Assets and Encounters to a Scene
+
+There are three independent ways to attach entities to a scene. Combine them: a good scene usually mentions its entities inline **and** links them.
+
+### 4.1 Inline mentions in the scene text (`--markdown`)
+A **mention** is a token in the story text that the app turns into a clickable badge, button or card. Not to be confused with **labels** (the free-text `tags` on entities, see "Labels").
+
+| Mention | Refers to | Renders as | Placement |
+|---|---|---|---|
+| `@npc[<characterId>]` | PC, NPC **or monster** | Badge opening the sheet (monsters get a red skull badge) | Inline, inside a sentence |
+| `@statblock[<characterId>]` | PC, NPC or monster | Full 5e statblock card | **Alone on its own line** |
+| `@sfx[<sfxId>]` | Sound effect | Play/stop button | Inline |
+| `@asset[<name>]` | Asset (image); name is case-insensitive, the id also works | Button opening the image | Inline |
+| `@encounter[<encounterId>]` | Battle encounter of this scene | Card with a "Start Combat" button | **Alone on its own line** |
+
+Example scene markdown:
+```markdown
+The innkeeper @npc[npc-locandiere] points at the cellar door. Two @npc[mon-scheletro] rattle below.
+
+@statblock[mon-scheletro]
+
+@sfx[sfx-door-creak] The trapdoor opens onto the @asset[Cellar map].
+
+@encounter[enc-cellar-ambush-1a2b]
+```
+
+Rules:
+1. **Never wrap a mention in formatting**: no `**bold**`, `*italic*` or backticks. `**@npc[npc-locandiere]**` is parsed as bold text first, so the badge is not rendered and the raw text shows up. Write it plain and put emphasis on the surrounding words.
+2. Ids come from the CLI: `characters list`, `sfx list`, `encounters list`; assets by name from `assets list`. A wrong one renders a red "not found" chip.
+3. `encounters add` does **not** insert `@encounter[id]` in the text: add that line yourself with `stories scene update ... --markdown`.
+4. After deleting an entity, remove its mentions from the text.
+
+### 4.2 Scene links (quick-access panels in the Live Console)
+Independent of the text, a scene keeps two lists shown while running a session:
+```bash
+vellum-cli stories scene add <adventureId> --title "..." --characters "npc-locandiere,mon-scheletro" --sfx "sfx-door-creak" --json
+vellum-cli stories scene update <adventureId> <sceneId> --characters "npc-locandiere" --sfx "sfx-door-creak" --json
+```
+`--characters` takes NPC and monster ids; `--sfx` takes sfx ids. Each option **replaces** the whole list, so pass every id you want to keep. Assets have no scene link: they are only reachable through `@asset[...]` in the text.
+
+### 4.3 Encounters (combat setups)
+Monsters fight through an encounter, not through mentions. Create it on the scene with `slots` listing monster ids and counts, then mention it with `@encounter[id]` (see 4.1):
+```bash
+vellum-cli encounters add <adventureId> <sceneId> --name "Cellar Ambush" --difficulty "Media"   --slots '[{"characterId":"mon-scheletro","count":3}]' [--sfx <sfxId>] --json
+```
+`--sfx` plays automatically when combat starts.
+
+---
+
+## 5. Standard AI Agent Recipes
 
 ### Recipe A: Generating a New 3-Scene One-Shot Adventure
 1. Check available PCs/NPCs/Monsters:
-   `npm run cli -- characters list --json`
+   `vellum-cli characters list --json`
 2. Create the adventure blueprint:
-   `npm run cli -- stories create --title "Whispers of the Frost Peak" --type oneshot --level "Level 3" --json`
-3. Add Scene 1, Scene 2, and Scene 3 with Homebrewery markdown and linked characters.
+   `vellum-cli stories create --title "Whispers of the Frost Peak" --type oneshot --level "Level 3" --json`
+3. Add Scene 1, Scene 2, and Scene 3 with Homebrewery markdown and linked characters. Add mentions as plain `@npc[id]`, `@sfx[id]`, `@asset[name]` (never inside bold/italic/backticks) and link them with `--characters` / `--sfx`: see section 4.
 4. Run integrity check:
-   `npm run cli -- db validate --json`
+   `vellum-cli db validate --json`
 
 ### Recipe B: Batch Importing Entities via JSON
 Write an array or object to a file `payload.json`, then:
 ```bash
-npm run cli -- characters create --name "Captain Roderick" --data @payload.json --json
+vellum-cli characters create --name "Captain Roderick" --data @payload.json --json
 ```

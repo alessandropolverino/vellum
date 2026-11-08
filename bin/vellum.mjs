@@ -12,6 +12,7 @@ import { handleSfx } from './lib/sfx.mjs';
 import { handleAssets } from './lib/assets.mjs';
 import { handleLabels } from './lib/labels.mjs';
 import { handleDb } from './lib/dbCmd.mjs';
+import { handleSkill } from './lib/skill.mjs';
 import { error } from './lib/output.mjs';
 
 const VERSION = '0.1.0';
@@ -92,6 +93,10 @@ async function main() {
     case 'db':
     case 'database':
       return handleDb(options.help && !subCommand ? 'help' : subCommand, remainingArgs, options);
+
+    case 'skill':
+    case 'skills':
+      return handleSkill(options.help && !subCommand ? 'help' : subCommand, remainingArgs, options);
 
     case 'agent-guide':
     case 'agent':

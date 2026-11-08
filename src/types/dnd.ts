@@ -225,6 +225,8 @@ export interface EncounterPreset {
   description: string;
   slots: EncounterSlot[];
   autoSfxId?: string;
+  /** Free-text labels used to categorize encounters (same behaviour as other entities). */
+  tags?: string[];
 }
 
 export interface AdventureScene {

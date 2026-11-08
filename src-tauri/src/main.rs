@@ -36,6 +36,8 @@ fn is_cli_subcommand(arg: &str) -> bool {
             | "backup"
             | "stats"
             | "sfx"
+            | "skill"
+            | "skills"
     )
 }
 
