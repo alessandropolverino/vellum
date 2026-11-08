@@ -4,6 +4,8 @@ All notable user-facing changes to Vellum are documented in this file.
 
 ## Unreleased
 
+- Windows: Live session layout: a quick-log box is now always visible in the right column (default category "General", optional details), scene sheets moved into a new "Sheets" tab, and log entries can now be edited as well as deleted.
+
 ## Windows 0.4.1 — 2026-11-08
 
 - Windows: Fixed the installer wiping the user PATH on update: when your PATH was long, the installer replaced it with just the Vellum `bin` folder (breaking `node`, `cargo`, etc. in new terminals). It now edits PATH safely, keeps `%VAR%` entries, never adds the Vellum folder twice, and leaves PATH untouched on any error.

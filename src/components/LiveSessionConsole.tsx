@@ -96,13 +96,19 @@ export const LiveSessionConsole: React.FC<LiveSessionConsoleProps> = ({
   const { confirm: confirmDialog } = useDialogs();
   const [, setAudioTick] = useState(0);
   const [centerTab, setCenterTab] = useState<'story' | 'combat'>('story');
-  const [sideTab, setSideTab] = useState<'scenes' | 'party' | 'sounds' | 'log'>('scenes');
+  const [sideTab, setSideTab] = useState<
+    'scenes' | 'sheets' | 'party' | 'sounds' | 'log'
+  >('scenes');
   const [hideDmNotes, setHideDmNotes] = useState(false);
   const [inspectedChar, setInspectedChar] = useState<CharacterEntity | null>(null);
   const [inspectedAsset, setInspectedAsset] = useState<Asset | null>(null);
   const [levelUpPc, setLevelUpPc] = useState<CharacterEntity | null>(null);
 
-  const [logCategory, setLogCategory] = useState<SessionLogCategory>('choice');
+  const [logCategory, setLogCategory] = useState<SessionLogCategory>('general');
+  const [logDetailsOpen, setLogDetailsOpen] = useState(false);
+  const [editingLogId, setEditingLogId] = useState<string | null>(null);
+  const [editLogTitle, setEditLogTitle] = useState('');
+  const [editLogDetails, setEditLogDetails] = useState('');
   const [logTitle, setLogTitle] = useState('');
   const [logDetails, setLogDetails] = useState('');
 
@@ -143,6 +149,10 @@ export const LiveSessionConsole: React.FC<LiveSessionConsoleProps> = ({
     SessionLogCategory,
     { label: string; badgeClass: string }
   > = {
+    general: {
+      label: tr('General', 'Generale'),
+      badgeClass: 'bg-stone-700/40 text-stone-300 border-stone-600',
+    },
     narrative: {
       label: tr('Story / Scene', 'Storia / Scena'),
       badgeClass: 'bg-amber-500/20 text-amber-300 border-amber-500/40',
@@ -1026,28 +1036,7 @@ export const LiveSessionConsole: React.FC<LiveSessionConsoleProps> = ({
 
           {centerTab === 'story' ? (
             <div className="space-y-3">
-              {/* Quick bar of NPCs present in the current scene */}
-              {sceneCharacters.length > 0 && (
-                <div className="bg-stone-900/90 border border-stone-800 rounded-xl px-3.5 py-2 flex flex-wrap items-center gap-2 text-xs">
-                  <span className="text-stone-400 font-semibold">
-                    {tr('Scene Sheets:', 'Schede della Scena:')}
-                  </span>
-                  {sceneCharacters.map((ch) => (
-                    <button
-                      key={ch.id}
-                      onClick={() => setInspectedChar(ch)}
-                      className="px-2.5 py-1 rounded-lg bg-stone-950 hover:bg-amber-600/20 border border-stone-700 hover:border-amber-500 text-amber-200 font-semibold flex items-center gap-1.5 transition"
-                    >
-                      <span>{ch.name}</span>
-                      <span className="text-[10px] text-stone-400">
-                        ({tr('AC', 'CA')} {ch.ac} • {tr('HP', 'PF')} {ch.hpMax})
-                      </span>
-                    </button>
-                  ))}
-                </div>
-              )}
-
-              <div className="max-h-[75vh] overflow-y-auto pr-1">
+              <div className="max-h-[80vh] overflow-y-auto pr-1">
                 <HomebreweryRenderer
                   markdown={currentScene.homebreweryMarkdown}
                   characters={characters}
@@ -1376,25 +1365,57 @@ export const LiveSessionConsole: React.FC<LiveSessionConsoleProps> = ({
           <div className="flex items-center gap-1">
             {(
               [
-                ['scenes', tr('Scenes', 'Scene')],
-                ['party', tr('Party', 'Gruppo')],
-                ['sounds', tr('Sounds', 'Suoni')],
-                ['log', tr('Log', 'Diario')],
+                ['scenes', tr('Scenes', 'Scene'), 0],
+                ['sheets', tr('Sheets', 'Schede'), sceneCharacters.length],
+                ['party', tr('Party', 'Gruppo'), 0],
+                ['sounds', tr('Sounds', 'Suoni'), 0],
+                ['log', tr('Log', 'Diario'), currentInstance.timeline.length],
               ] as const
-            ).map(([id, label]) => (
+            ).map(([id, label, count]) => (
               <button
                 key={id}
                 onClick={() => setSideTab(id)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer ${
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer flex items-center gap-1 ${
                   sideTab === id
                     ? 'bg-stone-800 text-amber-300'
                     : 'text-stone-400 hover:text-stone-200 hover:bg-stone-900'
                 }`}
               >
                 {label}
+                {count > 0 && (
+                  <span className="bg-amber-600 text-stone-950 rounded-full px-1.5 text-[10px] font-bold">
+                    {count}
+                  </span>
+                )}
               </button>
             ))}
           </div>
+
+          {sideTab === 'sheets' && (
+            <div className="bg-stone-900/90 border border-stone-800 rounded-xl p-3.5 space-y-2">
+              <div className="font-header text-xs font-bold text-amber-400 uppercase tracking-wider">
+                {tr('Scene Sheets', 'Schede della Scena')}
+              </div>
+              {sceneCharacters.length === 0 ? (
+                <p className="text-xs text-stone-500">
+                  {tr('No sheets linked to this scene.', 'Nessuna scheda collegata a questa scena.')}
+                </p>
+              ) : (
+                sceneCharacters.map((ch) => (
+                  <button
+                    key={ch.id}
+                    onClick={() => setInspectedChar(ch)}
+                    className="w-full flex items-center justify-between gap-2 px-3 py-2 rounded-lg bg-stone-950 hover:bg-amber-600/20 border border-stone-800 hover:border-amber-500 text-left text-xs transition cursor-pointer"
+                  >
+                    <span className="font-bold text-amber-200">{ch.name}</span>
+                    <span className="text-stone-400">
+                      {tr('AC', 'CA')} {ch.ac} • {tr('HP', 'PF')} {ch.hpMax}
+                    </span>
+                  </button>
+                ))
+              )}
+            </div>
+          )}
 
           {sideTab === 'scenes' && (
             <div className="space-y-4">
@@ -1765,47 +1786,8 @@ export const LiveSessionConsole: React.FC<LiveSessionConsoleProps> = ({
               </span>
             </div>
 
-            <form onSubmit={handleAddManualLog} className="space-y-2 text-xs">
-              <div className="flex gap-1.5">
-                <select
-                  value={logCategory}
-                  onChange={(e) => setLogCategory(e.target.value as SessionLogCategory)}
-                  className="px-2 py-1.5 rounded bg-stone-950 border border-stone-800 text-amber-300 font-semibold"
-                >
-                  {(Object.keys(logCategoryMeta) as SessionLogCategory[]).map((cat) => (
-                    <option key={cat} value={cat}>
-                      {logCategoryMeta[cat].label}
-                    </option>
-                  ))}
-                </select>
-                <input
-                  type="text"
-                  value={logTitle}
-                  onChange={(e) => setLogTitle(e.target.value)}
-                  placeholder={tr('Step / choice title...', 'Titolo passo / scelta...')}
-                  className="flex-1 px-2.5 py-1.5 rounded bg-stone-950 border border-stone-800 text-stone-100 font-semibold"
-                />
-              </div>
-              <textarea
-                rows={2}
-                value={logDetails}
-                onChange={(e) => setLogDetails(e.target.value)}
-                placeholder={tr(
-                  'Event details for the session recap...',
-                  'Dettaglio evento per il riepilogo della partita...'
-                )}
-                className="w-full px-2.5 py-1.5 rounded bg-stone-950 border border-stone-800 text-stone-200"
-              />
-              <button
-                type="submit"
-                className="w-full py-1.5 rounded-lg bg-amber-600 hover:bg-amber-500 text-stone-950 font-bold transition cursor-pointer"
-              >
-                {tr('+ Add Step to Recap', '+ Aggiungi Passo al Riepilogo')}
-              </button>
-            </form>
-
-            {/* Timeline Feed */}
-            <div className="space-y-2 max-h-[40vh] overflow-y-auto pr-1 pt-2 border-t border-stone-800">
+            {/* Timeline Feed (entries are added from the always-visible dock below) */}
+            <div className="space-y-2 max-h-[55vh] overflow-y-auto pr-1">
               {currentInstance.timeline.map((entry) => {
                 const meta = logCategoryMeta[entry.category];
                 return (
@@ -1822,20 +1804,77 @@ export const LiveSessionConsole: React.FC<LiveSessionConsoleProps> = ({
                       <div className="flex items-center gap-1.5 text-[10px] text-stone-500">
                         <span>{entry.sceneTitle.split(':')[0]}</span>
                         <button
+                          title={tr('Edit', 'Modifica')}
+                          onClick={() => {
+                            setEditingLogId(entry.id);
+                            setEditLogTitle(entry.title);
+                            setEditLogDetails(entry.details);
+                          }}
+                          className="hover:text-amber-300 cursor-pointer"
+                        >
+                          ✎
+                        </button>
+                        <button
+                          title={tr('Delete', 'Elimina')}
                           onClick={() =>
                             updateInstance({
                               timeline: currentInstance.timeline.filter((t) => t.id !== entry.id),
                             })
                           }
-                          className="hover:text-red-400"
+                          className="hover:text-red-400 cursor-pointer"
                         >
                           ×
                         </button>
                       </div>
                     </div>
-                    <div className="font-bold text-stone-100">{entry.title}</div>
-                    {entry.details && (
-                      <p className="text-stone-400 leading-snug text-[11px]">{entry.details}</p>
+                    {editingLogId === entry.id ? (
+                      <div className="space-y-1.5">
+                        <input
+                          value={editLogTitle}
+                          onChange={(e) => setEditLogTitle(e.target.value)}
+                          className="w-full px-2 py-1 rounded bg-stone-900 border border-stone-700 text-stone-100 font-semibold"
+                        />
+                        <textarea
+                          rows={2}
+                          value={editLogDetails}
+                          onChange={(e) => setEditLogDetails(e.target.value)}
+                          className="w-full px-2 py-1 rounded bg-stone-900 border border-stone-700 text-stone-200"
+                        />
+                        <div className="flex gap-1.5 justify-end">
+                          <button
+                            onClick={() => setEditingLogId(null)}
+                            className="px-2 py-1 rounded text-stone-400 hover:text-stone-200 cursor-pointer"
+                          >
+                            {tr('Cancel', 'Annulla')}
+                          </button>
+                          <button
+                            onClick={() => {
+                              updateInstance({
+                                timeline: currentInstance.timeline.map((t) =>
+                                  t.id === entry.id
+                                    ? {
+                                        ...t,
+                                        title: editLogTitle.trim() || t.title,
+                                        details: editLogDetails.trim(),
+                                      }
+                                    : t
+                                ),
+                              });
+                              setEditingLogId(null);
+                            }}
+                            className="px-2 py-1 rounded bg-amber-600 text-stone-950 font-bold cursor-pointer"
+                          >
+                            {tr('Save', 'Salva')}
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <>
+                        <div className="font-bold text-stone-100">{entry.title}</div>
+                        {entry.details && (
+                          <p className="text-stone-400 leading-snug text-[11px]">{entry.details}</p>
+                        )}
+                      </>
                     )}
                   </div>
                 );
@@ -1844,6 +1883,81 @@ export const LiveSessionConsole: React.FC<LiveSessionConsoleProps> = ({
           </div>
             </div>
           )}
+
+          {/* Quick log dock: always visible, whatever side tab is open */}
+          <form
+            onSubmit={handleAddManualLog}
+            className="sticky bottom-2 bg-stone-900 border border-amber-700/70 rounded-xl p-2.5 space-y-1.5 text-xs shadow-lg"
+          >
+            <div className="flex gap-1.5">
+              <select
+                value={logCategory}
+                onChange={(e) => setLogCategory(e.target.value as SessionLogCategory)}
+                className="px-2 py-1.5 rounded bg-stone-950 border border-stone-800 text-amber-300 font-semibold"
+              >
+                {(Object.keys(logCategoryMeta) as SessionLogCategory[]).map((cat) => (
+                  <option key={cat} value={cat}>
+                    {logCategoryMeta[cat].label}
+                  </option>
+                ))}
+              </select>
+              <input
+                type="text"
+                value={logTitle}
+                onChange={(e) => setLogTitle(e.target.value)}
+                placeholder={tr('What happened? (Enter to add)', 'Cosa è successo? (Invio per aggiungere)')}
+                className="flex-1 min-w-0 px-2.5 py-1.5 rounded bg-stone-950 border border-stone-800 text-stone-100"
+              />
+              <button
+                type="submit"
+                title={tr('Add to log', 'Aggiungi al diario')}
+                className="px-3 rounded-lg bg-amber-600 hover:bg-amber-500 text-stone-950 font-bold cursor-pointer"
+              >
+                +
+              </button>
+            </div>
+            {logDetailsOpen && (
+              <textarea
+                rows={2}
+                value={logDetails}
+                onChange={(e) => setLogDetails(e.target.value)}
+                placeholder={tr('Details (optional)...', 'Dettagli (opzionale)...')}
+                className="w-full px-2.5 py-1.5 rounded bg-stone-950 border border-stone-800 text-stone-200"
+              />
+            )}
+            <div className="flex items-center justify-between text-[11px] text-stone-500">
+              <button
+                type="button"
+                onClick={() => setLogDetailsOpen((o) => !o)}
+                className="text-amber-400 hover:text-amber-300 cursor-pointer"
+              >
+                {logDetailsOpen ? '▴' : '▾'} {tr('Details', 'Dettagli')}
+              </button>
+              <span className="truncate ml-2">
+                {currentScene.code} · {currentScene.title}
+              </span>
+            </div>
+            {currentInstance.timeline[0] && (
+              <button
+                type="button"
+                onClick={() => setSideTab('log')}
+                className="w-full text-left pt-1.5 border-t border-dashed border-stone-700 cursor-pointer"
+              >
+                <span className="block text-[10px] uppercase text-stone-500">
+                  {tr('Last entry', 'Ultima voce')} · {currentInstance.timeline.length}{' '}
+                  {tr('total', 'totali')}
+                </span>
+                <span
+                  className={`text-[10px] font-bold px-1.5 py-0.5 rounded border mr-1.5 ${
+                    logCategoryMeta[currentInstance.timeline[0].category].badgeClass
+                  }`}
+                >
+                  {logCategoryMeta[currentInstance.timeline[0].category].label}
+                </span>
+                <span className="text-stone-200">{currentInstance.timeline[0].title}</span>
+              </button>
+            )}
+          </form>
         </div>
       </div>
 
