@@ -64,6 +64,9 @@ jobs:
 
       - run: npm ci
 
+      - name: Check bundle resource layout
+        run: npm run check:bundle
+
       - name: Fetch cloudflared (live session tunnel)
         run: npm run fetch:cloudflared
 

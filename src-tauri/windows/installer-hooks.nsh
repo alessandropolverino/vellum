@@ -6,12 +6,35 @@
 ; reads back as "" and writing it back would wipe (or truncate) the user's PATH.
 ; On any error the PATH is left untouched.
 
+; Stops the live-session tunnel (bin\cloudflared.exe) if it is still running, so the installer
+; and uninstaller can replace/delete the file. Only processes whose executable is exactly
+; $INSTDIR\bin\cloudflared.exe are stopped; other cloudflared installs are left alone.
+!macro VELLUM_STOP_TUNNEL
+  System::Call 'kernel32::SetEnvironmentVariable(t "VELLUM_BIN_DIR", t "$INSTDIR\bin") i .r0'
+  nsExec::Exec '"$SYSDIR\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -NonInteractive -ExecutionPolicy Bypass -Command "Get-Process -Name cloudflared -ErrorAction SilentlyContinue | Where-Object { $$_.Path -ieq (Join-Path $$env:VELLUM_BIN_DIR \"cloudflared.exe\") } | Stop-Process -Force -ErrorAction SilentlyContinue"'
+  Pop $0
+  Sleep 500
+!macroend
+
+!macro NSIS_HOOK_PREINSTALL
+  !insertmacro VELLUM_STOP_TUNNEL
+!macroend
+
+!macro NSIS_HOOK_PREUNINSTALL
+  !insertmacro VELLUM_STOP_TUNNEL
+!macroend
+
 !macro NSIS_HOOK_POSTINSTALL
-  ; If resources were extracted to _up_\bin (older version fallback), copy them to bin\
+  ; Resources are bundled as directories (bin\, bin\lib\, skills\vellum-cli\) and keep their
+  ; structure. If an older build extracted them to _up_\bin, copy the tree to bin\ (the
+  ; wildcard form of CopyFiles also copies subdirectories, so lib\ is not flattened).
   CreateDirectory "$INSTDIR\bin"
   IfFileExists "$INSTDIR\_up_\bin\*.*" 0 +3
-    CopyFiles /SILENT "$INSTDIR\_up_\bin\*.*" "$INSTDIR\bin\"
+    CopyFiles /SILENT "$INSTDIR\_up_\bin\*.*" "$INSTDIR\bin"
     RMDir /r "$INSTDIR\_up_"
+
+  ; 0.4.0/0.4.1 flattened skills\vellum-cli\SKILL.md to skills\SKILL.md; drop the stray copy.
+  Delete "$INSTDIR\skills\SKILL.md"
 
   ; Write the PATH updater script to a temp file
   InitPluginsDir

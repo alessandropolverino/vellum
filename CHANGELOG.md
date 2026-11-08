@@ -4,6 +4,9 @@ All notable user-facing changes to Vellum are documented in this file.
 
 ## Unreleased
 
+- Windows: Fixed `vellum-cli` failing after an update with `ERR_MODULE_NOT_FOUND` for `lib/assets.mjs`: the installer flattened the CLI's `lib` folder and the `skills/vellum-cli` folder. They now install with their folder structure (updating or reinstalling repairs it), and the CLI reports a clear error if `lib` is ever missing.
+- Windows: Fixed updates sometimes failing at `cloudflared.exe`: the app now stops the live-session tunnel before installing an update, and the installer/uninstaller terminates a leftover `cloudflared.exe` from the Vellum folder (other cloudflared processes are not touched).
+
 ## Windows 0.4.1 — 2026-11-08
 
 - Windows: Fixed the installer wiping the user PATH on update: when your PATH was long, the installer replaced it with just the Vellum `bin` folder (breaking `node`, `cargo`, etc. in new terminals). It now edits PATH safely, keeps `%VAR%` entries, never adds the Vellum folder twice, and leaves PATH untouched on any error.

@@ -42,8 +42,8 @@
       }
     },
     "resources": {
-      "../bin/**/*": "bin/",
-      "../skills/**/*": "skills/"
+      "../bin": "bin",
+      "../skills": "skills"
     }
   },
   "plugins": {
