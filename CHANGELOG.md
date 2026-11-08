@@ -6,6 +6,7 @@ All notable user-facing changes to Vellum are documented in this file.
 
 - Windows: Fixed `vellum-cli` failing after an update with `ERR_MODULE_NOT_FOUND` for `lib/assets.mjs`: the installer flattened the CLI's `lib` folder and the `skills/vellum-cli` folder. They now install with their folder structure (updating or reinstalling repairs it), and the CLI reports a clear error if `lib` is ever missing.
 - Windows: Fixed updates sometimes failing at `cloudflared.exe`: the app now stops the live-session tunnel before installing an update, and the installer/uninstaller terminates a leftover `cloudflared.exe` from the Vellum folder (other cloudflared processes are not touched).
+- Windows: Live session layout: a quick-log box is now always visible in the right column (default category "General", optional details), scene sheets moved into a new "Sheets" tab, and log entries can now be edited as well as deleted.
 
 ## Windows 0.4.1 — 2026-11-08
 
