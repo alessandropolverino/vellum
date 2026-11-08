@@ -4,6 +4,10 @@ All notable user-facing changes to Vellum are documented in this file.
 
 ## Unreleased
 
+## Windows 0.4.1 — 2026-11-08
+
+- Windows: Fixed the installer wiping the user PATH on update: when your PATH was long, the installer replaced it with just the Vellum `bin` folder (breaking `node`, `cargo`, etc. in new terminals). It now edits PATH safely, keeps `%VAR%` entries, never adds the Vellum folder twice, and leaves PATH untouched on any error.
+
 ## Windows 0.4.0 — 2026-11-08
 
 - App: The Story Editor now leaves much more room to write. Scenes are a slim numbered column that expands on hover, the three toolbars are replaced by a floating insert bar (type `/` at the start of a line for the full menu), and sounds, NPCs, assets and encounters live in a collapsible dock at the bottom with quick chips for what is pinned to the scene. Typing inside `@npc[`, `@statblock[`, `@sfx[`, `@asset[` or `@encounter[` opens a picker with text search and label filters (use the arrow keys and Enter); the expanded dock has the same search and label filter. The duplicate "Saved" indicator is gone.
