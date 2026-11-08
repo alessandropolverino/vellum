@@ -219,7 +219,7 @@ node bin/vellum.mjs <command> ...
 ---
 
 ### Assets (`assets`)
-Images with a caption, taggable in scene text as `@asset[<name>]` (case-insensitive; the id also works). The image is optional. In the Live Console a click on the tag opens the image and lets the DM show it to all connected players or only some of them.
+Images with a caption, mentioned in scene text as `@asset[<name>]` (case-insensitive; the id also works; see "Mentions in Story Text"). The image is optional. In the Live Console a click on the mention opens the image and lets the DM show it to all connected players or only some of them.
 - **List / get** (image data is omitted unless `--full`):
   ```bash
   vellum-cli assets list [--label a,b] [--search <query>] --json
@@ -248,7 +248,7 @@ Images with a caption, taggable in scene text as `@asset[<name>]` (case-insensit
 ---
 
 ### Labels (`labels`)
-Labels are free-text tags stored in the `tags` array of **characters (PCs, NPCs, monsters), sound effects and assets**. The app lets the DM edit them in each entity's editor and filter every list by them. They are **not** the `@character[...]` / `@asset[...]` markdown references used inside text.
+Labels are free-text tags stored in the `tags` array of **characters (PCs, NPCs, monsters), sound effects and assets**. The app lets the DM edit them in each entity's editor and filter every list by them. They are **not** the `@npc[...]` / `@asset[...]` mentions used inside story text.
 - **Set on an entity** (`characters`, `assets`, `sfx`): `--labels "a,b"` replaces them (`--tags` is a legacy alias), `--add-label "a,b"` and `--remove-label "a,b"` adjust them. Matching is case-insensitive and duplicates are dropped.
 - **Filter a list**: `--label "a,b"` (alias `--tag`) keeps only entities carrying **all** the given labels.
 - **Inspect / rename across entities**:
@@ -327,14 +327,32 @@ Labels are free-text tags stored in the `tags` array of **characters (PCs, NPCs,
 
 ---
 
-## 3. Standard AI Agent Recipes
+## 3. Mentions in Story Text (`@npc[...]`, `@sfx[...]`, `@asset[...]`, `@encounter[...]`)
+
+Scene text (`--markdown`) can **mention** stored entities. The app turns each mention into a clickable badge or button, so it already stands out and needs no extra formatting. Not to be confused with **labels** (the free-text `tags` on entities, see "Labels").
+
+| Mention | Refers to | Notes |
+|---|---|---|
+| `@npc[<characterId>]` | PC, NPC or monster | Opens the statblock. Use the character **id** (e.g. `npc-locandiere`). |
+| `@sfx[<sfxId>]` | Sound effect | Play/stop button. Use the sfx **id**. |
+| `@asset[<name>]` | Asset (image) | Name is case-insensitive; the id also works. |
+| `@encounter[<encounterId>]` | Battle encounter | Must sit **alone on its own line**. |
+
+Rules:
+1. **Never wrap a mention in formatting**: no `**bold**`, `*italic*` or backticks. `**@npc[npc-locandiere]**` is parsed as bold text first, so the badge is not rendered and the raw text shows up. Write `@npc[npc-locandiere]` plain; put emphasis on the surrounding words instead.
+2. Copy the id/name exactly from `characters list`, `sfx list`, `assets list` or `encounters list`. A wrong one renders a red "not found" chip.
+3. After deleting an entity, remove its mentions from the text.
+
+---
+
+## 4. Standard AI Agent Recipes
 
 ### Recipe A: Generating a New 3-Scene One-Shot Adventure
 1. Check available PCs/NPCs/Monsters:
    `vellum-cli characters list --json`
 2. Create the adventure blueprint:
    `vellum-cli stories create --title "Whispers of the Frost Peak" --type oneshot --level "Level 3" --json`
-3. Add Scene 1, Scene 2, and Scene 3 with Homebrewery markdown and linked characters.
+3. Add Scene 1, Scene 2, and Scene 3 with Homebrewery markdown and linked characters. Mention characters, sounds and assets as plain `@npc[id]`, `@sfx[id]`, `@asset[name]` (never inside bold/italic/backticks).
 4. Run integrity check:
    `vellum-cli db validate --json`
 

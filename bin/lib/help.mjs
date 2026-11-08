@@ -72,7 +72,13 @@ ${c.bold('3. ID CONVENTIONS:')}
    - Party:      ${c.cyan('party-<slug>')}
    - Instance:   ${c.cyan('inst-<slug>')}
 
-${c.bold('4. TYPICAL AGENT WORKFLOWS:')}
+${c.bold('4. MENTIONS IN STORY TEXT (not to be confused with labels/tags):')}
+   Scene markdown can mention stored entities: ${c.cyan('@npc[id]')} (character/monster), ${c.cyan('@sfx[id]')},
+   ${c.cyan('@asset[name]')}, and ${c.cyan('@encounter[id]')} (alone on its own line). The app renders each as a badge.
+   ${c.bold('Never wrap a mention in bold, italic or backticks')}: ${c.dim('**@npc[x]**')} is parsed as bold text and the badge is lost.
+   Write ${c.dim('@npc[npc-locandiere]')} plain and emphasise the words around it. Use ids/names exactly as listed by the CLI.
+
+${c.bold('5. TYPICAL AGENT WORKFLOWS:')}
 
    ${c.bold('A. Creating a Complete One-Shot Adventure:')}
    1. Create the adventure blueprint:
