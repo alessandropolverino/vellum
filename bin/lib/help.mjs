@@ -11,7 +11,8 @@ ${c.bold(c.yellow('    ╚═══╝  ╚══════╝╚════�
   ${c.dim('D&D 5e Campaign, One-Shot & Entity Engine CLI for Humans & AI Agents')}
 
 ${c.bold('USAGE:')}
-  ${c.cyan('vellum')} <command> [subcommand] [arguments] [options]
+  ${c.cyan('vellum-cli')} <command> [subcommand] [arguments] [options]   ${c.dim('(never opens the app window)')}
+  ${c.cyan('vellum')} <command> ...        ${c.dim('(same CLI; "vellum" alone launches the app)')}
   ${c.cyan('npm run cli --')} <command> [subcommand] [arguments] [options]
 
 ${c.bold('COMMANDS:')}
@@ -34,7 +35,7 @@ ${c.bold('GLOBAL OPTIONS:')}
   ${c.cyan('--help, -h')}         Show help for any command or subcommand
 
 ${c.bold('AI AGENT TIP:')}
-  Run ${c.cyan('vellum agent-guide')} to see standard patterns for creating adventures,
+  Run ${c.cyan('vellum-cli agent-guide')} to see standard patterns for creating adventures,
   inspecting statblocks, and executing batch operations via JSON and @filepath syntax.
 `);
 }
@@ -53,8 +54,8 @@ ${c.bold('1. STRICT JSON OUTPUT MODE (--json):')}
    This guarantees pure, predictable, machine-parseable JSON output without ANSI codes.
 
    ${c.dim('Example:')}
-   vellum characters list --kind pc --json
-   vellum stories get adv-cripte --json
+   vellum-cli characters list --kind pc --json
+   vellum-cli stories get adv-cripte --json
 
 ${c.bold('2. PASSING COMPLEX DATA (@file and Inline JSON):')}
    Every create/update command accepts a ${c.cyan('--data')} option. You can pass:
@@ -75,25 +76,25 @@ ${c.bold('4. TYPICAL AGENT WORKFLOWS:')}
 
    ${c.bold('A. Creating a Complete One-Shot Adventure:')}
    1. Create the adventure blueprint:
-      ${c.dim('vellum stories create --title "The Sunken Citadel" --type oneshot --level "Level 3" --json')}
+      ${c.dim('vellum-cli stories create --title "The Sunken Citadel" --type oneshot --level "Level 3" --json')}
    2. Add scenes with Homebrewery markdown:
-      ${c.dim('vellum stories scene add adv-the-sunken-citadel --title "The Entrance" --code "Scene 1" --markdown @scene1.md --json')}
+      ${c.dim('vellum-cli stories scene add adv-the-sunken-citadel --title "The Entrance" --code "Scene 1" --markdown @scene1.md --json')}
    3. Verify database integrity:
-      ${c.dim('vellum db validate --json')}
+      ${c.dim('vellum-cli db validate --json')}
 
    ${c.bold('B. Creating a Player Character (PG) or Monster:')}
-   ${c.dim('vellum characters create --name "Valerius" --kind pc --class "Wizard (Evocation)" --level "Level 4" --hp 26 --ac 12 --abilities 8,14,14,18,12,10 --json')}
-   ${c.dim('vellum characters action add pc-valerius --name "Fireball" --desc "8d6 fire damage in 20ft radius" --damage "8d6" --json')}
+   ${c.dim('vellum-cli characters create --name "Valerius" --kind pc --class "Wizard (Evocation)" --level "Level 4" --hp 26 --ac 12 --abilities 8,14,14,18,12,10 --json')}
+   ${c.dim('vellum-cli characters action add pc-valerius --name "Fireball" --desc "8d6 fire damage in 20ft radius" --damage "8d6" --json')}
    3. Level-up PC (in-place or save as new blueprint):
-      ${c.dim('vellum characters level-up pc-valerius --to-level 5 --save-as-new --name "Valerius (Level 5)" --json')}
+      ${c.dim('vellum-cli characters level-up pc-valerius --to-level 5 --save-as-new --name "Valerius (Level 5)" --json')}
 
    ${c.bold('C. Session Tracking in a Live Game:')}
    1. Advance scene:
-      ${c.dim('vellum instances set-scene inst-123 scene-dungeon-hall --json')}
+      ${c.dim('vellum-cli instances set-scene inst-123 scene-dungeon-hall --json')}
    2. Log milestone or choice:
-      ${c.dim('vellum instances log inst-123 --category choice --title "Spared Goblin Chief" --details "Negotiated passage" --json')}
+      ${c.dim('vellum-cli instances log inst-123 --category choice --title "Spared Goblin Chief" --details "Negotiated passage" --json')}
    3. Update PC damage:
-      ${c.dim('vellum instances pc-status inst-123 pc-tharion --hp 14 --condition "Avvelenato" --json')}
+      ${c.dim('vellum-cli instances pc-status inst-123 pc-tharion --hp 14 --condition "Avvelenato" --json')}
 
 ${c.bold(c.cyan('════════════════════════════════════════════════════════════════════════════'))}
 `);

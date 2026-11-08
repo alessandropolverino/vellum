@@ -6,12 +6,13 @@
   - `npm run dev` — Start Vite dev server (`http://localhost:1420`) with local disk DB API (`./data/vellum-db.json`).
   - `npm run build` — Run `tsc -b && vite build` to verify TypeScript and bundle frontend.
   - `npm run tauri dev` / `npm run tauri build` — Run or package the native Tauri v2 desktop application.
-  - `npm run cli -- <cmd>` — Execute Vellum CLI commands for CRUD operations on stories, characters/PGs, campaigns, parties, encounters, instances, and DB maintenance.
+  - `vellum-cli <cmd>` — Execute Vellum CLI commands for CRUD operations on stories, characters/PGs, campaigns, parties, encounters, instances, and DB maintenance. In an unbuilt checkout without the global install, use `npm run cli -- <cmd>` instead.
 
 ## CLI & AI Agent Skill
-- **Vellum CLI** (`bin/vellum.mjs`, executable via `vellum`, `npm run cli -- ...` or `node bin/vellum.mjs ...`): Allows developers, users, and autonomous AI agents (Claude, Gemini, Codex, Antigravity) to perform full CRUD operations on all entities.
-- **Skill reference**: See [`skills/vellum-cli/SKILL.md`](./skills/vellum-cli/SKILL.md) and run `npm run cli -- agent-guide` for comprehensive schemas, patterns, and examples.
-- **Agent Rules**: Always use `--json` for tool invocations; use `@filepath` syntax for long markdown or JSON payloads; run `npm run cli -- db validate --json` to verify integrity after mutations.
+- **Vellum CLI** (`bin/vellum.mjs`): Allows developers, users, and autonomous AI agents (Claude, Gemini, Codex, Antigravity) to perform full CRUD operations on all entities. **Agents invoke it as `vellum-cli <command>`**, which the desktop installer puts on the global `PATH`. It never opens the app window. Do not use bare `vellum`: with no arguments it launches the desktop app (with subcommands it runs the same CLI, but a typo can start the GUI). Fallbacks when `vellum-cli` is missing: `npm run cli -- ...` or `node bin/vellum.mjs ...`.
+- **Skill reference**: See [`skills/vellum-cli/SKILL.md`](./skills/vellum-cli/SKILL.md) and run `vellum-cli agent-guide` for comprehensive schemas, patterns, and examples.
+- **Agent Rules**: Always use `--json` for tool invocations; use `@filepath` syntax for long markdown or JSON payloads; run `vellum-cli db validate --json` to verify integrity after mutations.
+- **Which database**: the CLI edits the database file directly, never through a running app. It uses `data/vellum-db.json` found from the current directory upward (dev DB of a checkout) and otherwise the installed app's database in AppData. Check with `vellum-cli db stats --json` when unsure; force one with `--db <path>` or `VELLUM_DB_PATH`.
 
 ## Language & Localization (i18n)
 - **English is the primary language** across the entire project: all source code identifiers, comments, commit messages, PR descriptions, `README.md`, `CHANGELOG.md`, agent instructions, and default seed data (`SEED_DATABASE_EN`) must be written in English.
