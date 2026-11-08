@@ -11,6 +11,7 @@ Web & Desktop application (**Tauri v2 + React 19 + TypeScript + Tailwind CSS**) 
      - `:::dm-note` ... `:::` → Secret Dungeon Master notes (hidden with 1 click in *Player View*).
      - `@sfx[id]` → Embeds an interactive audio trigger button right inside your story text.
      - `@npc[id]` → Embeds a clickable badge that opens the character or monster's 5e sheet/statblock in a modal.
+     - `@asset[name]` → Embeds a button that opens a stored image (handout, map, illustration), which the DM can show to players.
      - `@statblock[id]` → Renders the full D&D 5e statblock card inline on the page.
      - `@encounter[id]` → Embeds a prepared combat encounter card with a **"⚔️ Start Combat"** button.
 
@@ -36,7 +37,7 @@ Web & Desktop application (**Tauri v2 + React 19 + TypeScript + Tailwind CSS**) 
    - Full English (`EN`, default) and Italian (`IT`) UI localization, switchable at any time from the top navigation bar.
 
 7. **Vellum CLI & AI Agent Integration**:
-   - Built-in command line interface (`vellum` / `npm run cli -- ...`) bundled with desktop installers, providing full CRUD capabilities on stories, characters/PGs, campaigns, parties, encounters, instances, and DB maintenance.
+   - Built-in command line interface (`vellum-cli`, installed globally by the desktop installer; `npm run cli -- ...` in a checkout) bundled with desktop installers, providing full CRUD capabilities on stories, characters/PGs, campaigns, parties, encounters, instances, and DB maintenance.
    - Strict `--json` output mode for automated pipelines and AI coding assistants (Claude, Gemini, Codex, Antigravity).
    - Embedded agent instructions and skill specification in [`skills/vellum-cli/SKILL.md`](./skills/vellum-cli/SKILL.md).
 
@@ -95,27 +96,29 @@ npm run tauri build
 
 ## CLI Usage for Developers & AI Agents
 
+The desktop installer puts `vellum-cli` on your `PATH`; it never opens the app window (bare `vellum` does). It edits the database file directly: from a repo checkout it uses `data/vellum-db.json`, anywhere else the installed app's database. Without the installer, replace `vellum-cli` with `npm run cli --` from the repo root.
+
 ```bash
 # General help and command overview
-npm run cli -- --help
+vellum-cli --help
 
 # Install/update the Vellum instructions for your coding agents (claude, codex, gemini)
 npm run cli -- skill install
 
 # AI Agent protocol and usage guide
-npm run cli -- agent-guide
+vellum-cli agent-guide
 
 # List stories/adventures in machine-readable JSON
-npm run cli -- stories list --json
+vellum-cli stories list --json
 
 # View a character statblock formatted for terminal
-npm run cli -- characters get pc-tharion
+vellum-cli characters get pc-tharion
 
 # Create a new character (PC, NPC, or Monster)
-npm run cli -- characters create --name "Valerius" --kind pc --class "Paladin" --hp 38 --ac 18 --json
+vellum-cli characters create --name "Valerius" --kind pc --class "Paladin" --hp 38 --ac 18 --json
 
 # Validate database integrity (foreign keys, broken references)
-npm run cli -- db validate --json
+vellum-cli db validate --json
 ```
 
 ## Releases
