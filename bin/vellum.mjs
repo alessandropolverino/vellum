@@ -9,6 +9,7 @@ import { handleParties } from './lib/parties.mjs';
 import { handleEncounters } from './lib/encounters.mjs';
 import { handleInstances } from './lib/instances.mjs';
 import { handleSfx } from './lib/sfx.mjs';
+import { handleAssets } from './lib/assets.mjs';
 import { handleDb } from './lib/dbCmd.mjs';
 import { error } from './lib/output.mjs';
 
@@ -78,6 +79,10 @@ async function main() {
     case 'sound':
     case 'sounds':
       return handleSfx(options.help && !subCommand ? 'help' : subCommand, remainingArgs, options);
+
+    case 'assets':
+    case 'asset':
+      return handleAssets(options.help && !subCommand ? 'help' : subCommand, remainingArgs, options);
 
     case 'db':
     case 'database':

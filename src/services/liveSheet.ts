@@ -2,6 +2,7 @@ import { deathStateAtZero } from './deathSaves';
 import { hasMagic, resourceStates, slotStates } from './spellResources';
 import {
   formatMod,
+  type Asset,
   formatSignedBonus,
   getProficiencyBonus,
   type AbilityKey,
@@ -17,6 +18,32 @@ export interface PlayerRosterEntry {
   id: string;
   name: string;
   subtitle: string;
+  /** Portrait version, so the phone's picker can show the hero's icon. */
+  icon: string | null;
+  details: ReturnType<typeof buildRosterDetails>;
+}
+
+/**
+ * The short, read-only summary a player sees when expanding a hero in the character picker.
+ * Deliberately limited to what a player needs to choose; no DM notes.
+ */
+export function buildRosterDetails(pc: CharacterEntity) {
+  const traits = [pc.personalityTraits, pc.ideals, pc.bonds, pc.flaws].filter(Boolean).join(' · ');
+  return {
+    ac: pc.ac,
+    hpMax: pc.hpMax,
+    speed: pc.speed,
+    abilities: ABILITY_KEYS.map((key) => ({
+      key,
+      score: pc.abilities[key],
+      mod: formatMod(pc.abilities[key]),
+    })),
+    background: pc.background || '',
+    skills: pc.skills || '',
+    languages: pc.languages || '',
+    personality: traits,
+    biography: (pc.biographyOrLore || '').slice(0, 600),
+  };
 }
 
 /**
@@ -159,5 +186,33 @@ export function buildShownPayload(
   return {
     type: 'shown',
     item: { title: character.name, subtitle, icon: iconVersion },
+  };
+}
+
+/** A persisted entity the DM can show to players. Only stored characters and assets qualify. */
+export type ShareRef = { kind: 'character'; id: string } | { kind: 'asset'; id: string };
+
+/** What is currently shown: to everyone (`targets: null`) or only to these characters' phones. */
+export interface ShareState {
+  ref: ShareRef;
+  targets: string[] | null;
+}
+
+export const EMPTY_SHOWN_PAYLOAD = JSON.stringify({ type: 'shown', item: null });
+
+/**
+ * An asset shown to players: its name, caption and image. `iconId` names the image on the live
+ * server and `fit` tells the phone to show the whole picture instead of a square crop.
+ */
+export function buildAssetShownPayload(asset: Asset, imageVersion: string | null, iconId: string) {
+  return {
+    type: 'shown',
+    item: {
+      title: asset.name,
+      subtitle: asset.caption,
+      icon: imageVersion,
+      iconId,
+      fit: 'contain',
+    },
   };
 }

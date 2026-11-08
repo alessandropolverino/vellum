@@ -45,6 +45,12 @@ pub struct RosterEntry {
     pub name: String,
     #[serde(default)]
     pub subtitle: String,
+    /// Portrait version (see `live_set_portrait`); lets the picker show the hero's icon.
+    #[serde(default)]
+    pub icon: Option<String>,
+    /// Read-only summary shown when a player expands the hero in the picker.
+    #[serde(default)]
+    pub details: serde_json::Value,
 }
 
 #[derive(Default)]
@@ -58,6 +64,8 @@ struct PlayerData {
     nicknames: HashMap<String, String>,
     /// kind ("combat", "shown") -> latest payload for every player; replayed to late joiners
     shared: HashMap<String, String>,
+    /// character id -> what the DM shows only to that character's phones; replayed on connect
+    shown_for: HashMap<String, String>,
     /// character id -> (mime type, image bytes) used as the small icon on phones
     portraits: HashMap<String, (String, Vec<u8>)>,
 }
@@ -186,6 +194,8 @@ struct RosterItem {
     id: String,
     name: String,
     subtitle: String,
+    icon: Option<String>,
+    details: serde_json::Value,
     claimed: bool,
 }
 
@@ -230,6 +240,8 @@ async fn roster_handler(
             id: r.id.clone(),
             name: r.name.clone(),
             subtitle: r.subtitle.clone(),
+            icon: r.icon.clone(),
+            details: r.details.clone(),
             claimed: claimed.contains(&r.id),
         })
         .collect();
@@ -373,6 +385,8 @@ async fn client_loop(socket: WebSocket, s: ServerShared, character_id: String) {
             .get(&character_id)
             .into_iter()
             .chain(d.shared.values())
+            // After the shared payloads, so something shown only to this player wins.
+            .chain(d.shown_for.get(&character_id))
             .cloned()
             .collect()
     };
@@ -705,6 +719,25 @@ pub async fn live_set_shared(
         .shared
         .insert(kind, payload.clone());
     let _ = r.tx.send((None, payload));
+    Ok(())
+}
+
+/// Stores what the DM shows only to one character's phones and pushes it there. The payload
+/// has the same shape as the shared `shown` one; an empty item clears it.
+#[tauri::command]
+pub async fn live_set_shown_for(
+    state: TauriState<'_, LiveState>,
+    character_id: String,
+    payload: String,
+) -> Result<(), String> {
+    let guard = state.inner.lock().await;
+    let r = guard.as_ref().ok_or("Live session is not running")?;
+    r.data
+        .lock()
+        .map_err(|e| e.to_string())?
+        .shown_for
+        .insert(character_id.clone(), payload.clone());
+    let _ = r.tx.send((Some(character_id), payload));
     Ok(())
 }
 

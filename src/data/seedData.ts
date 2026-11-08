@@ -10,6 +10,7 @@ function buildSeedDatabase(lang: 'en' | 'it'): DndDatabase {
     characters: [],
     parties: [],
     sfxCatalog: getBuiltInSfxCatalog(lang),
+    assets: [],
     adventures: [],
     playInstances: [],
   };
