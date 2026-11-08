@@ -972,7 +972,7 @@ export const AdventureStudioView: React.FC<AdventureStudioViewProps> = ({
                   defaultValue=""
                   onChange={(e) => {
                     if (!e.target.value) return;
-                    insertSnippet(`@asset[${e.target.value}] `);
+                    insertSnippet(`@asset[${assets.find((a) => a.id === e.target.value)?.name ?? e.target.value}] `);
                     e.target.value = '';
                   }}
                   className="px-2 py-1 rounded bg-stone-950 border border-stone-700 text-stone-300"
@@ -1001,7 +1001,7 @@ export const AdventureStudioView: React.FC<AdventureStudioViewProps> = ({
                     </span>
                     <span
                       className="hidden 2xl:inline text-stone-600"
-                      title="Supports :::read-aloud, :::dm-note, @sfx[id], @asset[id], @npc[id], @encounter[id]"
+                      title="Supports :::read-aloud, :::dm-note, @sfx[id], @asset[name], @npc[id], @encounter[id]"
                     >
                       :::read-aloud · :::dm-note · @sfx · @npc · @encounter
                     </span>

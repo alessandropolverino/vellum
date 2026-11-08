@@ -208,19 +208,19 @@ node bin/vellum.mjs <command> [subcommand] [arguments] [options]
 ---
 
 ### Assets (`assets`)
-Images with a caption, taggable in scene text as `@asset[<id>]`. In the Live Console a click on the tag opens the image and lets the DM show it to all connected players or only some of them.
+Images with a caption, taggable in scene text as `@asset[<name>]` (case-insensitive; the id also works). The image is optional. In the Live Console a click on the tag opens the image and lets the DM show it to all connected players or only some of them.
 - **List / get** (image data is omitted unless `--full`):
   ```bash
   npm run cli -- assets list [--tag <tag>] [--search <query>] --json
   npm run cli -- assets get <assetId> [--full] --json
   ```
-- **Create** (`--image` takes a png/jpg/webp/gif file path or a data URL):
+- **Create** (names must be unique and without `[ ]`; optional `--image` takes a png/jpg/webp/gif file path or a data URL):
   ```bash
   npm run cli -- assets create --name "Tavern map" --image ./tavern.png --caption "The Silver Stag" --tags "map,tavern" --json
   ```
 - **Update / delete**:
   ```bash
-  npm run cli -- assets update <assetId> --caption "New caption" --json
+  npm run cli -- assets update <assetId> --caption "New caption" [--image ./new.png | --clear-image] --json
   npm run cli -- assets delete <assetId> --json
   ```
 

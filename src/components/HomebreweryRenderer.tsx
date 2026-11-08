@@ -56,7 +56,13 @@ export const HomebreweryRenderer: React.FC<HomebreweryRendererProps> = ({
 
   const charMap = new Map(characters.map((c) => [c.id, c]));
   const sfxMap = new Map(sfxCatalog.map((s) => [s.id, s]));
-  const assetMap = new Map(assets.map((a) => [a.id, a]));
+  // Tags use the asset name (case-insensitive); the id still works as a fallback.
+  const findAsset = (ref: string) => {
+    const wanted = ref.toLowerCase();
+    return (
+      assets.find((a) => a.name.trim().toLowerCase() === wanted) ?? assets.find((a) => a.id === ref)
+    );
+  };
   const encMap = new Map(encounters.map((e) => [e.id, e]));
 
   // Render inline formatting: **bold**, *italic*, `code`, @sfx[id], @npc[id]
@@ -100,7 +106,7 @@ export const HomebreweryRenderer: React.FC<HomebreweryRendererProps> = ({
 
       if (part.startsWith('@asset[') && part.endsWith(']')) {
         const assetId = part.slice(7, -1).trim();
-        const asset = assetMap.get(assetId);
+        const asset = findAsset(assetId);
         if (!asset) {
           return (
             <span key={key} className="inline-flex items-center px-2 py-0.5 text-xs bg-red-200 text-red-900 rounded">

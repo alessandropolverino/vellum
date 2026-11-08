@@ -550,7 +550,7 @@
         var cap = el("div"); add(cap, el("h1", null, it.title), it.subtitle ? el("p", "sub", it.subtitle) : null);
         var close = el("button", "gbtn", t("Close", "Chiudi"));
         close.onclick = function () { S.dismissed = JSON.stringify(it); renderShown(); };
-        add(sh, img, cap, close); d.appendChild(sh); overHost.appendChild(d);
+        add(sh, it.fit === "contain" && !it.icon ? null : img, cap, close); d.appendChild(sh); overHost.appendChild(d);
       }
       function onCombat(prev) {
         var mine = false;

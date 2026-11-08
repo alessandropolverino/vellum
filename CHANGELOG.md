@@ -4,7 +4,7 @@ All notable user-facing changes to Vellum are documented in this file.
 
 ## Unreleased
 
-- App: New "Assets" entity: images with a caption and tags, managed in the new Assets tab (and via `vellum assets` in the CLI). Tag one in scene text with `@asset[id]` (or the new "Insert @asset" menu in the Story Editor); clicking it opens the image.
+- App: New "Assets" entity: images with a caption and tags, managed in the new Assets tab (and via `vellum assets` in the CLI). The image is optional and can be framed (pan, zoom, 16:9 / 4:3 / 1:1 / 3:4) in an editor like the portrait one. Tag one in scene text with `@asset[Name]` (or the new "Insert @asset" menu in the Story Editor); clicking it opens the image.
 - App: Showing content to players is now done from the entity itself. Click a tagged character, NPC, monster or asset in the Live Console and use the new "Show to players" panel next to its window: show it to everyone or only to selected connected players. Only stored entities can be shown; the old character picker in the QR dialog is replaced by a status line with a Stop button.
 - App: On the players' phones, the character picker now shows each hero's portrait and an expandable "Show details" section (stats, background, personality, story) to help choose.
 - Windows: CI now runs only on pull requests into `main`, release tags and manual runs, not on every PR into `dev` (contributor workflow only; no change for users).

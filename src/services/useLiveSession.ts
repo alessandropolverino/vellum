@@ -220,9 +220,9 @@ export function useLiveSession(
           }
         } else if (share?.ref.kind === 'asset') {
           const asset = assetMap.get(share.ref.id);
-          if (asset?.imageUrl) {
+          if (asset) {
             const key = `asset:${asset.id}`;
-            if (portraitSources.current.get(key) !== asset.imageUrl) {
+            if (asset.imageUrl && portraitSources.current.get(key) !== asset.imageUrl) {
               const small = await shrinkImage(asset.imageUrl, 1280);
               if (small) {
                 await invoke('live_set_portrait', { characterId: key, dataUrl: small });
@@ -231,7 +231,9 @@ export function useLiveSession(
               }
             }
             const version = iconVersions.current.get(key) ?? null;
-            if (version) shownPayload = JSON.stringify(buildAssetShownPayload(asset, version, key));
+            shownPayload = JSON.stringify(
+              buildAssetShownPayload(asset, asset.imageUrl ? version : null, key)
+            );
           }
         }
         if (cancelled) return;

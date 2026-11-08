@@ -245,11 +245,15 @@ export function validateDb(db) {
 
   // Check asset unique IDs and images
   const seenAssetIds = new Set();
+  const seenAssetNames = new Set();
   for (const asset of db.assets) {
     if (!asset.id) errors.push(`Asset has missing id: "${asset.name || 'unnamed'}"`);
     else if (seenAssetIds.has(asset.id)) errors.push(`Duplicate asset id: "${asset.id}"`);
     seenAssetIds.add(asset.id);
-    if (!asset.imageUrl) warnings.push(`Asset "${asset.id}" has no image.`);
+    if (seenAssetNames.has(String(asset.name).toLowerCase())) {
+      warnings.push(`Duplicate asset name "${asset.name}": @asset[name] tags are ambiguous.`);
+    }
+    seenAssetNames.add(String(asset.name).toLowerCase());
   }
 
   // Check character unique IDs

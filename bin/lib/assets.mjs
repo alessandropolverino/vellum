@@ -118,6 +118,14 @@ function findAsset(id, db) {
   return db.assets.find((a) => a.id === id || a.name.toLowerCase() === String(id).toLowerCase());
 }
 
+/** Tags use the asset name, so it must be unique (case-insensitive) and bracket-free. */
+function checkName(name, db, selfId) {
+  if (/[\[\]]/.test(name)) error('Asset name cannot contain [ or ].');
+  if (db.assets.some((a) => a.id !== selfId && a.name.toLowerCase() === name.toLowerCase())) {
+    error(`Another asset is already named "${name}".`);
+  }
+}
+
 function getAsset(id, db, options) {
   if (!id) error('Usage: vellum assets get <id> [--full] [--json]');
   const asset = findAsset(id, db);
@@ -132,7 +140,7 @@ function getAsset(id, db, options) {
   console.log(c.bold(c.cyan(` ASSET: ${asset.name}`)));
   console.log(c.yellow('─'.repeat(60)));
   console.log(` ${c.bold('ID:')}      ${asset.id}`);
-  console.log(` ${c.bold('Tag:')}     @asset[${asset.id}]`);
+  console.log(` ${c.bold('Tag:')}     @asset[${asset.name}]`);
   console.log(` ${c.bold('Tags:')}    ${asset.tags?.join(', ') || 'none'}`);
   console.log(` ${c.bold('Image:')}   ${asset.imageUrl ? `yes (${asset.imageUrl.length} chars)` : 'none'}`);
   console.log(` ${c.bold('Caption:')} ${asset.caption || 'none'}`);
@@ -144,8 +152,8 @@ function createAsset(positionals, options, db) {
   const name = options.name || positionals[0] || blueprint.name;
   if (!name) error('Missing required flag: --name <name>');
 
+  checkName(name, db);
   const image = options.image || blueprint.imageUrl;
-  if (!image) error('Missing required flag: --image <file path or data URL>');
 
   const id = options.id || blueprint.id || `asset-${slugify(name)}-${crypto.randomBytes(2).toString('hex')}`;
   if (db.assets.some((a) => a.id === id)) error(`Asset with ID "${id}" already exists.`);
@@ -154,7 +162,7 @@ function createAsset(positionals, options, db) {
     id,
     name,
     caption: options.caption || blueprint.caption || '',
-    imageUrl: toDataUrl(image),
+    imageUrl: image ? toDataUrl(image) : '',
     tags: options.tags ? splitTags(options.tags) : blueprint.tags || [],
   };
 
@@ -164,7 +172,7 @@ function createAsset(positionals, options, db) {
   if (options.json) {
     printJson(summarize(asset, options));
   } else {
-    success(`Asset "${asset.name}" (${asset.id}) created. Tag it in markdown with @asset[${asset.id}].`, options);
+    success(`Asset "${asset.name}" (${asset.id}) created. Tag it in markdown with @asset[${asset.name}].`, options);
   }
 }
 
@@ -174,7 +182,11 @@ function updateAsset(id, options, db) {
   if (!asset) error(`Asset "${id}" not found.`);
 
   const patch = parseData(options);
-  if (options.name) asset.name = options.name;
+  if (options.name) {
+    checkName(String(options.name), db, asset.id);
+    asset.name = String(options.name);
+  }
+  if (options['clear-image']) asset.imageUrl = '';
   if (options.caption !== undefined) asset.caption = String(options.caption);
   if (options.image) asset.imageUrl = toDataUrl(options.image);
   if (options.tags !== undefined) asset.tags = splitTags(options.tags);
@@ -200,7 +212,7 @@ function deleteAsset(id, options, db) {
   if (options.json) {
     printJson({ deleted: true, id, name: asset.name });
   } else {
-    success(`Asset "${asset.name}" (${id}) deleted. Remove any @asset[${id}] tags from your text.`, options);
+    success(`Asset "${asset.name}" (${id}) deleted. Remove any @asset[${asset.name}] tags from your text.`, options);
   }
 }
 
@@ -211,12 +223,12 @@ ${c.bold('vellum assets')} — Images with a caption, taggable in markdown and s
 ${c.bold('USAGE:')}
   vellum assets list [--tag <tag>] [--search <text>] [--json]
   vellum assets get <id> [--full] [--json]
-  vellum assets create --name <name> --image <file|dataUrl> [--caption <text>] [--tags a,b] [--id <id>] [--json]
-  vellum assets update <id> [--name <n>] [--caption <text>] [--image <file|dataUrl>] [--tags a,b] [--json]
+  vellum assets create --name <name> [--image <file|dataUrl>] [--caption <text>] [--tags a,b] [--id <id>] [--json]
+  vellum assets update <id> [--name <n>] [--caption <text>] [--image <file|dataUrl> | --clear-image] [--tags a,b] [--json]
   vellum assets delete <id> [--json]
 
 ${c.bold('NOTES:')}
-  Tag an asset in any scene text with @asset[<id>]; clicking it in the Live Console opens it
+  Tag an asset in any scene text with @asset[<name>] (the id also works); the image is optional; clicking it in the Live Console opens it
   and lets the DM show it to players. Listings omit the image data unless --full is given.
 `);
 }
