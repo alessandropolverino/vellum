@@ -3,8 +3,9 @@
 See [AGENTS.md](./AGENTS.md) for project architecture, build commands, localization rules, and mandatory **Branches and releases** / git worktree rules.
 
 ## CLI & AI Agent Operations
-- Use `npm run cli -- <command>` (or `node bin/vellum.mjs <command>`) for programmatic entity management.
-- See [`skills/vellum-cli/SKILL.md`](./skills/vellum-cli/SKILL.md) and [`agent-guide`](#) for command syntax and entity models.
+- Use `vellum-cli <command>` (globally installed by the desktop installer; never opens the app window) for programmatic entity management. Don't use bare `vellum`: with no arguments it launches the app. If `vellum-cli` is not on `PATH`, fall back to `npm run cli -- <command>` (or `node bin/vellum.mjs <command>`).
+- See [`skills/vellum-cli/SKILL.md`](./skills/vellum-cli/SKILL.md) and run `vellum-cli agent-guide` for command syntax and entity models.
+- The CLI edits the database file directly. From a repo checkout it picks `data/vellum-db.json`; elsewhere it uses the installed app's database. Run `vellum-cli db stats --json` if unsure.
 - Always append `--json` for predictable, machine-readable JSON outputs.
 
 ## Language & Localization (i18n)
