@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { LabelEditor, LabelOption } from './Labels';
 import {
   AbilityKey,
   CharacterEntity,
@@ -81,6 +82,7 @@ import {
 
 interface FullPageCharacterEditorProps {
   character: CharacterEntity;
+  labelOptions: LabelOption[];
   onSave: (char: CharacterEntity) => void;
   onCancel: () => void;
   onLevelUp: (char: CharacterEntity) => void;
@@ -88,6 +90,7 @@ interface FullPageCharacterEditorProps {
 
 export const FullPageCharacterEditor: React.FC<FullPageCharacterEditorProps> = ({
   character: initialChar,
+  labelOptions,
   onSave,
   onCancel,
   onLevelUp,
@@ -580,6 +583,14 @@ export const FullPageCharacterEditor: React.FC<FullPageCharacterEditorProps> = (
                   />
                 </Field>
               </div>
+
+              <Field label={tr('Labels', 'Etichette')}>
+                <LabelEditor
+                  value={editingChar.tags}
+                  suggestions={labelOptions}
+                  onChange={(tags) => patch({ tags })}
+                />
+              </Field>
 
               {isPc && (
                 <label className="p-3.5 rounded-xl bg-stone-950 border border-amber-500/30 flex items-start gap-2.5 cursor-pointer">

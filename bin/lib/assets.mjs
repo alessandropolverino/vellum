@@ -2,6 +2,7 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { loadDb, saveDb } from './db.mjs';
+import { applyLabelOptions, filterByLabels } from './labels.mjs';
 import { printJson, printTable, success, error, c } from './output.mjs';
 
 const MIME_BY_EXT = {
@@ -33,13 +34,6 @@ function toDataUrl(source) {
     error(`Cannot read image "${source}": ${err.message}`);
   }
   return `data:${mime};base64,${bytes.toString('base64')}`;
-}
-
-function splitTags(value) {
-  return String(value)
-    .split(',')
-    .map((t) => t.trim())
-    .filter(Boolean);
 }
 
 function parseData(options) {
@@ -82,10 +76,7 @@ function summarize(asset, options) {
 
 function listAssets(db, options) {
   let list = db.assets;
-  if (options.tag) {
-    const tag = String(options.tag).toLowerCase();
-    list = list.filter((a) => a.tags?.some((t) => t.toLowerCase() === tag));
-  }
+  list = filterByLabels(list, options);
   if (options.search) {
     const q = String(options.search).toLowerCase();
     list = list.filter(
@@ -163,7 +154,7 @@ function createAsset(positionals, options, db) {
     name,
     caption: options.caption || blueprint.caption || '',
     imageUrl: image ? toDataUrl(image) : '',
-    tags: options.tags ? splitTags(options.tags) : blueprint.tags || [],
+    tags: applyLabelOptions(blueprint.tags || [], options) ?? (blueprint.tags || []),
   };
 
   db.assets.push(asset);
@@ -189,7 +180,8 @@ function updateAsset(id, options, db) {
   if (options['clear-image']) asset.imageUrl = '';
   if (options.caption !== undefined) asset.caption = String(options.caption);
   if (options.image) asset.imageUrl = toDataUrl(options.image);
-  if (options.tags !== undefined) asset.tags = splitTags(options.tags);
+  const labels = applyLabelOptions(asset.tags, options);
+  if (labels !== undefined) asset.tags = labels;
   const { id: _ignored, ...rest } = patch;
   Object.assign(asset, rest);
   saveDb(db, options);
@@ -221,10 +213,10 @@ function printAssetsHelp() {
 ${c.bold('vellum assets')} — Images with a caption, taggable in markdown and showable to players
 
 ${c.bold('USAGE:')}
-  vellum assets list [--tag <tag>] [--search <text>] [--json]
+  vellum assets list [--label a,b] [--search <text>] [--json]
   vellum assets get <id> [--full] [--json]
-  vellum assets create --name <name> [--image <file|dataUrl>] [--caption <text>] [--tags a,b] [--id <id>] [--json]
-  vellum assets update <id> [--name <n>] [--caption <text>] [--image <file|dataUrl> | --clear-image] [--tags a,b] [--json]
+  vellum assets create --name <name> [--image <file|dataUrl>] [--caption <text>] [--labels a,b] [--id <id>] [--json]
+  vellum assets update <id> [--name <n>] [--caption <text>] [--image <file|dataUrl> | --clear-image] [--labels a,b | --add-label a,b | --remove-label a,b] [--json]
   vellum assets delete <id> [--json]
 
 ${c.bold('NOTES:')}

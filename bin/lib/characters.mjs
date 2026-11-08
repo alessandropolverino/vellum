@@ -1,5 +1,6 @@
 import crypto from 'node:crypto';
 import { loadDb, saveDb } from './db.mjs';
+import { applyLabelOptions, filterByLabels, parseLabels } from './labels.mjs';
 import { printJson, printTable, printStatblockCard, success, error, warn, c } from './output.mjs';
 
 function slugify(text) {
@@ -68,10 +69,7 @@ function listCharacters(db, options) {
     const kind = String(options.kind).toLowerCase();
     list = list.filter((c) => c.kind.toLowerCase() === kind);
   }
-  if (options.tag) {
-    const tag = String(options.tag).toLowerCase();
-    list = list.filter((c) => c.tags?.some((t) => t.toLowerCase() === tag));
-  }
+  list = filterByLabels(list, options);
   if (options.search) {
     const q = String(options.search).toLowerCase();
     list = list.filter(
@@ -193,9 +191,7 @@ function createCharacter(positionals, options, db) {
     reactionsOrLegendary: blueprint.reactionsOrLegendary || [],
     spellsNotes: options.spells || blueprint.spellsNotes || '',
     biographyOrLore: options.lore || blueprint.biographyOrLore || '',
-    tags: options.tags
-      ? String(options.tags).split(',').map((t) => t.trim())
-      : blueprint.tags || [],
+    tags: applyLabelOptions(blueprint.tags || [], options) ?? (blueprint.tags || []),
     accentColor: options.color || blueprint.accentColor || '#6366f1',
   };
 
@@ -245,9 +241,8 @@ function updateCharacter(id, options, db) {
     char.abilities = parseAbilities(options, char.abilities);
   }
   if (options.lore !== undefined) char.biographyOrLore = options.lore;
-  if (options.tags) {
-    char.tags = String(options.tags).split(',').map((t) => t.trim());
-  }
+  const labels = applyLabelOptions(char.tags, options);
+  if (labels !== undefined) char.tags = labels;
 
   Object.assign(char, patch);
   saveDb(db, options);
@@ -465,6 +460,10 @@ ${c.bold('OPTIONS:')}
   --size <size>                Size category (Media/Medium, Grande/Large, etc.)
   --creature-type <type>       Type, e.g. "Humanoid (Elf)", "Undead", "Fiend"
   --lore <text>                Biography or lore description
+  --label a,b                  (list) Keep only entities carrying ALL these labels (alias: --tag)
+  --labels a,b                 (create/update) Replace the labels (alias: --tags)
+  --add-label a,b              (update) Add labels
+  --remove-label a,b           (update) Remove labels
   --data <json|@file>          JSON payload or @file to merge
   --json                       Machine-readable JSON output
 `);
