@@ -12,6 +12,7 @@ import { useLanguage } from '../i18n/LanguageContext';
 import { useConfirmDelete } from './ConfirmDialog';
 import { HomebreweryRenderer } from './HomebreweryRenderer';
 import { StatblockCard } from './StatblockCard';
+import { LabelChips, LabelEditor, LabelOption } from './Labels';
 import { AssetPreviewCard } from './ShareToPlayersPanel';
 import {
   BookOpen,
@@ -42,6 +43,7 @@ interface AdventureStudioViewProps {
   characters: CharacterEntity[];
   sfxCatalog: SfxItem[];
   assets: Asset[];
+  labelOptions?: LabelOption[];
   selectedAdventureId: string;
   onSelectAdventure: (id: string) => void;
   onSaveAdventure: (adv: AdventureBlueprint) => void;
@@ -59,6 +61,7 @@ export const AdventureStudioView: React.FC<AdventureStudioViewProps> = ({
   characters,
   sfxCatalog,
   assets,
+  labelOptions = [],
   selectedAdventureId,
   onSelectAdventure,
   onSaveAdventure,
@@ -682,6 +685,7 @@ export const AdventureStudioView: React.FC<AdventureStudioViewProps> = ({
                         ? [{ characterId: monstersAndNpcs[0].id, count: 2 }]
                         : [],
                       autoSfxId: 'sfx-combat-drums',
+                      tags: [],
                     })
                   }
                   className="px-2 py-0.5 rounded bg-red-900/50 hover:bg-red-800 text-amber-100 font-bold text-[11px]"
@@ -710,6 +714,7 @@ export const AdventureStudioView: React.FC<AdventureStudioViewProps> = ({
                           {enc.difficulty}
                         </span>
                       </div>
+                      {enc.tags && enc.tags.length > 0 && <LabelChips labels={enc.tags} />}
                       <div className="flex items-center gap-1.5 pt-1">
                         <button
                           onClick={() => insertSnippet(`\n@encounter[${enc.id}]\n`)}
@@ -1068,7 +1073,7 @@ export const AdventureStudioView: React.FC<AdventureStudioViewProps> = ({
       {/* Encounter Preset Builder Modal */}
       {editingEncounter && currentScene && (
         <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-stone-900 border border-stone-700 rounded-2xl max-w-xl w-full p-6 space-y-4 shadow-2xl text-xs">
+          <div className="bg-stone-900 border border-stone-700 rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto p-6 space-y-4 shadow-2xl text-xs">
             <h3 className="font-header text-xl font-bold text-amber-400 flex items-center gap-2">
               <Swords className="w-5 h-5" />{' '}
               {tr('Configure Scene Encounter', 'Configura Incontro della Scena')}
@@ -1163,6 +1168,17 @@ export const AdventureStudioView: React.FC<AdventureStudioViewProps> = ({
                 />
               </div>
 
+              <div>
+                <label className="block text-stone-400 mb-1 font-semibold">
+                  {tr('Labels', 'Etichette')}
+                </label>
+                <LabelEditor
+                  value={editingEncounter.tags ?? []}
+                  suggestions={labelOptions}
+                  onChange={(tags) => setEditingEncounter({ ...editingEncounter, tags })}
+                />
+              </div>
+
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
                   <span className="font-bold text-amber-400">
@@ -1191,7 +1207,7 @@ export const AdventureStudioView: React.FC<AdventureStudioViewProps> = ({
                 {editingEncounter.slots.map((slot, sIdx) => (
                   <div
                     key={sIdx}
-                    className="flex items-center gap-2 bg-stone-950 p-2 rounded border border-stone-800"
+                    className="flex flex-wrap items-center gap-2 bg-stone-950 p-2 rounded border border-stone-800"
                   >
                     <input
                       type="number"
@@ -1203,7 +1219,7 @@ export const AdventureStudioView: React.FC<AdventureStudioViewProps> = ({
                         next[sIdx] = { ...slot, count: Math.max(1, Number(e.target.value)) };
                         setEditingEncounter({ ...editingEncounter, slots: next });
                       }}
-                      className="w-16 px-2 py-1 rounded bg-stone-900 border border-stone-700 text-amber-300 font-bold text-center"
+                      className="w-16 shrink-0 px-2 py-1 rounded bg-stone-900 border border-stone-700 text-amber-300 font-bold text-center"
                     />
                     <select
                       value={slot.characterId}
@@ -1212,7 +1228,7 @@ export const AdventureStudioView: React.FC<AdventureStudioViewProps> = ({
                         next[sIdx] = { ...slot, characterId: e.target.value };
                         setEditingEncounter({ ...editingEncounter, slots: next });
                       }}
-                      className="flex-1 px-2 py-1 rounded bg-stone-900 border border-stone-700 text-stone-100"
+                      className="flex-1 min-w-0 basis-48 px-2 py-1 rounded bg-stone-900 border border-stone-700 text-stone-100 truncate"
                     >
                       {characters.map((c) => (
                         <option key={c.id} value={c.id}>
@@ -1230,7 +1246,7 @@ export const AdventureStudioView: React.FC<AdventureStudioViewProps> = ({
                         setEditingEncounter({ ...editingEncounter, slots: next });
                       }}
                       placeholder={tr('Optional label', 'Etichetta opzionale')}
-                      className="w-36 px-2 py-1 rounded bg-stone-900 border border-stone-700 text-stone-300"
+                      className="w-36 min-w-0 flex-1 px-2 py-1 rounded bg-stone-900 border border-stone-700 text-stone-300"
                     />
                     <button
                       type="button"

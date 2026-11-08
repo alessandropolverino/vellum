@@ -1,6 +1,6 @@
 /**
- * Labels are free-text tags stored in the `tags` array of assets, characters (PCs, NPCs, monsters)
- * and sound effects. They are unrelated to the `@entity[...]` markdown references used in story text.
+ * Labels are free-text tags stored in the `tags` array of assets, characters (PCs, NPCs, monsters),
+ * sound effects and scene encounters. They are unrelated to the `@entity[...]` markdown references used in story text.
  * These helpers are shared by every entity list so labels behave identically everywhere.
  */
 

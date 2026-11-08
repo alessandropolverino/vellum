@@ -83,7 +83,12 @@ export function normalizeDatabase(raw: unknown): DndDatabase {
               homebreweryMarkdown: String(s?.homebreweryMarkdown || ''),
               linkedCharacterIds: Array.isArray(s?.linkedCharacterIds) ? s.linkedCharacterIds.map(String) : [],
               linkedSfxIds: Array.isArray(s?.linkedSfxIds) ? s.linkedSfxIds.map(String) : [],
-              encounters: Array.isArray(s?.encounters) ? s.encounters : [],
+              encounters: Array.isArray(s?.encounters)
+                ? s.encounters.map((e: any) => ({
+                    ...e,
+                    tags: Array.isArray(e?.tags) ? e.tags.map(String) : [],
+                  }))
+                : [],
             }))
           : [],
         updatedAt: String(a?.updatedAt || new Date().toISOString().slice(0, 10)),
