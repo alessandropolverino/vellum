@@ -99,6 +99,9 @@ npm run tauri build
 # General help and command overview
 npm run cli -- --help
 
+# Install/update the Vellum instructions for your coding agents (claude, codex, gemini)
+npm run cli -- skill install
+
 # AI Agent protocol and usage guide
 npm run cli -- agent-guide
 
