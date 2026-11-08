@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   AdventureBlueprint,
   Campaign,
@@ -14,6 +14,7 @@ import { getBuiltInSfxCatalog } from './data/sfxCatalog';
 import { storageRepository } from './services/storageRepository';
 import { soundboardEngine } from './services/audioEngine';
 import { useLanguage } from './i18n/LanguageContext';
+import { collectLabels } from './services/labels';
 import { DashboardView } from './components/DashboardView';
 import { AdventureStudioView } from './components/AdventureStudioView';
 import { LiveSessionConsole } from './components/LiveSessionConsole';
@@ -41,6 +42,16 @@ type ActiveTab = 'dashboard' | 'studio' | 'console' | 'characters' | 'sfx' | 'as
 export const App: React.FC = () => {
   const { lang, setLang, tr } = useLanguage();
   const [db, setDb] = useState<DndDatabase>(SEED_DATABASE);
+  // Labels used anywhere (assets, characters, sounds): feeds autocomplete and the list filters.
+  const labelOptions = useMemo(
+    () =>
+      collectLabels(
+        db.assets,
+        db.characters.filter((c) => !c.instanceOnlyId),
+        db.sfxCatalog
+      ),
+    [db.assets, db.characters, db.sfxCatalog]
+  );
   const [storageSource, setStorageSource] = useState<string>('Loading...');
   const [lastSaveInfo, setLastSaveInfo] = useState<string>('');
   const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'error'>('saved');
@@ -536,6 +547,7 @@ export const App: React.FC = () => {
           <CharactersView
             characters={db.characters}
             parties={db.parties}
+            labelOptions={labelOptions}
             onSaveCharacter={handleSaveCharacter}
             onDeleteCharacter={handleDeleteCharacter}
             onSaveParty={handleSaveParty}
@@ -546,6 +558,7 @@ export const App: React.FC = () => {
         {activeTab === 'sfx' && (
           <SfxManagerView
             sfxCatalog={db.sfxCatalog}
+            labelOptions={labelOptions}
             onSaveSfx={handleSaveSfx}
             onDeleteSfx={handleDeleteSfx}
           />
@@ -554,6 +567,7 @@ export const App: React.FC = () => {
         {activeTab === 'assets' && (
           <AssetsView
             assets={db.assets}
+            labelOptions={labelOptions}
             onSaveAsset={handleSaveAsset}
             onDeleteAsset={handleDeleteAsset}
           />

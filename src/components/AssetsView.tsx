@@ -3,10 +3,13 @@ import { Asset } from '../types/dnd';
 import { AssetImageEditor } from './AssetImageEditor';
 import { useLanguage } from '../i18n/LanguageContext';
 import { useConfirmDelete } from './ConfirmDialog';
+import { LabelChips, LabelEditor, LabelFilter, LabelOption } from './Labels';
+import { addLabelFilter, hasAllLabels } from '../services/labels';
 import { Plus, Upload, Trash2, Copy, Check, Crop, Image as ImageIcon } from 'lucide-react';
 
 interface AssetsViewProps {
   assets: Asset[];
+  labelOptions: LabelOption[];
   onSaveAsset: (asset: Asset) => void;
   onDeleteAsset: (id: string) => void;
 }
@@ -20,12 +23,18 @@ const readAsDataUrl = (file: File) =>
   });
 
 /** Library of images with captions: tag them in scene text as @asset[id] and show them to players. */
-export const AssetsView: React.FC<AssetsViewProps> = ({ assets, onSaveAsset, onDeleteAsset }) => {
+export const AssetsView: React.FC<AssetsViewProps> = ({
+  assets,
+  labelOptions,
+  onSaveAsset,
+  onDeleteAsset,
+}) => {
   const { tr } = useLanguage();
   const confirmDelete = useConfirmDelete();
   const [editing, setEditing] = useState<Asset | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [search, setSearch] = useState('');
+  const [labelFilter, setLabelFilter] = useState<string[]>([]);
   const [uploadError, setUploadError] = useState(false);
   // Image waiting to be framed in the editor (a fresh upload or the current image).
   const [framing, setFraming] = useState<string | null>(null);
@@ -34,10 +43,11 @@ export const AssetsView: React.FC<AssetsViewProps> = ({ assets, onSaveAsset, onD
   const q = search.trim().toLowerCase();
   const filtered = assets.filter(
     (a) =>
-      !q ||
-      a.name.toLowerCase().includes(q) ||
-      a.caption.toLowerCase().includes(q) ||
-      a.tags.some((t) => t.toLowerCase().includes(q))
+      hasAllLabels(a.tags, labelFilter) &&
+      (!q ||
+        a.name.toLowerCase().includes(q) ||
+        a.caption.toLowerCase().includes(q) ||
+        a.tags.some((t) => t.toLowerCase().includes(q)))
   );
 
   const newAsset = (): Asset => ({
@@ -87,6 +97,7 @@ export const AssetsView: React.FC<AssetsViewProps> = ({ assets, onSaveAsset, onD
             placeholder={tr('Search assets…', 'Cerca asset…')}
             className="px-2.5 py-1.5 rounded-lg bg-stone-900 border border-stone-800 text-stone-300 text-xs"
           />
+          <LabelFilter options={labelOptions} selected={labelFilter} onChange={setLabelFilter} />
         </div>
         <button
           onClick={() => {
@@ -129,12 +140,11 @@ export const AssetsView: React.FC<AssetsViewProps> = ({ assets, onSaveAsset, onD
                   <div className="text-xs text-stone-400 line-clamp-2">{asset.caption}</div>
                 )}
                 {asset.tags.length > 0 && (
-                  <div className="flex flex-wrap gap-1 pt-1">
-                    {asset.tags.map((t) => (
-                      <span key={t} className="px-1.5 py-0.5 rounded bg-stone-800 text-[10px] text-stone-400">
-                        {t}
-                      </span>
-                    ))}
+                  <div className="pt-1">
+                    <LabelChips
+                      labels={asset.tags}
+                      onPick={(l) => setLabelFilter((f) => addLabelFilter(f, l))}
+                    />
                   </div>
                 )}
               </div>
@@ -270,21 +280,12 @@ export const AssetsView: React.FC<AssetsViewProps> = ({ assets, onSaveAsset, onD
             </div>
             <div>
               <label className="block text-stone-400 mb-1 font-semibold">
-                {tr('Tags (comma separated)', 'Tag (separati da virgola)')}
+                {tr('Labels', 'Etichette')}
               </label>
-              <input
-                type="text"
-                value={editing.tags.join(', ')}
-                onChange={(e) =>
-                  setEditing({
-                    ...editing,
-                    tags: e.target.value
-                      .split(',')
-                      .map((t) => t.trim())
-                      .filter(Boolean),
-                  })
-                }
-                className="w-full px-3 py-2 rounded bg-stone-950 border border-stone-700 text-stone-100"
+              <LabelEditor
+                value={editing.tags}
+                suggestions={labelOptions}
+                onChange={(tags) => setEditing({ ...editing, tags })}
               />
             </div>
 

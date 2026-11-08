@@ -4,6 +4,8 @@ import { soundboardEngine } from '../services/audioEngine';
 import { storageRepository } from '../services/storageRepository';
 import { useLanguage } from '../i18n/LanguageContext';
 import { useConfirmDelete } from './ConfirmDialog';
+import { LabelChips, LabelEditor, LabelFilter, LabelOption } from './Labels';
+import { addLabelFilter, hasAllLabels } from '../services/labels';
 import {
   VolumeX,
   Plus,
@@ -19,12 +21,14 @@ import {
 
 interface SfxManagerViewProps {
   sfxCatalog: SfxItem[];
+  labelOptions: LabelOption[];
   onSaveSfx: (item: SfxItem) => void;
   onDeleteSfx: (id: string) => void;
 }
 
 export const SfxManagerView: React.FC<SfxManagerViewProps> = ({
   sfxCatalog,
+  labelOptions,
   onSaveSfx,
   onDeleteSfx,
 }) => {
@@ -32,6 +36,7 @@ export const SfxManagerView: React.FC<SfxManagerViewProps> = ({
   const confirmDelete = useConfirmDelete();
   const [, setTick] = useState(0);
   const [selectedCategory, setSelectedCategory] = useState<'all' | SfxCategory>('all');
+  const [labelFilter, setLabelFilter] = useState<string[]>([]);
   const [editingSfx, setEditingSfx] = useState<SfxItem | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
@@ -66,7 +71,9 @@ export const SfxManagerView: React.FC<SfxManagerViewProps> = ({
   }, []);
 
   const filtered = sfxCatalog.filter(
-    (s) => selectedCategory === 'all' || s.category === selectedCategory
+    (s) =>
+      (selectedCategory === 'all' || s.category === selectedCategory) &&
+      hasAllLabels(s.tags, labelFilter)
   );
 
   const activeIds = soundboardEngine.getActiveTrackIds();
@@ -126,6 +133,7 @@ export const SfxManagerView: React.FC<SfxManagerViewProps> = ({
               </option>
             ))}
           </select>
+          <LabelFilter options={labelOptions} selected={labelFilter} onChange={setLabelFilter} />
         </div>
 
         <div className="flex items-center gap-2">
@@ -149,7 +157,7 @@ export const SfxManagerView: React.FC<SfxManagerViewProps> = ({
       {/* Sound list */}
       {filtered.length === 0 ? (
         <p className="text-sm text-stone-500 py-6 text-center">
-          {tr('No sounds in this category.', 'Nessun suono in questa categoria.')}
+          {tr('No sounds match the current filters.', 'Nessun suono corrisponde ai filtri correnti.')}
         </p>
       ) : (
         <ul className="divide-y divide-stone-800/70 border border-stone-800 rounded-xl overflow-hidden">
@@ -185,6 +193,14 @@ export const SfxManagerView: React.FC<SfxManagerViewProps> = ({
                     {item.customAudioUrl && <Radio className="w-3 h-3 text-emerald-400 shrink-0" />}
                   </div>
                   <div className="text-xs text-stone-500 truncate">{item.description}</div>
+                  {item.tags.length > 0 && (
+                    <div className="pt-1">
+                      <LabelChips
+                        labels={item.tags}
+                        onPick={(l) => setLabelFilter((f) => addLabelFilter(f, l))}
+                      />
+                    </div>
+                  )}
                 </div>
 
                 <span className="hidden md:block text-xs text-stone-500 w-56 truncate text-right">
@@ -297,6 +313,17 @@ export const SfxManagerView: React.FC<SfxManagerViewProps> = ({
                   value={editingSfx.description}
                   onChange={(e) => setEditingSfx({ ...editingSfx, description: e.target.value })}
                   className="w-full px-3 py-1.5 rounded bg-stone-950 border border-stone-700 text-stone-200"
+                />
+              </div>
+
+              <div>
+                <label className="block text-stone-400 mb-1 font-semibold">
+                  {tr('Labels', 'Etichette')}
+                </label>
+                <LabelEditor
+                  value={editingSfx.tags}
+                  suggestions={labelOptions}
+                  onChange={(tags) => setEditingSfx({ ...editingSfx, tags })}
                 />
               </div>
 

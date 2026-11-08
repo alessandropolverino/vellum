@@ -103,7 +103,8 @@ node bin/vellum.mjs <command> [subcommand] [arguments] [options]
 ### Characters, PGs, NPCs & Monsters (`characters` / `pgs` / `chars`)
 - **List characters**:
   ```bash
-  npm run cli -- characters list [--kind <pc|npc|monster>] [--search <query>] [--tag <tag>] --json
+  npm run cli -- characters list [--kind <pc|npc|monster>] [--search <query>] [--label a,b] --json
+  # Labels (see "Labels" below): --labels a,b on create/update, or --add-label / --remove-label on update
   ```
 - **Get character**:
   ```bash
@@ -211,17 +212,39 @@ node bin/vellum.mjs <command> [subcommand] [arguments] [options]
 Images with a caption, taggable in scene text as `@asset[<name>]` (case-insensitive; the id also works). The image is optional. In the Live Console a click on the tag opens the image and lets the DM show it to all connected players or only some of them.
 - **List / get** (image data is omitted unless `--full`):
   ```bash
-  npm run cli -- assets list [--tag <tag>] [--search <query>] --json
+  npm run cli -- assets list [--label a,b] [--search <query>] --json
   npm run cli -- assets get <assetId> [--full] --json
   ```
 - **Create** (names must be unique and without `[ ]`; optional `--image` takes a png/jpg/webp/gif file path or a data URL):
   ```bash
-  npm run cli -- assets create --name "Tavern map" --image ./tavern.png --caption "The Silver Stag" --tags "map,tavern" --json
+  npm run cli -- assets create --name "Tavern map" --image ./tavern.png --caption "The Silver Stag" --labels "map,tavern" --json
   ```
 - **Update / delete**:
   ```bash
   npm run cli -- assets update <assetId> --caption "New caption" [--image ./new.png | --clear-image] --json
   npm run cli -- assets delete <assetId> --json
+  ```
+
+---
+
+### Sound effects (`sfx`)
+- **List / get / label**:
+  ```bash
+  npm run cli -- sfx list [--category <cat>] [--label a,b] [--search <query>] --json
+  npm run cli -- sfx get <sfxId> --json
+  npm run cli -- sfx update <sfxId> --add-label "tavern" --json
+  ```
+
+---
+
+### Labels (`labels`)
+Labels are free-text tags stored in the `tags` array of **characters (PCs, NPCs, monsters), sound effects and assets**. The app lets the DM edit them in each entity's editor and filter every list by them. They are **not** the `@character[...]` / `@asset[...]` markdown references used inside text.
+- **Set on an entity** (`characters`, `assets`, `sfx`): `--labels "a,b"` replaces them (`--tags` is a legacy alias), `--add-label "a,b"` and `--remove-label "a,b"` adjust them. Matching is case-insensitive and duplicates are dropped.
+- **Filter a list**: `--label "a,b"` (alias `--tag`) keeps only entities carrying **all** the given labels.
+- **Inspect / rename across entities**:
+  ```bash
+  npm run cli -- labels list --json
+  npm run cli -- labels rename "tavern" "inn" --json
   ```
 
 ---
