@@ -14,7 +14,8 @@
     "tauri": "tauri",
     "cli": "node bin/vellum.mjs",
     "release:bump": "node scripts/bump-version.mjs",
-    "fetch:cloudflared": "node scripts/fetch-cloudflared.mjs"
+    "fetch:cloudflared": "node scripts/fetch-cloudflared.mjs",
+    "check:bundle": "node scripts/check-bundle-resources.mjs"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.12.4",

@@ -14,6 +14,7 @@ echo [Vellum CLI] Error: Could not locate vellum.mjs in %SCRIPT_DIR% >&2
 exit /b 1
 
 :RunLocal
+if not exist "%SCRIPT_DIR%lib\args.mjs" goto :BrokenInstall
 node "%SCRIPT_DIR%vellum.mjs" %*
 exit /b %ERRORLEVEL%
 
@@ -28,4 +29,9 @@ exit /b %ERRORLEVEL%
 :NoNode
 echo [Vellum CLI] Error: Node.js was not found in PATH. >&2
 echo Please install Node.js from https://nodejs.org to execute Vellum CLI commands. >&2
+exit /b 1
+
+:BrokenInstall
+echo [Vellum CLI] Error: the "lib" folder is missing next to vellum.mjs in %SCRIPT_DIR% >&2
+echo The Vellum installation looks incomplete. Reinstall the latest Vellum version. >&2
 exit /b 1

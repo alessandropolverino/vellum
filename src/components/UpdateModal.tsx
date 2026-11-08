@@ -60,6 +60,14 @@ export const UpdateControl: React.FC = () => {
     try {
       // Safety copy first: a new version may migrate the database schema.
       await storageRepository.createBackup('pre-update');
+      // The installer replaces bin/cloudflared.exe: stop any live-session tunnel first so the
+      // file is not locked (the updater exits the app without a normal shutdown).
+      try {
+        const { invoke } = await import('@tauri-apps/api/core');
+        await invoke('live_stop');
+      } catch {
+        // Not fatal: the installer also terminates a leftover tunnel process.
+      }
       await update.downloadAndInstall((event) => {
         if (event.event === 'Started') {
           setProgress({ done: 0, total: event.data.contentLength ?? null });
